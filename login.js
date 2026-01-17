@@ -18,7 +18,7 @@ import {
 
 // -------------------------- CONFIGURAZIONE FIREBASE --------------------------
 const firebaseConfig = {
-    apiKey: "AIzaSyBCZqWbOdM2a89arMX18TMKqZI6BmeSsV",
+    apiKey: "AIzaSyBCZqWbOdM2a89arMX18TMKqZI6BmeSsVQ",
     authDomain: "personal-trainer-fe4cc.firebaseapp.com",
     projectId: "personal-trainer-fe4cc",
     storageBucket: "personal-trainer-fe4cc.firebasestorage.app",
