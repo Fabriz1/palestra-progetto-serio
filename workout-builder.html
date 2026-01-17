@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workout Builder - PT Platform</title>
+    <link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f172a">
+
+    <!-- Font e Icone -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Chart.js per i grafici a torta -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- CSS (Useremo un file dedicato per non sporcare style.css generale) -->
+    <link rel="stylesheet" href="builder-style.css">
+</head>
+<body>
+
+    <!-- OVERLAY PER MOBILE (Blocca accesso da telefono) -->
+    <div id="mobile-blocker">
+        <i class="ph ph-desktop" style="font-size: 48px; margin-bottom: 20px;"></i>
+        <h2>Usa un PC</h2>
+        <p>Il builder avanzato richiede uno schermo grande per gestire le tabelle e i grafici.</p>
+        <a href="dashboard-pt.html" class="btn-back-home">Torna alla Dashboard</a>
+    </div>
+
+    <!-- APP CONTAINER -->
+    <div class="builder-container">
+        
+        <!-- HEADER SUPERIORE -->
+        <header class="builder-header">
+            <div class="header-left">
+                <button id="btn-back" class="icon-btn"><i class="ph ph-arrow-left"></i></button>
+                <h1 contenteditable="true" id="workout-name">Nuova Scheda Allenamento</h1>
+            </div>
+            
+            <div class="header-center">
+                <select id="client-select">
+                    <option value="" disabled selected>Seleziona Cliente...</option>
+                    <!-- Popolato via JS -->
+                </select>
+                <div class="days-control">
+                    <label>Giorni:</label>
+                    <input type="number" id="num-days" value="3" min="1" max="7">
+                </div>
+            </div>
+
+            <div class="header-right">
+                <button class="btn-secondary" id="btn-import-excel"><i class="ph ph-microsoft-excel-logo"></i> Importa Excel</button>
+                <button class="btn-primary" id="btn-save-workout"><i class="ph ph-floppy-disk"></i> Salva Scheda</button>
+            </div>
+        </header>
+
+        <!-- AREA DI LAVORO (GRID) -->
+        <main class="workspace">
+            
+            <!-- COLONNA SINISTRA: EDITOR ESERCIZI -->
+            <section class="editor-panel">
+                <!-- TABS GIORNI (Giorno 1, Giorno 2...) -->
+                <div class="days-tabs" id="days-tabs-container">
+                    <button class="tab-btn active" data-day="1">Giorno 1</button>
+                    <button class="tab-btn" data-day="2">Giorno 2</button>
+                    <button class="tab-btn" data-day="3">Giorno 3</button>
+                </div>
+
+                <!-- CONTENUTO DEL GIORNO CORRENTE -->
+                <div class="day-content" id="day-content-area">
+                    
+                    <div class="exercises-list" id="exercises-list-day-1">
+                        <!-- QUI VERRANNO INSERITE LE RIGHE DEGLI ESERCIZI -->
+                        <!-- Esempio di riga esercizio (generata poi via JS) -->
+                        <!--
+                        <div class="exercise-row">
+                            <div class="drag-handle"><i class="ph ph-dots-six-vertical"></i></div>
+                            <input type="text" placeholder="Nome Esercizio" class="input-ex-name">
+                            <input type="text" placeholder="Sets" class="input-sets">
+                            <input type="text" placeholder="Reps" class="input-reps">
+                            <select class="select-muscle">...</select>
+                            ...
+                        </div>
+                        -->
+                    </div>
+
+                    <button class="btn-add-exercise" id="btn-add-ex">
+                        <i class="ph ph-plus-circle"></i> Aggiungi Esercizio
+                    </button>
+                    
+                </div>
+            </section>
+
+            <!-- COLONNA DESTRA: LIVE STATS -->
+            <section class="stats-panel">
+                <h3>Analisi Volume Live</h3>
+                
+                <div class="charts-container">
+                    <div class="chart-box">
+                        <canvas id="volumeChart"></canvas> <!-- Grafico a Torta -->
+                    </div>
+                </div>
+
+                <div class="stats-list" id="stats-breakdown">
+                    <!-- Lista testuale volumi -->
+                    <div class="stat-item">
+                        <span class="muscle-label">Pettorali</span>
+                        <span class="volume-value">0.0 Sets</span>
+                    </div>
+                </div>
+
+                <div class="tips-box">
+                    <h4>Legenda Calcolo</h4>
+                    <p><small>Primario: 1.0 | Secondario: <span id="val-sec">0.5</span> | Terziario: <span id="val-ter">0.3</span></small></p>
+                </div>
+            </section>
+
+        </main>
+    </div>
+<!-- MODALE DI SALVATAGGIO -->
+    <div id="save-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Salva Scheda</h3>
+                <button id="btn-close-modal" class="btn-icon-small"><i class="ph ph-x"></i></button>
+            </div>
+            
+            <div class="modal-body">
+                <p>Dove vuoi destinare questa scheda?</p>
+                
+                <!-- Opzione 1: Assegna a Cliente -->
+                <div class="save-option" id="opt-assign">
+                    <div class="radio-circle selected"></div>
+                    <div class="opt-content">
+                        <h4>Assegna a un Cliente</h4>
+                        <p>La scheda diventerà attiva per l'atleta selezionato.</p>
+                        <select id="modal-client-select" class="modal-select">
+                            <option value="" disabled selected>Scegli Atleta...</option>
+                            <!-- Popolato via JS -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Opzione 2: Salva in Archivio -->
+                <div class="save-option" id="opt-archive">
+                    <div class="radio-circle"></div>
+                    <div class="opt-content">
+                        <h4>Salva in Archivio / Modelli</h4>
+                        <p>Salva come template riutilizzabile in futuro.</p>
+                        <input type="text" id="modal-template-name" placeholder="Nome Modello (es. Ipertrofia Base)" class="modal-input hidden">
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button id="btn-confirm-save" class="btn-primary full-width">Conferma e Salva</button>
+            </div>
+        </div>
+    </div>
+    <!-- JS BUILDER -->
+    <script type="module" src="workout-builder.js"></script>
+</body>
+</html>

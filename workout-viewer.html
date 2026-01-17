@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Workout Session</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f172a">
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- CSS Nuovo -->
+    <link rel="stylesheet" href="viewer-style.css">
+</head>
+
+<body>
+
+    <!-- TOP NAV -->
+    <header class="session-header">
+        <button id="btn-back" class="circle-btn"><i class="ph ph-caret-left"></i></button>
+        <div class="header-titles">
+            <span class="sub-label">ALLENAMENTO</span>
+            <h1 id="day-title">Caricamento...</h1>
+        </div>
+        <div class="timer-container" id="session-timer-box">
+            <div class="timer-content" id="session-timer">0m</div>
+        </div>
+    </header>
+
+    <!-- LISTA ESERCIZI (Accordion) -->
+    <main class="exercises-stream" id="exercises-list">
+        <!-- Qui verranno iniettate le card -->
+        <!-- Esempio Card (Per visualizzazione mentale):
+        <div class="ex-card collapsed">
+            <div class="ex-summary">
+                <div class="ex-info">
+                    <h3>Panca Piana</h3>
+                    <span>4 Set x 10 Reps</span>
+                </div>
+                <div class="ex-status icon-ring"><i class="ph ph-caret-down"></i></div>
+            </div>
+            <div class="ex-details">
+                ... Inputs ...
+            </div>
+        </div>
+        -->
+    </main>
+
+    <!-- ACTION BAR FISSA IN BASSO -->
+    <footer class="action-bar">
+        <button id="btn-finish" class="btn-finish-slide">
+            <div class="slide-track">
+                <span class="slide-text">SCORRI PER FINIRE</span>
+                <div class="slide-knob"><i class="ph ph-check"></i></div>
+            </div>
+        </button>
+    </footer>
+
+    <!-- TIMER RECUPERO (Overlay) -->
+    <div id="rest-overlay" class="rest-overlay hidden">
+        <div class="rest-modal">
+            <div class="rest-circle">
+                <svg viewBox="0 0 100 100">
+                    <circle class="bg" cx="50" cy="50" r="45"></circle>
+                    <circle class="progress" cx="50" cy="50" r="45" id="timer-circle"></circle>
+                </svg>
+                <div class="time-text" id="rest-countdown">01:30</div>
+            </div>
+            <div class="rest-actions">
+                <button class="btn-pill secondary" id="btn-add-30">+30s</button>
+                <button class="btn-pill primary" id="btn-skip-rest">RIPRENDI</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT -->
+    <script type="module" src="workout-viewer.js"></script>
+</body>
+
+</html>

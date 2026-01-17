@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coach Dashboard - PT Platform</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f172a">
+
+    <!-- Font Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Icone Phosphor (Stile molto pulito/Apple) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- CSS -->
+    <link rel="stylesheet" href="style.css">
+    <!-- CSS Specifico Dashboard (lo aggiungeremo al file style.css tra poco) -->
+</head>
+
+<body>
+
+    <div class="app-container">
+
+        <!-- SIDEBAR (Navigazione Sinistra) -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-small">PT</div>
+                <span class="brand-name">Platform</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <!-- I data-target servono al JS per cambiare scheda -->
+                <button class="nav-link" data-target="section-home">
+                    <i class="ph ph-house"></i>
+                    <span>Home</span>
+                    <span id="requests-badge" class="badge hidden">0</span> <!-- Pallino rosso notifiche -->
+                </button>
+
+                <button class="nav-link active" data-target="section-stats">
+                    <i class="ph ph-chart-bar"></i>
+                    <span>Stats & Clienti</span>
+                </button>
+
+                <button class="nav-link" data-target="section-schede">
+                    <i class="ph ph-notebook"></i>
+                    <span>Schede</span>
+                </button>
+
+                <button class="nav-link" data-target="section-chat">
+                    <i class="ph ph-chat-circle-dots"></i>
+                    <span>Messaggi</span>
+                </button>
+
+                <button class="nav-link" data-target="section-settings">
+                    <i class="ph ph-gear"></i>
+                    <span>Impostazioni</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-mini-profile">
+                    <img id="pt-avatar" src="" alt="Avatar" class="avatar-circle"> <!-- Foto Google -->
+                    <div class="user-info">
+                        <h4 id="pt-name">Caricamento...</h4>
+                        <span class="user-role">Coach</span>
+                    </div>
+                </div>
+                <button id="logout-btn" class="logout-icon"><i class="ph ph-sign-out"></i></button>
+            </div>
+        </aside>
+
+        <!-- AREA CONTENUTI PRINCIPALE -->
+        <main class="main-content">
+
+            <!-- HEADER SUPERIORE -->
+            <header class="top-bar">
+                <h2 id="page-title">Panoramica Clienti</h2>
+                <div class="date-display" id="current-date">--/--/----</div>
+            </header>
+
+            <!-- SEZIONE 1: HOME (Richieste e Novità) -->
+            <section id="section-home" class="content-section hidden">
+                <div class="welcome-banner">
+                    <h3>Bentornato, Coach! 👋</h3>
+                    <p>Hai <span id="pending-requests-count">0</span> nuove richieste di adesione.</p>
+                </div>
+
+                <div class="requests-container">
+                    <h4>Richieste in attesa</h4>
+                    <div id="requests-list" class="list-placeholder">
+                        <p>Nessuna nuova richiesta al momento.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SEZIONE 2: STATS (Quella che volevi come principale) -->
+            <section id="section-stats" class="content-section">
+                <!-- Filtri veloci -->
+                <div class="stats-controls">
+                    <input type="text" placeholder="Cerca atleta..." class="search-bar">
+                    <div class="view-toggles">
+                        <button class="toggle-btn active">Griglia</button>
+                        <button class="toggle-btn">Lista</button>
+                    </div>
+                </div>
+
+                <!-- Griglia dei Clienti (Qui verranno iniettati via JS) -->
+                <div class="clients-grid" id="clients-grid">
+                    <!-- Esempio di come apparirà una Card Cliente (Statico per ora) -->
+                    <!-- Verrà popolato da Firebase -->
+                    <div class="client-card placeholder-card">
+                        <div class="client-header">
+                            <div class="client-avatar">MB</div>
+                            <div>
+                                <h4>Mario Bianchi</h4>
+                                <span class="status-badge positive">+15% Forza</span>
+                            </div>
+                        </div>
+
+                        <button class="btn-details">Vedi Analisi</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SEZIONE 3: SCHEDE -->
+            <!-- SOSTITUISCI TUTTO IL BLOCCO <section id="section-schede"> CON QUESTO -->
+            <section id="section-schede" class="content-section hidden">
+                <div class="section-header-row">
+                    <h3>Gestione Schede</h3>
+                    <button class="btn-primary" id="btn-create-workout">
+                        <i class="ph ph-plus"></i> Nuova Scheda
+                    </button>
+                </div>
+
+                <!-- Sotto-navigazione interna -->
+                <div class="tabs-subnav">
+                    <button class="subnav-btn active" id="tab-active-workouts">Schede Clienti Attive</button>
+                    <button class="subnav-btn" id="tab-archive-workouts">Archivio</button>
+                </div>
+
+                <!-- LISTA SCHEDE ATTIVE -->
+                <div id="view-active-workouts" class="workouts-view">
+                    <div class="table-container">
+                        <div class="table-header-row">
+                            <span class="col-name">Nome Scheda</span>
+                            <span class="col-client">Assegnata a</span>
+                            <span class="col-date">Data Creazione</span>
+                            <span class="col-actions">Azioni</span>
+                        </div>
+                        <div id="list-active-workouts" class="table-body">
+                            <!-- Qui il JS inserirà le righe -->
+                            <p class="empty-msg">Caricamento schede...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LISTA ARCHIVIO -->
+                <div id="view-archive-workouts" class="workouts-view hidden">
+                    <div class="table-container">
+                        <div class="table-header-row">
+                            <span class="col-name">Nome Scheda</span>
+                            <span class="col-days">Giorni</span>
+                            <span class="col-date">Data Creazione</span>
+                            <span class="col-actions">Azioni</span>
+                        </div>
+                        <div id="list-archive-workouts" class="table-body">
+                            <!-- Qui il JS inserirà le righe -->
+                            <p class="empty-msg">Nessuna scheda in archivio.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SEZIONE 4: CHAT -->
+            <section id="section-chat" class="content-section hidden">
+                <div class="chat-layout">
+                    <div class="chat-sidebar">
+                        <!-- Lista conversazioni -->
+                        <div class="chat-list-item active">
+                            <div class="avatar-small">MB</div>
+                            <div class="chat-preview">
+                                <h5>Mario Bianchi</h5>
+                                <p>Grazie coach, a domani!</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-window">
+                        <!-- Finestra messaggi -->
+                        <div class="messages-area">
+                            <p class="system-msg">Seleziona una chat per iniziare</p>
+                        </div>
+                        <div class="message-input-area">
+                            <input type="text" placeholder="Scrivi un messaggio...">
+                            <button class="send-btn"><i class="ph ph-paper-plane-right"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SEZIONE 5: IMPOSTAZIONI (Profilo + Volumi) -->
+            <!-- SEZIONE IMPOSTAZIONI AGGIORNATA -->
+            <section id="section-settings" class="content-section hidden">
+                <div class="settings-container" style="max-width: 800px; margin: 0 auto;">
+
+                    <h2>Impostazioni Profilo & Metodo</h2>
+
+                    <!-- 1. PROFILO COACH -->
+                    <div class="settings-card">
+                        <h3>Il tuo Profilo</h3>
+                        <div class="profile-edit-row"
+                            style="display: flex; gap: 20px; align-items: start; margin-bottom: 20px;">
+                            <!-- Anteprima Foto -->
+                            <div class="avatar-upload-wrapper" style="text-align: center;">
+                                <img id="settings-avatar-preview" src=""
+                                    style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #E5E5EA; display: block; margin-bottom: 10px;">
+                                <button class="btn-small-outline" id="btn-change-photo"
+                                    style="font-size: 11px; padding: 4px 8px;">Cambia Foto</button>
+                                <input type="file" id="input-photo-file" accept="image/*" style="display: none;">
+                            </div>
+
+                            <div style="flex-grow: 1;">
+                                <label class="input-label">Nome Visualizzato</label>
+                                <input type="text" id="settings-name" class="full-width-input"
+                                    placeholder="Il tuo nome">
+
+                                <label class="input-label" style="margin-top: 10px;">Biografia / Presentazione</label>
+                                <textarea id="settings-bio" class="full-width-input" rows="3"
+                                    placeholder="Scrivi qualcosa su di te che i clienti vedranno..."></textarea>
+                            </div>
+                        </div>
+
+                        <div class="invite-hero-card">
+                            <div class="invite-content">
+                                <label>IL TUO CODICE TEAM</label>
+                                <div class="code-big-display">
+                                    <span id="display-trainer-code">...</span>
+                                </div>
+                                <p>Condividi questo codice con i tuoi atleti per collegarli al tuo account.</p>
+                            </div>
+                            <button class="copy-btn-large copy-btn">
+                                <i class="ph ph-copy"></i> Copia Codice
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 2. PARAMETRI VOLUME -->
+                    <div class="settings-card">
+                        <h3>Parametri Calcolo Volume</h3>
+                        <p class="info-text">Definisci quanto contano i muscoli sinergici nel calcolo del volume totale
+                            (1 set = x volume).</p>
+
+                        <div class="volume-inputs-grid"
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin-top: 20px;">
+                            <div class="input-group">
+                                <label>Primario (Fisso)</label>
+                                <input type="number" value="1.0" disabled style="background: #F2F2F7;">
+                            </div>
+                            <div class="input-group">
+                                <label>Secondario</label>
+                                <input type="number" step="0.05" id="vol-secondary" placeholder="0.5">
+                            </div>
+                            <div class="input-group">
+                                <label>Terziario</label>
+                                <input type="number" step="0.05" id="vol-tertiary" placeholder="0.3">
+                            </div>
+                            <div class="input-group">
+                                <label>Quaternario</label>
+                                <input type="number" step="0.05" id="vol-quaternary" placeholder="0.15">
+                            </div>
+                            <div class="input-group">
+                                <label>Altro</label>
+                                <input type="number" step="0.05" id="vol-other" placeholder="0.1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TASTO SALVA -->
+                    <div class="save-bar" style="align-items: center; text-align: center; margin-top: 20px;">
+                        <button class="btn-primary" id="btn-save-settings-all"
+                            style="align-items: center; text-align: center;">Salva Modifiche</button>
+                    </div>
+
+                </div>
+            </section>
+
+        </main>
+    </div>
+    <!-- PANNELLO DETTAGLIO CLIENTE (SLIDE-OVER) -->
+    <!-- PANNELLO DETTAGLIO CLIENTE (FULL SCREEN) -->
+    <div id="client-detail-panel" class="slide-panel hidden">
+        <!-- CONTENITORE FOGLIO BIANCO -->
+        <div class="slide-panel-inner">
+
+            <!-- HEADER (Fisso in alto) -->
+            <div class="slide-header">
+                <button id="btn-close-client" class="btn-icon"><i class="ph ph-x"></i></button>
+                <div class="client-title-info">
+                    <h2 id="detail-client-name">Caricamento...</h2>
+                    <span id="detail-client-email">...</span>
+                </div>
+                <div class="slide-actions">
+                    <button class="btn-secondary small">Archivia</button>
+                    <button class="btn-primary small">Chat</button>
+                </div>
+            </div>
+
+            <!-- BODY SCROLLABILE -->
+            <div class="slide-body">
+
+                <!-- TABS -->
+                <div class="client-tabs">
+                    <button class="c-tab active" data-tab="c-tab-overview">Panoramica</button>
+                    <button class="c-tab" data-tab="c-tab-body">Misure & Peso</button>
+                    <button class="c-tab" data-tab="c-tab-lifts">Carichi & Grafici</button>
+                </div>
+
+                <!-- CONTENUTO 1: PANORAMICA -->
+                <div id="c-tab-overview" class="c-tab-content">
+                    <div class="info-grid">
+                        <div class="info-box">
+                            <label>Scheda Attiva</label>
+                            <strong id="detail-active-workout">-</strong>
+                        </div>
+                        <div class="info-box">
+                            <label>Ultimo Accesso</label>
+                            <strong id="detail-last-login">-</strong>
+                        </div>
+                        <div class="info-box">
+                            <label>Stato Forma</label>
+                            <strong class="text-green">In Progresso</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CONTENUTO 2: MISURE (Form e Tabella) -->
+                <div id="c-tab-body" class="c-tab-content hidden">
+
+                    <!-- LISTA -->
+                    <div id="view-measures-list">
+                        <div class="measures-actions">
+                            <h3>Storico Monitoraggi</h3>
+                            <button id="btn-show-add-measure" class="btn-primary-outline">
+                                <i class="ph ph-plus"></i> Nuova Rilevazione
+                            </button>
+                        </div>
+                        <div class="table-wrapper">
+                            <table class="measures-table">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Peso</th>
+                                        <th>BF %</th>
+                                        <th>Muscolo kg</th>
+                                        <th>Somma Pliche</th>
+                                        <th>Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="measures-list-body">
+                                    <!-- JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- FORM (Nascosto) -->
+                    <div id="view-measure-form" class="hidden">
+                        <div class="form-header">
+                            <h3>Nuova Rilevazione Completa</h3>
+                            <div class="form-actions">
+                                <button id="btn-cancel-input" class="btn-secondary">Annulla</button>
+                                <button id="btn-save-full-measure" class="btn-primary">Salva Dati</button>
+                            </div>
+                        </div>
+                        <!-- GRIGLIA INPUT (Copiata da prima) -->
+                        <div class="measure-form-grid">
+                            <div class="form-section">
+                                <h4>Generali & Cardio</h4>
+                                <div class="input-grid-3">
+                                    <div class="inp-wrap"><label>Data</label><input type="date" id="m-date"></div>
+                                    <div class="inp-wrap"><label>Peso (kg)</label><input type="number" step="0.1"
+                                            id="m-weight"></div>
+                                    <div class="inp-wrap"><label>Altezza (cm)</label><input type="number" id="m-height">
+                                    </div>
+                                    <div class="inp-wrap"><label>FC Riposo</label><input type="number" id="m-rhr"></div>
+                                    <div class="inp-wrap"><label>FC Max</label><input type="number" id="m-hrmax"></div>
+                                    <div class="inp-wrap"><label>VO2 Max</label><input type="number" id="m-vo2"></div>
+                                </div>
+                            </div>
+                            <div class="form-section">
+                                <h4>Composizione (BIA)</h4>
+                                <div class="input-grid-3">
+                                    <div class="inp-wrap"><label>Massa Grassa %</label><input type="number" step="0.1"
+                                            id="m-fat-perc"></div>
+                                    <div class="inp-wrap"><label>Muscolo kg</label><input type="number" step="0.1"
+                                            id="m-muscle-kg"></div>
+                                    <div class="inp-wrap"><label>Acqua %</label><input type="number" step="0.1"
+                                            id="m-water"></div>
+                                    <div class="inp-wrap"><label>Osso kg</label><input type="number" step="0.1"
+                                            id="m-bone"></div>
+                                    <div class="inp-wrap"><label>Viscerale</label><input type="number" step="0.1"
+                                            id="m-visceral"></div>
+                                    <div class="inp-wrap"><label>BMR (kcal)</label><input type="number" id="m-bmr">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-section">
+                                <h4>Pliche (mm)</h4>
+                                <div class="input-grid-3">
+                                    <div class="inp-wrap"><label>Pettorale</label><input type="number" step="0.1"
+                                            id="p-chest"></div>
+                                    <div class="inp-wrap"><label>Addome</label><input type="number" step="0.1"
+                                            id="p-abs"></div>
+                                    <div class="inp-wrap"><label>Coscia</label><input type="number" step="0.1"
+                                            id="p-thigh"></div>
+                                    <div class="inp-wrap"><label>Tricipite</label><input type="number" step="0.1"
+                                            id="p-tricep"></div>
+                                    <div class="inp-wrap"><label>Sottoscapolare</label><input type="number" step="0.1"
+                                            id="p-subscap"></div>
+                                    <div class="inp-wrap"><label>Sovrailiaca</label><input type="number" step="0.1"
+                                            id="p-supra"></div>
+                                </div>
+                            </div>
+                            <div class="form-section">
+                                <h4>Circonferenze (cm)</h4>
+                                <div class="input-grid-4">
+                                    <div class="inp-wrap"><label>Collo</label><input type="number" step="0.1"
+                                            id="c-neck"></div>
+                                    <div class="inp-wrap"><label>Spalle</label><input type="number" step="0.1"
+                                            id="c-shoulders"></div>
+                                    <div class="inp-wrap"><label>Petto</label><input type="number" step="0.1"
+                                            id="c-chest"></div>
+                                    <div class="inp-wrap"><label>Braccio</label><input type="number" step="0.1"
+                                            id="c-arm-relax"></div>
+                                    <div class="inp-wrap"><label>Vita</label><input type="number" step="0.1"
+                                            id="c-waist"></div>
+                                    <div class="inp-wrap"><label>Fianchi</label><input type="number" step="0.1"
+                                            id="c-hips"></div>
+                                    <div class="inp-wrap"><label>Coscia</label><input type="number" step="0.1"
+                                            id="c-thigh"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CONTENUTO 3: GRAFICI -->
+                <!-- TAB 3: CARICHI & GRAFICI (Dashboard PT) -->
+                <!-- TAB 3: ANALISI & PROGRESSI (Rifatto) -->
+                <!-- TAB 3: CARICHI & GRAFICI (Struttura Storico) -->
+                <div id="c-tab-lifts" class="c-tab-content hidden">
+
+                    <!-- STANZA 1: LISTA STORICO SCHEDE -->
+                    <div id="view-history" class="fade-in">
+                        <div class="history-header">
+                            <h3>Storico Programmi</h3>
+                            <p>Seleziona una scheda per analizzare i progressi.</p>
+                        </div>
+
+                        <div id="workout-history-list" class="history-list">
+                            <!-- JS inserirà qui le card delle schede -->
+                            <!-- Esempio:
+            <div class="history-card">
+                <div class="hc-info">
+                    <h4>Ipertrofia A</h4>
+                    <span>Assegnata: 12 Gen 2024</span>
+                </div>
+                <div class="hc-status active">ATTIVA</div>
+                <i class="ph ph-caret-right"></i>
+            </div>
+            -->
+                            <p class="empty-msg">Caricamento storico...</p>
+                        </div>
+                    </div>
+
+                    <!-- STANZA 2: ANALISI DETTAGLIO (Nascosta) -->
+                    <div id="view-analysis" class="hidden fade-in">
+
+                        <!-- Header Navigazione -->
+                        <div class="analysis-nav-header">
+                            <div style="display:flex; align-items:center; gap:15px;">
+                                <button class="btn-back-text" onclick="closeWorkoutAnalysis()">
+                                    <i class="ph ph-arrow-left"></i> Torna
+                                </button>
+                                <h2 id="analysis-title">Nome Scheda</h2>
+                            </div>
+
+                            <!-- NUOVO BOTTONE STORICO -->
+                            <button class="btn-secondary-outline small" onclick="openLogHistoryPanel()">
+                                <i class="ph ph-scroll"></i> Diario Logs
+                            </button>
+                        </div>
+
+                        <!-- Barra Controlli Grafici -->
+                        <div class="analysis-controls">
+                            <div class="toggle-group">
+                                <button class="toggle-chip active"
+                                    onclick="setAnalysisType(this, 'exercise')">Esercizi</button>
+                                <button class="toggle-chip" onclick="setAnalysisType(this, 'muscle')">Muscoli</button>
+                                <button class="toggle-chip" onclick="setAnalysisType(this, 'session')">Sedute</button>
+                            </div>
+                            <!-- Nota: Ho tolto il selettore date perché analizzeremo l'intera durata della scheda selezionata -->
+                            <div style="flex-grow: 1; display: flex; gap: 10px; justify-content: flex-end;">
+                                <input type="text" id="analysis-search" class="analysis-search" placeholder="Cerca...">
+                                <button class="analysis-sort-btn" onclick="toggleSortOrder()" id="btn-sort">
+                                    <i class="ph ph-sort-descending"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Lista Grafici (Accordion) -->
+                        <div id="analysis-list-container" class="analysis-list">
+                            <!-- Qui appariranno i grafici come prima -->
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    <!-- PANNELLO STORICO LOG (Slide Over Full) -->
+    <div id="log-history-panel" class="slide-panel-right hidden">
+        <div class="slide-header">
+            <div class="slide-title">
+                <h3>Registro Allenamenti</h3>
+                <p>Cronologia dettagliata delle sessioni salvate</p>
+            </div>
+            <button class="btn-icon" onclick="closeLogHistoryPanel()">
+                <i class="ph ph-x"></i>
+            </button>
+        </div>
+        <div id="log-history-body" class="slide-content-scroll">
+            <!-- Qui il JS inietterà le card degli allenamenti -->
+        </div>
+    </div>
+    <!-- MODALE AGGIUNGI MISURA (Piccola) -->
+    <!-- JS DASHBOARD -->
+    <script type="module" src="dashboard-pt.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dashboard Atleta</title>
+    <link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f172a">
+
+    <!-- Font Inter & Icone -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Chart.js per i Grafici -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- CSS Specifico -->
+    <link rel="stylesheet" href="client-style.css">
+</head>
+<body>
+
+    <div class="app-wrapper">
+        
+        <!-- HEADER FISSO -->
+        <header class="app-header">
+            <div class="header-user" onclick="switchTab('view-profile')"> <!-- Cliccando vai al profilo -->
+                <img id="header-avatar" src="" class="avatar-circle">
+                <div class="header-texts">
+                    <span class="greeting">Bentornato,</span>
+                    <h2 id="header-name">Caricamento...</h2>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="icon-btn" id="btn-notifications">
+                    <i class="ph ph-bell"></i>
+                    <span class="badge-dot hidden"></span>
+                </button>
+            </div>
+        </header>
+
+        <!-- AREA CONTENUTO SCROLLABILE -->
+        <main class="content-area">
+            
+            <!-- 1. HOME: PANORAMICA -->
+            <section id="view-home" class="view-section active">
+                
+                <!-- Hero Card Scheda -->
+                <div class="hero-card" id="hero-workout-card">
+                    <div class="hero-bg"></div>
+                    <div class="hero-content">
+                        <span class="status-pill">SCHEDA ATTIVA</span>
+                        <h3 id="hero-workout-title">Nessuna Scheda</h3>
+                        <div class="hero-meta">
+                            <span><i class="ph ph-calendar-blank"></i> Settimana 1</span>
+                            <span id="hero-days-count"><i class="ph ph-barbell"></i> - Giorni</span>
+                        </div>
+                        <button class="btn-hero-action" id="btn-goto-program">
+                            VAI AL PROGRAMMA <i class="ph ph-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Statistiche Rapide -->
+                <div class="stats-row">
+                    <div class="stat-box">
+                        <span class="stat-val" id="stat-weight">-</span>
+                        <span class="stat-lbl">Peso Kg</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-val" id="stat-workouts">-</span>
+                        <span class="stat-lbl">Allenamenti</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-val text-green" id="stat-streak">🔥</span>
+                        <span class="stat-lbl">Costanza</span>
+                    </div>
+                </div>
+
+                <!-- Anteprima Chat -->
+                <div class="section-block">
+                    <div class="block-header">
+                        <h4>Messaggi Coach</h4>
+                        <span class="link-action" onclick="switchTab('view-chat')">Apri Chat</span>
+                    </div>
+                    <div class="msg-preview-card" onclick="switchTab('view-chat')">
+                        <div class="msg-avatar"><i class="ph ph-chat-circle-text"></i></div>
+                        <div class="msg-content">
+                            <strong>Coach</strong>
+                            <p id="home-last-msg">Nessun nuovo messaggio.</p>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- 2. SCHEDA: LISTA GIORNI -->
+            <section id="view-program" class="view-section hidden">
+                <div class="page-title">
+                    <h2>Il tuo Allenamento</h2>
+                    <p>Seleziona la seduta da svolgere oggi.</p>
+                </div>
+                
+                <div id="workout-days-list" class="days-list-wrapper">
+                    <!-- JS inserirà qui le card dei giorni -->
+                    <div class="empty-state">
+                        <i class="ph ph-clipboard-text"></i>
+                        <p>Il coach non ti ha ancora assegnato una scheda.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. CHAT -->
+            <section id="view-chat" class="view-section hidden full-height">
+                <div class="chat-wrapper">
+                    <div class="chat-feed" id="client-chat-msgs">
+                        <!-- Messaggi -->
+                    </div>
+                    <div class="chat-input-bar">
+                        <input type="text" id="chat-input" placeholder="Scrivi un messaggio...">
+                        <button id="btn-send-chat"><i class="ph ph-paper-plane-right"></i></button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. PROGRESSI (ANALISI AVANZATA) -->
+            <section id="view-progress" class="view-section hidden">
+                <div class="page-title">
+                    <h2>Analisi Progressi</h2>
+                </div>
+
+                <!-- Filtri Grafico -->
+                <div class="chart-controls">
+                    <!-- 1. Tipo di Analisi -->
+                    <div class="control-row">
+                        <button class="filter-chip active" data-type="exercise">Esercizio</button>
+                        <button class="filter-chip" data-type="muscle">Muscolo</button>
+                        <button class="filter-chip" data-type="session">Seduta</button>
+                        <button class="filter-chip" data-type="body">Peso Corporeo</button>
+                    </div>
+
+                    <!-- 2. Selezione Specifica (es. quale esercizio?) -->
+                    <div class="control-row mt-10">
+                        <select id="chart-selector" class="chart-select">
+                            <option>Seleziona...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Area Grafico -->
+                <div class="chart-card">
+                    <canvas id="progressChart"></canvas>
+                </div>
+
+                <!-- Statistiche Testuali sotto il grafico -->
+                <div class="chart-stats-grid" id="chart-stats-details">
+                    <div class="mini-stat">
+                        <label>Massimo</label>
+                        <strong>-</strong>
+                    </div>
+                    <div class="mini-stat">
+                        <label>Media</label>
+                        <strong>-</strong>
+                    </div>
+                    <div class="mini-stat">
+                        <label>Ultimo</label>
+                        <strong>-</strong>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. PROFILO (Editabile) -->
+            <section id="view-profile" class="view-section hidden">
+                <div class="page-title">
+                    <h2>Il tuo Profilo</h2>
+                </div>
+
+                <div class="profile-card">
+                    <div class="profile-photo-edit">
+                        <img id="profile-img-large" src="" class="avatar-xl">
+                        <button class="btn-cam" onclick="document.getElementById('edit-photo-input').click()">
+                            <i class="ph ph-camera"></i>
+                        </button>
+                        <input type="file" id="edit-photo-input" accept="image/*" hidden>
+                    </div>
+
+                    <div class="form-stack">
+                        <div class="inp-box">
+                            <label>Obiettivo</label>
+                            <textarea id="prof-goals" rows="2"></textarea>
+                        </div>
+                        <div class="inp-box">
+                            <label>Storia Sportiva</label>
+                            <textarea id="prof-history" rows="2"></textarea>
+                        </div>
+                        <div class="inp-box">
+                            <label>Infortuni / Dolori</label>
+                            <textarea id="prof-injuries" rows="2"></textarea>
+                        </div>
+                        <div class="inp-box">
+                            <label>Note Generali</label>
+                            <textarea id="prof-notes" rows="2"></textarea>
+                        </div>
+                    </div>
+
+                    <button id="btn-save-profile" class="btn-primary full-width mt-20">Salva Modifiche</button>
+                    <button id="btn-logout" class="btn-danger-text mt-10">Esci</button>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- BOTTOM NAV BAR -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-target="view-home">
+                <i class="ph ph-house"></i>
+                <span>Home</span>
+            </button>
+            <button class="nav-item" data-target="view-program">
+                <i class="ph ph-barbell"></i>
+                <span>Scheda</span>
+            </button>
+            <button class="nav-item" data-target="view-chat">
+                <i class="ph ph-chat-circle"></i>
+                <span>Chat</span>
+            </button>
+            <button class="nav-item" data-target="view-progress">
+                <i class="ph ph-chart-line-up"></i>
+                <span>Progressi</span>
+            </button>
+        </nav>
+
+    </div>
+
+    <!-- SCRIPT -->
+    <script type="module" src="dashboard-client.js"></script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Benvenuto - Setup Profilo</title>
+    <link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f172a">
+
+    <!-- Font e Icone -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- CSS (Lo creeremo nello step successivo) -->
+    <link rel="stylesheet" href="onboarding-style.css">
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <!-- BARRA PROGRESSO SUPERIORE -->
+        <div class="progress-header">
+            <div class="progress-track">
+                <div class="progress-fill" id="progress-bar" style="width: 20%"></div>
+            </div>
+        </div>
+
+        <!-- CONTENITORE STEP (Slider) -->
+        <div class="wizard-slider" id="wizard-slider">
+
+            <!-- STEP 1: CODICE COACH -->
+            <div class="step-slide active" data-step="1">
+                <div class="step-content centered">
+                    <div class="icon-circle"><i class="ph ph-lock-key"></i></div>
+                    <h1>Codice Accesso</h1>
+                    <p>Inserisci il codice univoco fornito dal tuo Coach per entrare nel team.</p>
+                    
+                    <input type="text" id="inp-code" class="input-big-code" placeholder="CODICE" maxlength="6" autocomplete="off">
+                    <p id="code-error-msg" class="error-msg hidden">Codice non trovato.</p>
+                </div>
+                <div class="step-footer">
+                    <button class="btn-primary" onclick="nextStep(1)">Verifica Codice</button>
+                </div>
+            </div>
+
+            <!-- STEP 2: DATI PERSONALI & FOTO -->
+            <div class="step-slide" data-step="2">
+                <div class="step-content">
+                    <h2>Chi sei?</h2>
+                    <p>Carica una foto per farti riconoscere dal coach.</p>
+                    
+                    <div class="photo-upload-area" id="photo-area">
+                        <img id="img-preview" src="" class="hidden">
+                        <div class="photo-placeholder">
+                            <i class="ph ph-camera-plus"></i>
+                            <span>Tocca per caricare</span>
+                        </div>
+                        <input type="file" id="inp-photo" accept="image/*" hidden>
+                    </div>
+
+                    <label class="lbl">Nome e Cognome</label>
+                    <input type="text" id="inp-name" class="input-std" placeholder="Mario Rossi">
+                    
+                    <label class="lbl">Età</label>
+                    <input type="number" id="inp-age" class="input-std" placeholder="Anni">
+                </div>
+                <div class="step-footer">
+                    <button class="btn-primary" onclick="nextStep(2)">Continua</button>
+                </div>
+            </div>
+
+            <!-- STEP 3: OBIETTIVO (Selezione) -->
+            <div class="step-slide" data-step="3">
+                <div class="step-content">
+                    <h2>Il tuo Obiettivo</h2>
+                    <p>Seleziona l'obiettivo principale.</p>
+                    
+                    <div class="grid-options single-select" id="grid-goals">
+                        <button class="opt-card" data-val="Dimagrimento">
+                            <span class="emoji">🔥</span> Dimagrimento
+                        </button>
+                        <button class="opt-card" data-val="Ipertrofia">
+                            <span class="emoji">💪</span> Ipertrofia
+                        </button>
+                        <button class="opt-card" data-val="Forza">
+                            <span class="emoji">🏋️‍♂️</span> Forza
+                        </button>
+                        <button class="opt-card" data-val="Ricomposizione">
+                            <span class="emoji">⚖️</span> Ricomposizione
+                        </button>
+                        <button class="opt-card" data-val="Salute">
+                            <span class="emoji">❤️</span> Salute
+                        </button>
+                        <button class="opt-card" data-val="Performance">
+                            <span class="emoji">⚡</span> Performance
+                        </button>
+                    </div>
+                </div>
+                <div class="step-footer">
+                    <button class="btn-primary" onclick="nextStep(3)">Continua</button>
+                </div>
+            </div>
+
+            <!-- STEP 4: SPORT (Multipla) -->
+            <div class="step-slide" data-step="4">
+                <div class="step-content">
+                    <h2>Sport Passati</h2>
+                    <p>Cosa hai praticato? (Scorri per altro)</p>
+                    
+                    <div class="grid-options multi-select" id="grid-sports">
+                        <button class="opt-card" data-val="Calcio">⚽ Calcio</button>
+                        <button class="opt-card" data-val="Basket">🏀 Basket</button>
+                        <button class="opt-card" data-val="Nuoto">🏊‍♂️ Nuoto</button>
+                        <button class="opt-card" data-val="Tennis">🎾 Tennis</button>
+                        <button class="opt-card" data-val="Palestra">🏋️‍♂️ Sala Pesi</button>
+                        <button class="opt-card" data-val="Crossfit">🤸‍♂️ Crossfit</button>
+                        <button class="opt-card" data-val="Corsa">🏃‍♂️ Corsa</button>
+                        <button class="opt-card" data-val="Arti Marziali">🥋 Arti Marziali</button>
+                        <button class="opt-card" data-val="Pallavolo">🏐 Pallavolo</button>
+                    </div>
+                    
+                    <label class="lbl mt-20">Altro (opzionale)</label>
+                    <input type="text" id="inp-sport-other" class="input-std" placeholder="Es. Rugby...">
+                </div>
+                <div class="step-footer">
+                    <button class="btn-primary" onclick="nextStep(4)">Continua</button>
+                </div>
+            </div>
+
+            <!-- STEP 5: DETTAGLI FISICI -->
+            <div class="step-slide" data-step="5">
+                <div class="step-content">
+                    <h2>Condizione Fisica</h2>
+                    
+                    <label class="lbl">Infortuni o Dolori (passati o presenti)</label>
+                    <div class="grid-options multi-select" id="grid-injuries">
+                        <button class="opt-card small" data-val="Nessuno">Nessuno</button>
+                        <button class="opt-card small" data-val="Schiena">Schiena</button>
+                        <button class="opt-card small" data-val="Ginocchia">Ginocchia</button>
+                        <button class="opt-card small" data-val="Spalle">Spalle</button>
+                        <button class="opt-card small" data-val="Collo">Collo</button>
+                    </div>
+                    <input type="text" id="inp-injuries-detail" class="input-std mt-10" placeholder="Dettagli (es. crociato rotto 2018)...">
+
+                    <label class="lbl mt-20">Problemi Posturali (diagnosticati)</label>
+                    <div class="grid-options multi-select" id="grid-posture">
+                        <button class="opt-card small" data-val="Nessuno">Nessuno</button>
+                        <button class="opt-card small" data-val="Scoliosi">Scoliosi</button>
+                        <button class="opt-card small" data-val="Cifosi">Cifosi</button>
+                        <button class="opt-card small" data-val="Lordosi">Iperlordosi</button>
+                    </div>
+                </div>
+                <div class="step-footer">
+                    <button class="btn-primary" onclick="nextStep(5)">Continua</button>
+                </div>
+            </div>
+
+            <!-- STEP 6: NOTE FINALI -->
+            <div class="step-slide" data-step="6">
+                <div class="step-content">
+                    <h2>Ultima cosa...</h2>
+                    <p>Vuoi dire qualcos'altro al coach?</p>
+                    
+                    <textarea id="inp-notes" class="input-area" placeholder="Scrivi qui qualsiasi cosa ritieni utile..."></textarea>
+                </div>
+                <div class="step-footer">
+                    <button class="btn-primary btn-success" id="btn-finish">Entra nel Team 🚀</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- JS -->
+    <script type="module" src="onboarding.js"></script>
+</body>
+</html>

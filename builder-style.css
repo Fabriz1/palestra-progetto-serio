@@ -1,0 +1,527 @@
+/* RESET E BASE (Specifico per il Builder) */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #F5F5F7;
+    height: 100vh;
+    overflow: hidden; /* Importante per l'effetto app */
+    color: #1D1D1F;
+}
+
+/* --- MOBILE BLOCKER --- */
+#mobile-blocker {
+    display: none; /* Default nascosto su PC */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #1D1D1F;
+    color: white;
+    z-index: 9999;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 20px;
+}
+
+@media (max-width: 1024px) {
+    #mobile-blocker {
+        display: flex; /* Visibile su schermi piccoli */
+    }
+    .builder-container {
+        display: none; /* Nascondi l'app vera */
+    }
+}
+
+.btn-back-home {
+    margin-top: 20px;
+    color: #0071E3;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+/* --- LAYOUT GENERALE --- */
+.builder-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* HEADER */
+.builder-header {
+    height: 70px;
+    background: white;
+    border-bottom: 1px solid #E5E5EA;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    flex-shrink: 0;
+}
+
+.header-left, .header-center, .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.header-center {
+    flex-grow: 1;
+    justify-content: center;
+}
+
+.icon-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #1D1D1F;
+}
+
+#workout-name {
+    font-size: 20px;
+    font-weight: 700;
+    border-bottom: 1px dashed transparent;
+    padding-bottom: 2px;
+}
+
+#workout-name:hover, #workout-name:focus {
+    border-bottom-color: #0071E3;
+    outline: none;
+}
+
+/* INPUT HEADER */
+#client-select, #num-days {
+    padding: 8px 12px;
+    border: 1px solid #D2D2D7;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.btn-primary {
+    background: #0071E3;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.btn-secondary {
+    background: white;
+    color: #1D1D1F;
+    border: 1px solid #D2D2D7;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+/* WORKSPACE (GRID 2 COLONNE) */
+.workspace {
+    flex-grow: 1;
+    display: grid;
+    grid-template-columns: 3fr 1fr; /* 75% Editor, 25% Stats */
+    overflow: hidden; /* Contiene lo scroll */
+}
+
+/* --- COLONNA EDITOR (SINISTRA) --- */
+.editor-panel {
+    background: #F5F5F7;
+    border-right: 1px solid #E5E5EA;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* TABS GIORNI */
+.days-tabs {
+    display: flex;
+    gap: 2px;
+    background: white;
+    padding: 12px 24px 0 24px;
+    border-bottom: 1px solid #E5E5EA;
+}
+
+.tab-btn {
+    padding: 10px 24px;
+    background: #F5F5F7;
+    border: 1px solid #E5E5EA;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    font-weight: 500;
+    color: #86868B;
+    transition: all 0.2s;
+}
+
+.tab-btn.active {
+    background: #FFFFFF;
+    color: #0071E3;
+    font-weight: 600;
+    border-top: 2px solid #0071E3; /* Linea blu sopra */
+}
+
+/* CONTENUTO GIORNO SCROLLABILE */
+.day-content {
+    flex-grow: 1;
+    overflow-y: auto; /* Qui avviene lo scroll se la scheda è lunga */
+    padding: 24px;
+}
+
+/* STILE RIGA ESERCIZIO */
+.exercise-row {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    border: 1px solid #E5E5EA;
+    display: flex;
+    align-items: flex-start; /* Allinea in alto per input multilinea */
+    gap: 12px;
+    flex-wrap: wrap; /* Permette di andare a capo su schermi medi */
+}
+
+.drag-handle {
+    color: #C7C7CC;
+    cursor: grab;
+    padding-top: 10px;
+}
+
+/* INPUT DENTRO LA RIGA */
+.exercise-row input, .exercise-row select {
+    padding: 10px;
+    border: 1px solid #E5E5EA;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+}
+
+.exercise-row input:focus, .exercise-row select:focus {
+    border-color: #0071E3;
+}
+
+/* Dimensioni specifiche input */
+.input-ex-name { flex-grow: 2; min-width: 200px; font-weight: 600; }
+.input-sets { width: 60px; text-align: center; }
+.input-reps { width: 80px; text-align: center; }
+.select-muscle { width: 140px; }
+.select-technique { width: 140px; color: #E056FD; font-weight: 500;} /* Colore viola per tecniche */
+
+/* TASTO CANCELLA RIGA */
+.btn-remove-row {
+    background: none;
+    border: none;
+    color: #FF3B30;
+    cursor: pointer;
+    font-size: 18px;
+    padding-top: 10px;
+}
+
+/* AREA BOTTONE AGGIUNGI */
+.btn-add-exercise {
+    width: 100%;
+    padding: 16px;
+    border: 2px dashed #D2D2D7;
+    background: transparent;
+    border-radius: 12px;
+    color: #86868B;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: all 0.2s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-add-exercise:hover {
+    border-color: #0071E3;
+    color: #0071E3;
+    background: rgba(0, 113, 227, 0.05);
+}
+
+/* --- COLONNA STATS (DESTRA) --- */
+.stats-panel {
+    background: white;
+    padding: 24px;
+    border-left: 1px solid #E5E5EA;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.stats-panel h3 {
+    margin-bottom: 20px;
+    font-size: 18px;
+}
+
+.charts-container {
+    margin-bottom: 30px;
+    position: relative;
+    height: 250px; /* Altezza fissa per il grafico */
+}
+
+.stats-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #F5F5F7;
+    font-size: 14px;
+}
+
+.muscle-label {
+    font-weight: 500;
+}
+
+.volume-value {
+    font-family: monospace;
+    font-weight: 600;
+}
+
+.tips-box {
+    margin-top: auto; /* Spinge in basso */
+    background: #F2F2F7;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #636366;
+}
+
+/* NOTE AGGIUNTIVE SOTTO ESERCIZIO (Nascoste di default o toggle) */
+.row-extras {
+    width: 100%;
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #E5E5EA;
+}
+
+.row-extras input {
+    flex-grow: 1;
+    font-size: 12px;
+}
+/* --- AGGIUNTE PER LOGICA AVANZATA --- */
+
+/* Etichette sopra gli input (es. "Sets", "Minuti") */
+.input-group-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.input-label {
+    font-size: 10px;
+    color: #86868B;
+    margin-bottom: 2px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+/* Container Muscoli Sinergici */
+.synergists-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    margin-top: 8px;
+}
+
+.synergist-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+}
+
+.synergist-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+    color: white;
+    font-size: 10px;
+}
+.bg-secondary { background: #FF9500; } /* Arancione */
+.bg-tertiary { background: #AF52DE; } /* Viola */
+.bg-quaternary { background: #5856D6; } /* Blu scuro */
+.bg-other { background: #8E8E93; } /* Grigio */
+
+.btn-add-synergist {
+    background: none;
+    border: 1px dashed #0071E3;
+    color: #0071E3;
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    width: fit-content;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-add-synergist:hover {
+    background: #F0F8FF;
+}
+
+.btn-del-syn {
+    color: #FF3B30;
+    cursor: pointer;
+    font-size: 14px;
+}
+/* --- LAYOUT SPECIALI PER TECNICHE AVANZATE --- */
+
+/* Contenitore per i layout complessi (Top Set + Backoff) */
+.special-layout-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px;
+    background: #F2F2F7;
+    border-radius: 8px;
+    border: 1px dashed #D2D2D7;
+}
+
+.special-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.special-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #0071E3;
+    width: 60px; /* Larghezza fissa etichetta */
+    text-align: right;
+}
+
+.special-input {
+    padding: 6px;
+    border: 1px solid #E5E5EA;
+    border-radius: 6px;
+    font-size: 12px;
+    text-align: center;
+}
+
+/* Stile per la Select Metrica (RPE, RIR...) */
+.select-metric {
+    width: 80px;
+    font-weight: 600;
+    font-size: 11px;
+    color: #FF2D55; /* Colore diverso per risaltare */
+}
+
+/* Input valore intensità (es. "@ 8") */
+.input-intensity {
+    width: 50px;
+    text-align: center;
+    font-weight: 700;
+}
+/* --- MODALE SALVATAGGIO --- */
+.hidden { display: none !important; }
+
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px); /* Effetto vetro sfocato Apple */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.modal-card {
+    background: white;
+    width: 450px;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    transform: scale(1);
+    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.modal-header h3 { margin: 0; font-size: 20px; }
+
+.btn-icon-small {
+    background: none; border: none; font-size: 20px; cursor: pointer; color: #86868B;
+}
+
+/* Opzioni di salvataggio */
+.save-option {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    border: 2px solid #E5E5EA;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.save-option:hover { border-color: #D2D2D7; background: #F9F9FA; }
+.save-option.active { border-color: #0071E3; background: #F0F8FF; }
+
+.radio-circle {
+    width: 20px; height: 20px;
+    border: 2px solid #C7C7CC;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.save-option.active .radio-circle {
+    border-color: #0071E3;
+    background: #0071E3;
+    box-shadow: inset 0 0 0 4px white; /* Crea il pallino interno */
+}
+
+.opt-content h4 { margin: 0 0 4px 0; font-size: 15px; }
+.opt-content p { margin: 0 0 10px 0; font-size: 12px; color: #86868B; }
+
+.modal-select, .modal-input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #D2D2D7;
+    border-radius: 8px;
+    margin-top: 5px;
+}
+
+.full-width { width: 100%; justify-content: center; margin-top: 10px; }
+
+@keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accedi - PT Platform</title>
+    <link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f172a">
+
+    <!-- Importiamo il font 'Inter' per quello stile pulito/Apple che cerchiamo -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Link al CSS (che creeremo nel prossimo step) -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="main-container">
+        <div class="login-card">
+            
+            <!-- Header della Card -->
+            <div class="card-header">
+                <div class="logo-placeholder">PT</div> <!-- Qui poi metteremo un logo vero -->
+                <h1>Benvenuto</h1>
+                <p class="subtitle">La piattaforma evoluta per coach e atleti.</p>
+            </div>
+
+            <!-- Sezione 1: Pulsante Login (Visibile di default) -->
+            <div id="login-section">
+                <button id="google-login-btn" class="btn-google">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google Logo">
+                    <span>Accedi con Google</span>
+                </button>
+            </div>
+
+            <!-- Sezione 2: Selezione Ruolo (Nascosta di default, appare al primo registro) -->
+            <div id="role-selection-section" class="hidden">
+                <h2>Come vuoi registrarti?</h2>
+                <div class="role-options">
+                    
+                    <!-- Opzione Personal Trainer -->
+                    <div class="role-card" id="btn-role-pt">
+                        <div class="role-icon">🏋️‍♂️</div>
+                        <h3>Personal Trainer</h3>
+                        <p>Gestisco atleti, creo schede e monitoro progressi.</p>
+                    </div>
+
+                    <!-- Opzione Cliente -->
+                    <div class="role-card" id="btn-role-client">
+                        <div class="role-icon">🏃</div>
+                        <h3>Cliente / Atleta</h3>
+                        <p>Voglio allenarmi ed entrare nel team del mio coach.</p>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="card-footer">
+                <p>&copy; 2025 PT Platform</p>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Logica Javascript (Importata come modulo) -->
+    <script type="module" src="login.js"></script>
+
+</body>
+</html>
