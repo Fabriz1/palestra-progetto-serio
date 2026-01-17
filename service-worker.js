@@ -4,7 +4,7 @@ const ASSETS = [
   "/",
 
   // HTML
-  "/login.html",
+  "/index.html",
   "/dashboard-client.html",
   "/dashboard-pt.html",
   "/onboarding.html",
