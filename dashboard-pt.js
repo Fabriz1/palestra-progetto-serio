@@ -587,21 +587,133 @@ window.deleteClient = async (id) => {
 // =========================================
 
 window.openClientDetail = async (clientId) => {
+    console.log("Apertura dettaglio per:", clientId);
     currentSelectedClientId = clientId;
+    
+    // Mostra il pannello (se esiste)
     if(clientPanel) clientPanel.classList.remove('hidden');
+    
+    // 1. SCARICA DATI
     const snap = await getDoc(doc(db, "users", clientId));
+    if (!snap.exists()) {
+        console.error("Cliente non trovato nel DB");
+        return;
+    }
+    
     const data = snap.data();
-    document.getElementById('detail-client-name').textContent = data.name || "Cliente";
-    document.getElementById('detail-client-email').textContent = data.email || "";
-    document.getElementById('detail-active-workout').textContent = data.activeWorkoutId ? "Presente" : "-";
+    console.log("DATI UTENTE:", data); // Vedi i dati in console
 
+    // --- FUNZIONE DI SICUREZZA (Anti-Crash) ---
+    // Se l'HTML non ha l'ID, non rompe tutto ma avvisa in console
+    const safeUpdate = (elementId, textValue) => {
+        const el = document.getElementById(elementId);
+        if (el) {
+            el.textContent = textValue || "-";
+        } else {
+            console.warn(`ATTENZIONE: Manca l'elemento HTML con id="${elementId}"`);
+        }
+    };
+
+    // 2. HEADER PANNELLO
+    safeUpdate('detail-client-name', data.name || "Cliente");
+    safeUpdate('detail-client-email', data.email);
+    safeUpdate('detail-active-workout', data.activeWorkoutId ? "Presente" : "Nessuna");
+
+    // 3. PANORAMICA (Dati Onboarding)
+    safeUpdate('ov-age', data.age ? data.age + " Anni" : "-");
+    safeUpdate('ov-goals', data.goals);
+    safeUpdate('ov-history', data.history);
+    safeUpdate('ov-client-notes', data.notes);
+
+    // 4. LOGICA INFORTUNI (Colore Rosso)
+    const inj = data.injuries && data.injuries !== "Nessuno" ? data.injuries : null;
+    const pos = data.posture && data.posture !== "Normale" ? data.posture : null;
+    
+    let physText = "✅ Sano / Nessun problema";
+    if (inj || pos) {
+        physText = "";
+        if (inj) physText += `⚠️ INFORTUNI: ${inj}. `;
+        if (pos) physText += `ℹ️ POSTURA: ${pos}.`;
+    }
+    safeUpdate('ov-physical', physText);
+
+    // Gestione Colore Card (Solo se esiste)
+    const physCard = document.getElementById('card-physical');
+    if (physCard) {
+        if (inj || pos) {
+            physCard.style.backgroundColor = "#FFF5F5"; // Rosso chiaro
+            physCard.style.borderColor = "#FFDADA";
+        } else {
+            physCard.style.backgroundColor = "#FAFAFC"; // Grigio default
+            physCard.style.borderColor = "#E5E5EA";
+        }
+    }
+
+    // 5. NOTE PRIVATE COACH
+    const noteInput = document.getElementById('coach-notes-input');
+    if (noteInput) {
+        noteInput.value = data.coachPrivateNotes || "";
+    }
+
+    // 6. TASTO CHAT
     const btnChat = document.querySelector('.slide-header .btn-primary.small');
     if (btnChat) {
         btnChat.onclick = () => startChatWithClient(clientId, data.name || "Cliente");
     }
-    loadClientCharts(clientId);
-    loadMeasurements(clientId);
+
+    // Carica le altre sezioni (Grafici e Misure)
+    // Usiamo try-catch per evitare che un errore qui blocchi tutto il resto
+    try { loadClientCharts(clientId); } catch(e) { console.error("Err Grafici", e); }
+    try { loadMeasurements(clientId); } catch(e) { console.error("Err Misure", e); }
 };
+// Listener Salvataggio Note Coach
+const btnSaveNotes = document.getElementById('btn-save-coach-notes');
+if(btnSaveNotes) {
+    btnSaveNotes.onclick = async () => {
+        if(!currentSelectedClientId) return;
+        const txt = document.getElementById('coach-notes-input').value;
+        const status = document.getElementById('coach-notes-status');
+        
+        btnSaveNotes.textContent = "Salvataggio...";
+        await updateDoc(doc(db, "users", currentSelectedClientId), { coachPrivateNotes: txt });
+        
+        btnSaveNotes.textContent = "Salva Note";
+        if(status) { status.style.opacity = '1'; setTimeout(()=> status.style.opacity='0', 2000); }
+    };
+}
+
+// --- FUNZIONE PER SALVARE NOTE COACH ---
+const btnSaveCoachNotes = document.getElementById('btn-save-coach-notes');
+if (btnSaveCoachNotes) {
+    btnSaveCoachNotes.addEventListener('click', async () => {
+        if (!currentSelectedClientId) return;
+        
+        const noteText = document.getElementById('coach-notes-input').value;
+        const statusLabel = document.getElementById('coach-notes-status');
+        
+        btnSaveCoachNotes.textContent = "Salvataggio...";
+        btnSaveCoachNotes.disabled = true;
+
+        try {
+            await updateDoc(doc(db, "users", currentSelectedClientId), {
+                coachPrivateNotes: noteText
+            });
+            
+            // Feedback Visivo
+            btnSaveCoachNotes.textContent = "Salva Note";
+            btnSaveCoachNotes.disabled = false;
+            if(statusLabel) {
+                statusLabel.classList.add('visible');
+                setTimeout(() => statusLabel.classList.remove('visible'), 2000);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Errore salvataggio note.");
+            btnSaveCoachNotes.textContent = "Salva Note";
+            btnSaveCoachNotes.disabled = false;
+        }
+    });
+}
 
 if (btnClosePanel) btnClosePanel.addEventListener('click', () => clientPanel.classList.add('hidden'));
 

@@ -375,7 +375,7 @@ function createExerciseRowHTML(container, data, index) {
     nameInput.addEventListener('input', (e) => {
         const val = e.target.value; 
         updateData(); 
-
+        if (val.endsWith(' ')) return;
         if (globalExerciseLibrary[val]) {
             const libData = globalExerciseLibrary[val];
             

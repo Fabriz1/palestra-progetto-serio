@@ -1005,3 +1005,54 @@ h2 { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #1D1D1F; }
     width: 28px; height: 28px; cursor: pointer; margin-right: 2px;
     display: flex; align-items: center; justify-content: center;
 }
+
+/* --- STILE PANORAMICA (Overview) --- */
+
+/* Note Coach */
+.coach-notes-section {
+    background: #FFF8E1; /* Giallo chiaro "Post-it" o cartellina */
+    border: 1px solid #FFE082;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 30px;
+}
+.section-header-mini {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+}
+.section-header-mini h4 { font-size: 14px; font-weight: 700; color: #F57F17; margin: 0; display: flex; align-items: center; gap: 6px; }
+.save-status { font-size: 11px; color: #86868B; opacity: 0; transition: opacity 0.3s; }
+.save-status.visible { opacity: 1; }
+
+#coach-notes-input {
+    width: 100%; min-height: 80px; border: 1px solid rgba(0,0,0,0.1);
+    background: rgba(255,255,255,0.5); border-radius: 8px; padding: 10px;
+    font-family: inherit; font-size: 14px; resize: vertical; outline: none;
+}
+#coach-notes-input:focus { background: white; border-color: #F57F17; }
+
+/* Griglia Dati Onboarding */
+.section-title-divider {
+    font-size: 13px; text-transform: uppercase; color: #86868B; letter-spacing: 1px;
+    margin-bottom: 15px; border-bottom: 1px solid #E5E5EA; padding-bottom: 5px;
+}
+
+.overview-grid-layout {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 15px;
+}
+
+.overview-card {
+    background: #FAFAFC; border: 1px solid #E5E5EA; border-radius: 12px;
+    padding: 15px; display: flex; align-items: flex-start; gap: 12px;
+}
+.overview-card.full-width { grid-column: span 2; }
+.overview-card.warning-card { background: #FFF5F5; border-color: #FFDADA; } /* Rosso leggero per infortuni */
+
+.ov-icon {
+    font-size: 20px; color: #0071E3; background: white; width: 32px; height: 32px;
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05); flex-shrink: 0;
+}
+.overview-card.warning-card .ov-icon { color: #FF3B30; }
+
+.ov-content label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #86868B; margin-bottom: 4px; }
+.ov-content p { margin: 0; font-size: 14px; color: #1D1D1F; line-height: 1.4; }
