@@ -4,12 +4,16 @@
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
 body {
-    background-color: #F5F7FA; /* Grigio-Bluastro moderno */
+    background-color: #F5F7FA;
     font-family: 'Inter', sans-serif;
     color: #1D1D1F;
-    height: 100vh; width: 100vw;
-    display: flex; flex-direction: column;
-    overflow: hidden;
+    
+    /* MODIFICA FONDAMENTALE: */
+    height: 100dvh; 
+    width: 100vw;
+    display: flex; 
+    flex-direction: column;
+    overflow: hidden; /* Il body non scrolla, scrolla solo la lista interna */
 }
 
 /* UTILS */
@@ -40,7 +44,16 @@ body {
 }
 .circle-btn:active { transform: scale(0.9); }
 
-.header-titles { text-align: center; }
+.header-titles { 
+     flex-grow: 1; /* Si prende tutto lo spazio centrale */
+    padding: 0 10px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; /* Se è lunghissimo mette i puntini */
+
+
+}
 .sub-label { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: #86868B; text-transform: uppercase; display: block; }
 #day-title { font-size: 16px; font-weight: 700; margin: 0; color: #1D1D1F; }
 
@@ -77,8 +90,9 @@ body {
    ========================================= */
 .exercises-stream {
     flex-grow: 1; overflow-y: auto; overflow-x: hidden;
-    padding: 20px; padding-bottom: 120px; /* Spazio per footer */
+    padding: 20px; padding-bottom: 150px !important; /* Spazio per footer */
     display: flex; flex-direction: column; gap: 16px;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* EXERCISE CARD (Accordion) */
@@ -88,6 +102,8 @@ body {
     border: 1px solid white;
     transition: transform 0.3s, box-shadow 0.3s;
     overflow: hidden;
+    margin-bottom: 16px; 
+    
 }
 
 .ex-card.active {
@@ -190,7 +206,25 @@ body {
     transition: background 0.2s;
 }
 .btn-copy:active { background: rgba(0, 113, 227, 0.2); }
+.sub-label { display: none; } /* Nascondiamo la scritta piccola sopra */
+#day-title { font-size: 17px; margin: 0; } /* Titolo header più compatto */
 
+/* NUOVO TITOLONE PAGINA */
+.page-intro-header {
+    padding: 10px 0 25px 0;
+}
+.page-intro-header h2 {
+    font-size: 28px;
+    font-weight: 800;
+    color: #1D1D1F;
+    line-height: 1.2;
+    margin-bottom: 6px;
+}
+.page-intro-header p {
+    font-size: 15px;
+    color: #86868B;
+    font-weight: 500;
+}
 /* =========================================
    4. ACTION BAR (Footer)
    ========================================= */
@@ -198,11 +232,36 @@ body {
     position: fixed; bottom: 0; left: 0; width: 100%;
     background: white; padding: 16px 20px 30px 20px;
     box-shadow: 0 -10px 40px rgba(0,0,0,0.05); z-index: 90;
+    
+    display: flex; /* Flexbox */
+    align-items: center; 
+    gap: 15px; /* Spazio REALE tra i bottoni */
+    
+    /* Nota: Se vuoi il cestino a DESTRA e lo slider a SINISTRA,
+       tieni row-reverse se l'HTML ha prima cestino poi slider.
+       Altrimenti rimuovilo per ordine naturale. */
+    flex-direction: row-reverse; 
+}
+.btn-action-secondary {
+    width: 56px; /* Stessa altezza dello slider */
+    height: 56px;
+    border-radius: 50%; /* O 16px se lo vuoi quadrato smussato */
+    border: none;
+    background: #FFF4F4; /* Rosso chiarissimo */
+    color: #FF3B30; /* Rosso Apple */
+    font-size: 24px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0; /* Non si schiaccia mai */
+    transition: transform 0.1s;
 }
 
 /* Slide to Finish (Simulato) */
 .btn-finish-slide {
-    width: 100%; height: 56px; border: none; border-radius: 30px;
+    /* width: 100%;  <--- RIMOSSO: Questo causava il problema */
+    flex: 1;      /* <--- AGGIUNTO: Occupa solo lo spazio disponibile */
+    
+    height: 56px; border: none; border-radius: 30px;
     background: #1D1D1F; position: relative; overflow: hidden;
     cursor: pointer; display: flex; align-items: center; justify-content: center;
     box-shadow: 0 8px 20px rgba(0,0,0,0.2);

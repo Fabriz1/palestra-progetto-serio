@@ -3,17 +3,20 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Workout Session</title>
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0f172a">
-
+    
+    <!-- viewer-style.css?v=2 -->
+    <link rel="stylesheet" href="viewer-style.css">
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
     <!-- CSS Nuovo -->
-    <link rel="stylesheet" href="viewer-style.css">
+    
 </head>
 
 <body>
@@ -31,26 +34,24 @@
     </header>
 
     <!-- LISTA ESERCIZI (Accordion) -->
-    <main class="exercises-stream" id="exercises-list">
-        <!-- Qui verranno iniettate le card -->
-        <!-- Esempio Card (Per visualizzazione mentale):
-        <div class="ex-card collapsed">
-            <div class="ex-summary">
-                <div class="ex-info">
-                    <h3>Panca Piana</h3>
-                    <span>4 Set x 10 Reps</span>
-                </div>
-                <div class="ex-status icon-ring"><i class="ph ph-caret-down"></i></div>
-            </div>
-            <div class="ex-details">
-                ... Inputs ...
-            </div>
-        </div>
-        -->
+    <main class="exercises-stream">
+        
+        <!-- NUOVO TITOLONE (Scrolla insieme alla pagina) -->
+        
+
+        <!-- Qui dentro il JS inietterà le card -->
+        <div id="exercises-list"></div>
+    
     </main>
 
     <!-- ACTION BAR FISSA IN BASSO -->
     <footer class="action-bar">
+        <!-- Nuovo Cestino Quadrato/Tondo -->
+        <button id="btn-trash" class="btn-action-secondary">
+            <i class="ph ph-trash"></i>
+        </button>
+
+        <!-- Slider esistente (si adatterà in larghezza) -->
         <button id="btn-finish" class="btn-finish-slide">
             <div class="slide-track">
                 <span class="slide-text">SCORRI PER FINIRE</span>
@@ -77,6 +78,17 @@
     </div>
 
     <!-- SCRIPT -->
+     <script>
+    // FORZA L'AGGIORNAMENTO DELLA PWA/SERVICE WORKER
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for(let registration of registrations) {
+                registration.unregister();
+                console.log("Service Worker Rimosso/Aggiornato per forza");
+            }
+        });
+    }
+</script>
     <script type="module" src="workout-viewer.js"></script>
 </body>
 

@@ -345,49 +345,65 @@ function createExerciseRowHTML(container, data, index) {
             const div = document.createElement('div');
             div.className = 'synergist-row';
             div.style.marginTop = "5px";
+            
+            // Select Tipo (Secondario, etc)
             const typeSelect = document.createElement('select'); typeSelect.style.width = "100px";
             typeSelect.innerHTML = `<option value="secondary" ${m.type === 'secondary'?'selected':''}>Secondario</option><option value="tertiary" ${m.type === 'tertiary'?'selected':''}>Terziario</option><option value="quaternary" ${m.type === 'quaternary'?'selected':''}>Quaternario</option>`;
+            
+            // Select Muscolo (FIX APPLICATO QUI)
             const muscSelect = document.createElement('select');
-            muscSelect.innerHTML = `<option value="" disabled>Muscolo</option>` + MUSCLES.map(opt => `<option value="${opt}" ${opt === m.name ? 'selected' : ''}>${opt}</option>`).join('');
+            // Aggiunto check: ${!m.name ? 'selected' : ''} nell'opzione placeholder
+            muscSelect.innerHTML = `<option value="" disabled ${!m.name ? 'selected' : ''}>Muscolo</option>` + 
+                                   MUSCLES.map(opt => `<option value="${opt}" ${opt === m.name ? 'selected' : ''}>${opt}</option>`).join('');
+            
             const delBtn = document.createElement('i'); delBtn.className = 'ph ph-x btn-del-syn'; delBtn.style.cursor="pointer";
+            
             typeSelect.addEventListener('change', (e) => { m.type = e.target.value; updateLiveStats(); });
             muscSelect.addEventListener('change', (e) => { m.name = e.target.value; updateLiveStats(); });
             delBtn.addEventListener('click', () => { const realIndex = data.muscles.indexOf(m); if (realIndex > -1) data.muscles.splice(realIndex, 1); renderSynergists(); updateLiveStats(); });
+            
             div.appendChild(typeSelect); div.appendChild(muscSelect); div.appendChild(delBtn);
             synList.appendChild(div);
         });
     };
     renderSynergists();
     row.querySelector('.btn-add-synergist').addEventListener('click', () => { data.muscles.push({ name: "", type: "secondary" }); renderSynergists(); });
+    // ... dentro createExerciseRowHTML ...
+
+   
     const nameInput = row.querySelector('.input-ex-name');
     nameInput.addEventListener('input', (e) => {
-        const val = e.target.value; // Non fare trim() subito per permettere spazi
-        updateData(); // Salva il nome corrente
+        const val = e.target.value; 
+        updateData(); 
 
-        // Se il nome corrisponde esattamente a uno in libreria -> POPOLA
         if (globalExerciseLibrary[val]) {
             const libData = globalExerciseLibrary[val];
             
             // 1. Imposta Muscolo Primario
             if (libData.p) {
                 row.querySelector('.select-muscle').value = libData.p;
-                // Simula evento change per aggiornare i dati
                 row.querySelector('.select-muscle').dispatchEvent(new Event('change'));
             }
 
-            // 2. Aggiungi Sinergici (Se non ce ne sono già)
-            // Solo se la lista sinergici attuale è vuota o ha solo placeholder
+            // 2. Gestione Sinergici Intelligente
             const currentSyns = data.muscles.filter(m => m.type !== 'primary');
+            
+            // Popola solo se l'utente non ha già messo mano ai sinergici
             if (currentSyns.length === 0 && libData.s && libData.s.length > 0) {
-                // Rimuovi eventuali secondari vuoti
+                // Pulisci
                 data.muscles = data.muscles.filter(m => m.type === 'primary');
                 
-                // Aggiungi i nuovi dalla libreria
-                libData.s.forEach(synName => {
-                    data.muscles.push({ name: synName, type: 'secondary' });
+                // Aggiungi i nuovi (Gestisce sia Stringhe che Oggetti)
+                libData.s.forEach(item => {
+                    if (typeof item === 'string') {
+                        // Formato Base (exercise-db.js): Default Secondario
+                        data.muscles.push({ name: item, type: 'secondary' });
+                    } else {
+                        // Formato Imparato (Firebase): Rispetta il tipo (es. tertiary)
+                        data.muscles.push({ name: item.name, type: item.type });
+                    }
                 });
                 
-                // Rirenderizza la lista sinergici
                 renderSynergists(); 
                 updateLiveStats();
             }
@@ -478,67 +494,92 @@ optAssign.classList.add('active');
 btnConfirmSave.addEventListener('click', async () => {
     const user = auth.currentUser; if (!user) return;
     btnConfirmSave.textContent = "Salvataggio..."; btnConfirmSave.disabled = true;
-     const newKnowledge = {};
+     // ... dentro btnConfirmSave ... prima del try ...
+
+    // --- APPRENDIMENTO AUTOMATICO AVANZATO (Con Tipi) ---
+    const newKnowledge = {};
     let hasNewKnowledge = false;
 
-    // Scansiona tutti gli esercizi della scheda corrente
     for(let i=1; i<=totalDays; i++) {
         if(workoutData[i]) {
             workoutData[i].forEach(ex => {
                 const name = ex.name.trim();
                 if (!name) return;
 
-                // Estrai muscoli usati in questa scheda
-                const primary = ex.muscles.find(m => m.type === 'primary')?.name;
-                const secondary = ex.muscles.filter(m => m.type !== 'primary').map(m => m.name);
+                // Dati Attuali della Scheda
+                const currentPrimary = ex.muscles.find(m => m.type === 'primary')?.name;
+                // Prendiamo l'oggetto completo {name, type} per i sinergici, escludendo nomi vuoti
+                const currentSynergists = ex.muscles
+                    .filter(m => m.type !== 'primary' && m.name)
+                    .map(m => ({ name: m.name, type: m.type }));
 
-                if (!primary) return; // Se non ha muscolo, ignora
+                if (!currentPrimary) return; 
 
-                // Logica Apprendimento:
-                // 1. Se l'esercizio non esiste in libreria -> IMPARA
-                // 2. Se esiste ma i muscoli sono diversi -> IMPARA (Sovrascrivi preferenza coach)
-                
                 const known = globalExerciseLibrary[name];
-                
                 let isDifferent = false;
+
                 if (!known) {
-                    isDifferent = true; // Nuovo
+                    isDifferent = true; // Nuovo esercizio
                 } else {
-                    // Controlla se primario è diverso
-                    if (known.p !== primary) isDifferent = true;
-                    // Controlla se secondari sono diversi (semplificato: lunghezza o contenuto)
-                    if (known.s.length !== secondary.length || !known.s.every(s => secondary.includes(s))) {
+                    // 1. Confronta Primario
+                    if (known.p !== currentPrimary) isDifferent = true;
+
+                    // 2. Confronta Sinergici (Normalizziamo il DB per il confronto)
+                    // Il DB base ha stringhe ["Tri"], noi abbiamo [{name:"Tri", type:"sec"}]
+                    // Dobbiamo convertire il DB base in formato oggetto per confrontare mele con mele.
+                    
+                    let knownSynergistsNorm = [];
+                    if (known.s) {
+                        knownSynergistsNorm = known.s.map(item => {
+                            if (typeof item === 'string') return { name: item, type: 'secondary' };
+                            return { name: item.name, type: item.type };
+                        });
+                    }
+
+                    // Logica di confronto array profonda
+                    if (knownSynergistsNorm.length !== currentSynergists.length) {
                         isDifferent = true;
+                    } else {
+                        // Ordiniamo per nome per confrontare
+                        const sortFn = (a, b) => a.name.localeCompare(b.name);
+                        knownSynergistsNorm.sort(sortFn);
+                        const currentSynsSorted = [...currentSynergists].sort(sortFn);
+
+                        for(let k=0; k < knownSynergistsNorm.length; k++) {
+                            // Se cambia il NOME o cambia il TIPO -> È diverso
+                            if (knownSynergistsNorm[k].name !== currentSynsSorted[k].name || 
+                                knownSynergistsNorm[k].type !== currentSynsSorted[k].type) {
+                                isDifferent = true;
+                                break;
+                            }
+                        }
                     }
                 }
 
                 if (isDifferent) {
-                    newKnowledge[name] = { p: primary, s: secondary };
+                    // SALVA LA DEFINIZIONE COMPLETA (Con i tipi!)
+                    newKnowledge[name] = { 
+                        p: currentPrimary, 
+                        s: currentSynergists // Salva array di oggetti: [{name:'...', type:'tertiary'}]
+                    };
                     hasNewKnowledge = true;
                 }
             });
         }
     }
 
-    // Se abbiamo imparato cose nuove, chiedi conferma o salva silenziosamente
-    // (Per UX veloce, salviamo silenziosamente nel profilo utente senza rompere le scatole)
     if (hasNewKnowledge) {
         try {
             const userRef = doc(db, "users", user.uid);
-            // Merge profondo: aggiorna solo le chiavi nuove dentro la mappa exerciseLibrary
-            // Nota: Firestore update con dot notation per mappe nidificate
             const updatePayload = {};
+            // Usa la dot notation per aggiornare chiavi specifiche nella mappa
             for (const [key, val] of Object.entries(newKnowledge)) {
                 updatePayload[`exerciseLibrary.${key}`] = val;
             }
-            
-            // Lanciamo l'update in background (senza await) per non rallentare l'UI
-            updateDoc(userRef, updatePayload).catch(e => console.warn("Errore auto-learning:", e));
-            
-            console.log("Appreso nuovi esercizi:", newKnowledge);
-        } catch (e) {
-            console.warn("Skip learning", e);
-        }
+            // Salvataggio silenzioso
+            updateDoc(userRef, updatePayload).catch(e => console.warn("Errore learning:", e));
+            console.log("🧠 Appreso nuove definizioni:", newKnowledge);
+        } catch (e) { console.warn(e); }
     }
     try {
         let finalName = document.getElementById('workout-name').textContent.trim();

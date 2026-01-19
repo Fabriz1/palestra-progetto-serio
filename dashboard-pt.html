@@ -5,8 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Coach Dashboard - PT Platform</title>
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0f172a">
+
 
     <!-- Font Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -54,6 +53,7 @@
                 <button class="nav-link" data-target="section-chat">
                     <i class="ph ph-chat-circle-dots"></i>
                     <span>Messaggi</span>
+                    <span id="chat-badge" class="badge hidden"></span>
                 </button>
 
                 <button class="nav-link" data-target="section-settings">
@@ -102,10 +102,32 @@
             <section id="section-stats" class="content-section">
                 <!-- Filtri veloci -->
                 <div class="stats-controls">
-                    <input type="text" placeholder="Cerca atleta..." class="search-bar">
+                    <div class="filters-row">
+                        <!-- Ricerca -->
+                        <input type="text" id="search-client" placeholder="Cerca atleta..." class="search-bar"
+                            onkeyup="applyClientFilters()">
+
+                        <!-- Filtro Colore -->
+                        <select id="filter-color" class="filter-select" onchange="applyClientFilters()">
+                            <option value="all">🎨 Tutti i Colori</option>
+                            <option value="gold">🟡 Gold</option>
+                            <option value="silver">⚪ Silver</option>
+                            <option value="bronze">🟤 Bronze</option>
+                            <option value="blue">🔵 Blue</option>
+                            <option value="red">🔴 Red</option>
+                            <option value="none">🚫 Nessun Colore</option>
+                        </select>
+
+                        <!-- Filtro Tag (Popolato via JS) -->
+                        <select id="filter-tag" class="filter-select" onchange="applyClientFilters()">
+                            <option value="all">Tutte le Etichette</option>
+                            <!-- JS inserirà qui i tag usati nel team -->
+                        </select>
+                    </div>
+
                     <div class="view-toggles">
-                        <button class="toggle-btn active">Griglia</button>
-                        <button class="toggle-btn">Lista</button>
+                        <button class="toggle-btn active" onclick="setGridView()">Griglia</button>
+                        <button class="toggle-btn" onclick="setListView()">Lista</button>
                     </div>
                 </div>
 

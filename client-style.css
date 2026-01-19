@@ -115,87 +115,562 @@ body {
 .day-info p { margin: 0; font-size: 13px; color: #86868B; }
 
 /* CHAT FULL PAGE */
-.full-height { height: 100%; display: flex; flex-direction: column; padding: 0; }
-.chat-wrapper { display: flex; flex-direction: column; height: 100%; background: white; }
-.chat-feed { flex-grow: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 8px; background: #EFEFF4; }
+/* =========================================
+   CHAT FULL PAGE (FIXED LAYOUT)
+   ========================================= */
+
+/* Sgancia la chat dal padding del content-area */
+#view-chat {
+    position: fixed;
+    top: 66px; /* Altezza esatta dell'Header */
+    bottom: 85px; /* Altezza esatta della Navbar in basso */
+    left: 0;
+    width: 100%;
+    background: white;
+    z-index: 50; /* Sopra il contenuto normale, sotto i menu */
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+}
+
+/* Il wrapper ora riempie semplicemente lo spazio assegnato */
+.chat-wrapper {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: white;
+}
+
+/* Area Messaggi Scrollabile */
+.chat-feed {
+    flex: 1; /* Prende tutto lo spazio disponibile */
+    overflow-y: auto;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #F2F2F7;
+    -webkit-overflow-scrolling: touch; /* Scroll fluido iOS */
+}
+
+/* Barra Input Fissa in fondo al contenitore chat */
 .chat-input-bar {
-    padding: 12px; background: white; border-top: 1px solid #E5E5EA; display: flex; gap: 10px; align-items: center;
+    flex-shrink: 0; /* Non farti schiacciare */
+    padding: 10px 15px;
+    background: white;
+    border-top: 1px solid #E5E5EA;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    min-height: 60px;
+}
+/* FLOATING BAR (Dynamic Island) */
+.workout-floating-bar {
+    position: fixed;
+    bottom: 90px; /* Sopra la navbar */
+    left: 20px; right: 20px;
+    background: #1D1D1F; /* Nero Apple */
+    color: white;
+    border-radius: 30px; /* Pillola */
+    padding: 12px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    z-index: 900;
+    cursor: pointer;
+    animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.workout-floating-bar.hidden { display: none; }
+
+.pulsing-dot {
+    width: 10px; height: 10px; background: #34C759;
+    border-radius: 50%; margin-right: 12px;
+    box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.7);
+    animation: pulse-green 2s infinite;
+}
+
+.floating-info { flex-grow: 1; display: flex; flex-direction: column; }
+.f-label { font-size: 9px; color: #86868B; font-weight: 700; letter-spacing: 0.5px; }
+.floating-info strong { font-size: 14px; font-weight: 600; }
+
+.floating-timer {
+    font-family: 'Courier New', monospace; font-weight: 700; font-size: 14px; color: #34C759; margin-right: 10px;
+}
+
+@keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes pulse-green {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(52, 199, 89, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 199, 89, 0); }
 }
 .chat-input-bar input {
-    flex-grow: 1; padding: 10px 16px; border: 1px solid #D2D2D7; border-radius: 20px; font-size: 15px; outline: none;
+    flex-grow: 1;
+    padding: 10px 16px;
+    border: 1px solid #C7C7CC;
+    border-radius: 20px;
+    font-size: 16px; /* Evita zoom su iOS */
+    outline: none;
+    background: #FAFAFA;
 }
+
 .chat-input-bar button {
-    background: #0071E3; color: white; border: none; width: 40px; height: 40px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center; font-size: 18px;
+    width: 40px; 
+    height: 40px;
+    background: #0071E3;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
 /* GRAFICI E PROGRESSI */
-.chart-controls { margin-bottom: 20px; }
-.control-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; }
-.control-row::-webkit-scrollbar { display: none; }
+.chart-controls { 
+    margin-bottom: 25px; 
+    position: relative; 
+    z-index: 100; /* ALZIAMO QUESTO LIVELLO */
+}
 
+/* Contenitore Chips Scrollabile (Invisibile) */
+.control-row { 
+    display: flex; gap: 10px; 
+    overflow-x: auto; 
+    padding: 4px 2px 15px 2px; /* Spazio per l'ombra */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE */
+    mask-image: linear-gradient(to right, black 90%, transparent 100%); /* Sfumatura a destra */
+}
+.control-row::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+
+/* Chip (Pillola) */
 .filter-chip {
-    background: white; border: 1px solid #E5E5EA; padding: 8px 16px; border-radius: 20px;
-    font-size: 13px; font-weight: 600; color: #636366; white-space: nowrap; cursor: pointer;
+    background: white; 
+    border: 1px solid #E5E5EA; 
+    padding: 10px 20px; 
+    border-radius: 24px;
+    font-size: 13px; font-weight: 600; color: #86868B; 
+    white-space: nowrap; cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    transition: all 0.2s;
+    flex-shrink: 0; /* Non si schiacciano */
 }
-.filter-chip.active { background: #1D1D1F; color: white; border-color: #1D1D1F; }
 
+/* Stato Attivo */
+.filter-chip.active { 
+    background: #1D1D1F; 
+    color: white; 
+    border-color: #1D1D1F; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+/* Select Personalizzata */
+.select-wrapper {
+    position: relative;
+    width: 100%;
+}
 .chart-select {
-    width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #D2D2D7;
-    font-size: 15px; background: white;
+    width: 100%; 
+    padding: 16px; padding-right: 40px;
+    border-radius: 16px; 
+    border: 1px solid transparent; 
+    background-color: white;
+    font-size: 15px; font-weight: 600; color: #1D1D1F;
+    appearance: none; /* Nasconde freccia nativa */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    outline: none;
+    transition: border 0.2s;
+}
+.chart-select:focus { border-color: #0071E3; }
+
+/* Freccina Custom */
+.select-wrapper::after {
+    content: '';
+    position: absolute; right: 16px; top: 50%;
+    transform: translateY(-50%);
+    width: 10px; height: 10px;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2724%27%20height%3D%2724%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%2386868B%27%20stroke-width%3D%273%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpolyline%20points%3D%276%209%2012%2015%2018%209%27%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat; background-size: contain;
+    pointer-events: none;
+}
+.dropdown-row-wrapper {
+    position: relative;
+    display: block;
+    overflow: visible !important; /* FONDAMENTALE: Lascia uscire la tendina */
+    z-index: 500; /* Si assicura di stare sopra */
 }
 
-.chart-card { background: white; padding: 15px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
+/* Modifica di sicurezza per il contenitore generale */
+.chart-controls {
+    overflow: visible !important; 
+    z-index: 500;
+}
+/* Card del Grafico */
+.chart-card { 
+    background: white; 
+    padding: 20px; 
+    border-radius: 24px; 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.04); 
+    margin-bottom: 25px; 
+    height: 300px; /* Altezza fissa per consistenza */
+    position: relative;
+    z-index: 1;
+}
+/* =========================================
+   CUSTOM DROPDOWN (PREMIUM)
+   ========================================= */
+.custom-dropdown {
+    position: relative;
+    width: 100%;
+    z-index: 50; /* Deve stare sopra al grafico */
+}
 
-.chart-stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center; }
-.mini-stat label { display: block; font-size: 10px; color: #86868B; text-transform: uppercase; margin-bottom: 4px; }
-.mini-stat strong { font-size: 16px; font-weight: 800; }
+/* Il bottone principale */
+.dropdown-trigger {
+    background: white;
+    padding: 16px;
+    border-radius: 16px;
+    display: flex; justify-content: space-between; align-items: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+    margin-bottom: 20px;
+}
+.dropdown-trigger:active { transform: scale(0.99); background: #F9F9FA; }
+.dropdown-trigger span { font-size: 15px; font-weight: 600; color: #1D1D1F; }
+.dropdown-trigger i { color: #86868B; transition: transform 0.3s; }
+
+/* Rotazione freccia quando aperto */
+.custom-dropdown.open .dropdown-trigger i { transform: rotate(180deg); }
+.custom-dropdown.open .dropdown-trigger { border-color: #0071E3; }
+
+/* La lista a tendina */
+.dropdown-options {
+    position: absolute; 
+    top: 115%; /* Spostato leggermente più in basso */
+    left: 0; 
+    width: 100%;
+    
+    background: white; /* Sfondo bianco solido */
+    border: 1px solid #E5E5EA; /* Bordino grigio per vederla bene */
+    border-radius: 16px;
+    
+    box-shadow: 0 20px 50px rgba(0,0,0,0.2); /* Ombra molto forte per staccarla */
+    
+    padding: 8px;
+    max-height: 250px; 
+    overflow-y: auto;
+    
+    z-index: 999; /* LIVELLO MASSIMO: Sopra ogni cosa */
+    
+    animation: dropIn 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+    z-index: 5000;
+}
+.dropdown-options.hidden { display: none; }
+
+/* Singola opzione */
+.custom-option {
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 14px; color: #1D1D1F; font-weight: 500;
+    cursor: pointer;
+    transition: background 0.1s;
+    z-index: 5000;
+}
+.custom-option:active, .custom-option:hover { background: #F2F2F7; color: #0071E3; }
+
+@keyframes dropIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Griglia Statistiche Sotto */
+.chart-stats-grid { 
+    display: grid; grid-template-columns: 1fr 1fr 1fr; 
+    gap: 15px; text-align: center; 
+    background: white; padding: 20px; border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+}
+.mini-stat { display: flex; flex-direction: column; gap: 5px; }
+.mini-stat label { 
+    font-size: 10px; font-weight: 700; color: #86868B; 
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.mini-stat strong { 
+    font-size: 18px; font-weight: 800; color: #1D1D1F; 
+}
 
 /* =========================================
    PROFILO STYLING (FIX PREMIUM)
    ========================================= */
+/* =========================================
+   PROFILO STYLING (REDESIGN)
+   ========================================= */
+
+/* La Card Bianca */
 .profile-card {
-    background: white; border-radius: 24px; padding: 24px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    background: white; 
+    border-radius: 24px; 
+    padding: 30px 24px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.05); /* Ombra più morbida e diffusa */
+    margin-bottom: 40px;
 }
 
-.profile-photo-edit { display: flex; flex-direction: column; align-items: center; margin-bottom: 30px; position: relative; }
-.avatar-xl { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 4px solid #F5F5F7; }
+/* Foto e Icona */
+.profile-photo-edit { 
+    display: flex; flex-direction: column; align-items: center; 
+    margin-bottom: 35px; position: relative; 
+}
+.avatar-xl { 
+    width: 110px; height: 110px; 
+    border-radius: 50%; object-fit: cover; 
+    border: 1px solid #E5E5EA; /* Bordo sottile elegante */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
 .btn-cam {
-    position: absolute; bottom: 0; background: #0071E3; color: white; border: 4px solid white;
-    width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    transform: translateX(35px); cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    position: absolute; bottom: 5px; 
+    background: #0071E3; color: white; border: 4px solid white;
+    width: 38px; height: 38px; border-radius: 50%; 
+    display: flex; align-items: center; justify-content: center;
+    transform: translateX(40px); cursor: pointer; 
+    box-shadow: 0 4px 10px rgba(0, 113, 227, 0.3);
 }
 
-.form-stack { display: flex; flex-direction: column; gap: 20px; }
+/* Form Layout */
+.form-stack { display: flex; flex-direction: column; gap: 24px; }
 
+/* Etichette (Labels) */
 .inp-box label {
-    font-size: 11px; font-weight: 700; color: #86868B; text-transform: uppercase;
-    margin-bottom: 8px; display: block; letter-spacing: 0.5px;
+    font-size: 11px; font-weight: 700; color: #86868B; 
+    text-transform: uppercase; letter-spacing: 0.8px;
+    margin-bottom: 8px; display: block; margin-left: 5px;
 }
 
-/* Input Area "Morbida" */
-.input-area-small {
-    width: 100%; padding: 14px;
-    border: 1px solid transparent; background-color: #F9F9FA;
-    border-radius: 14px; font-family: inherit; font-size: 15px; color: #1D1D1F;
-    resize: none; outline: none; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+/* Campi di Testo (TEXTAREA STILE IOS) */
+.profile-card textarea {
+    width: 100%;
+    background-color: #F2F2F7; /* Grigio chiaro Apple */
+    border: 1px solid transparent; /* Niente bordo di default */
+    border-radius: 16px;
+    padding: 16px;
+    font-family: 'Inter', sans-serif;
+    font-size: 15px; color: #1D1D1F; font-weight: 500;
+    resize: none; /* Rimuove l'angolino trascinabile brutto */
+    outline: none;
+    transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
-.input-area-small:focus {
-    background-color: white; border-color: #0071E3;
+
+/* Effetto Focus (Quando ci clicchi) */
+.profile-card textarea:focus {
+    background-color: white; 
+    border-color: #0071E3; 
     box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.1);
 }
 
-/* Bottone Blu Largo */
+/* Bottone Salva */
 .btn-primary.full-width {
-    width: 100%; background: #0071E3; color: white; border: none; padding: 16px;
-    border-radius: 16px; font-weight: 700; font-size: 16px; cursor: pointer;
-    box-shadow: 0 8px 20px rgba(0, 113, 227, 0.2); transition: transform 0.1s;
+    width: 100%; 
+    background: #0071E3; color: white; border: none; 
+    padding: 18px; /* Più alto */
+    border-radius: 18px; 
+    font-weight: 700; font-size: 16px; cursor: pointer;
+    box-shadow: 0 8px 25px rgba(0, 113, 227, 0.25); 
+    transition: transform 0.1s;
+    margin-top: 30px;
 }
-.btn-primary.full-width:active { transform: scale(0.98); }
+.btn-primary.full-width:active { transform: scale(0.97); }
 
-/* Bottone Esci */
+/* Bottone Esci (Migliorato) */
 .btn-danger-text {
-    background: none; border: none; color: #FF3B30; font-weight: 600; font-size: 15px;
-    width: 100%; padding: 15px; cursor: pointer; margin-top: 10px;
+    width: 100%;
+    background: #FFF2F2; /* Sfondo rosso pallidissimo */
+    color: #FF3B30; 
+    border: none; 
+    border-radius: 18px;
+    padding: 16px; 
+    font-weight: 700; font-size: 15px;
+    cursor: pointer; margin-top: 15px;
+    transition: background 0.2s;
 }
+.btn-danger-text:active { background: #FFE5E5; }
+/* =========================================
+   BOTTOM SHEET (Preview Allenamento)
+   ========================================= */
+.sheet-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+    z-index: 1000; opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+    display: flex; align-items: flex-end; /* Allinea in basso */
+}
+.sheet-overlay.active { opacity: 1; pointer-events: auto; }
+
+.bottom-sheet {
+    background: white; width: 100%;
+    border-top-left-radius: 24px; border-top-right-radius: 24px;
+    padding: 24px; padding-bottom: 40px;
+    transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.1);
+}
+.sheet-overlay.active .bottom-sheet { transform: translateY(0); }
+
+.sheet-handle {
+    width: 40px; height: 5px; background: #E5E5EA;
+    border-radius: 10px; margin: 0 auto 20px auto;
+}
+
+.sheet-content { text-align: center; }
+.sheet-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; color: #1D1D1F; }
+.sheet-subtitle { font-size: 15px; color: #86868B; margin-bottom: 30px; }
+
+/* Bottoni Sheet */
+.btn-sheet-start {
+    width: 100%; padding: 16px; border-radius: 16px;
+    background: #0071E3; color: white; font-size: 16px; font-weight: 700;
+    border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(0, 113, 227, 0.3);
+}
+
+/* Warning Box (Nascosto di base) */
+.sheet-warning {
+    background: #FFF4F4; border: 1px solid #FFDCDC;
+    border-radius: 16px; padding: 16px; margin-top: 15px;
+    text-align: left; display: none; /* Nascosto */
+}
+.sheet-warning.visible { display: block; animation: fadeIn 0.3s; }
+
+.warning-title { color: #FF3B30; font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.warning-text { font-size: 13px; color: #3A3A3C; margin-bottom: 15px; line-height: 1.4; }
+
+.warning-actions { display: flex; gap: 10px; }
+.btn-warn-secondary {
+    flex: 1; padding: 12px; border-radius: 10px; border: none;
+    background: white; color: #1D1D1F; font-weight: 600; border: 1px solid #E5E5EA;
+}
+.btn-warn-danger {
+    flex: 1; padding: 12px; border-radius: 10px; border: none;
+    background: #FF3B30; color: white; font-weight: 600;
+}
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+/* LISTA ANTEPRIMA ESERCIZI */
+.sheet-exercises-list {
+    margin: 20px 0;
+    max-height: 40vh; /* Occupa massimo il 40% dello schermo */
+    overflow-y: auto; /* Scorre se è lunga */
+    text-align: left; /* Allinea a sinistra (i titoli erano centrati) */
+    background: #F5F7FA; /* Sfondo leggero per distinguere l'area */
+    border-radius: 16px;
+    padding: 0 16px;
+}
+
+.preview-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 0;
+    border-bottom: 1px solid #E5E5EA;
+}
+.preview-row:last-child { border-bottom: none; }
+
+.preview-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1D1D1F;
+}
+.preview-details {
+    font-size: 12px;
+    color: #86868B;
+    font-weight: 500;
+    background: white;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid #E5E5EA;
+}
+/* =========================================
+   FIX CHAT CON DYNAMIC ISLAND
+   ========================================= */
+
+/* Quando ci alleniamo, la barra di input della chat deve salire 
+   per non finire sotto la Dynamic Island */
+body.is-training #view-chat {
+    /* 85px (Navbar) + 80px (Island + Spazio) = 165px */
+    bottom: 165px !important; 
+    transition: bottom 0.3s ease;
+}
+/* HEADER SCHEDA ROW */
+.page-title-row {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 20px;
+}
+.btn-icon-stats {
+    background: #F2F2F7; color: #0071E3;
+    width: 44px; height: 44px; border-radius: 50%; border: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; cursor: pointer; transition: transform 0.1s;
+}
+.btn-icon-stats:active { transform: scale(0.9); background: #E5E5EA; }
+
+/* LISTA VOLUMI NEL SHEET */
+.volume-list-container {
+    text-align: left; margin: 20px 0; max-height: 50vh; overflow-y: auto;
+}
+.vol-item {
+    margin-bottom: 12px;
+}
+.vol-header {
+    display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 4px;
+}
+.vol-bar-bg {
+    width: 100%; height: 8px; background: #F2F2F7; border-radius: 4px; overflow: hidden;
+}
+.vol-bar-fill {
+    height: 100%; background: #0071E3; border-radius: 4px;
+}
+
+/* NOTE COACH */
+.coach-notes-box {
+    background: #FFF8E1; border: 1px solid #FFE082; color: #F57F17;
+    padding: 15px; border-radius: 12px; text-align: left; margin-bottom: 20px;
+    font-size: 13px; line-height: 1.4;
+}
+.btn-sheet-close {
+    width: 100%; padding: 14px; background: #F2F2F7; border: none; border-radius: 14px;
+    font-weight: 600; color: #1D1D1F; cursor: pointer;
+}
+/* GRAFICO CIAMBELLA */
+.chart-donut-wrapper {
+    position: relative;
+    width: 200px; height: 200px; /* Dimensione fissa per non esplodere */
+    margin: 0 auto 20px auto;
+}
+
+.donut-center-text {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center; pointer-events: none;
+}
+.donut-center-text span { font-size: 28px; font-weight: 800; display: block; line-height: 1; color: #1D1D1F; }
+.donut-center-text small { font-size: 11px; color: #86868B; text-transform: uppercase; font-weight: 600; }
+.icon-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.nav-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 10px;
+    height: 10px;
+    background-color: #FF3B30; /* Rosso Apple */
+    border: 2px solid white; /* Bordo bianco per staccare */
+    border-radius: 50%;
+    z-index: 10;
+}
+
+.nav-badge.hidden { display: none; }

@@ -159,19 +159,46 @@ if (photoArea) {
     inpPhoto.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (file) {
-            // Limite dimensione (es. 2MB)
-            if (file.size > 2 * 1024 * 1024) {
-                alert("Foto troppo grande. Usa un'immagine sotto i 2MB.");
-                return;
-            }
-
             const reader = new FileReader();
-            reader.onload = (ev) => {
-                photoBase64 = ev.target.result; // Stringa Base64 pronta per il DB
-                imgPreview.src = photoBase64;
-                imgPreview.classList.remove('hidden');
-                placeholder.classList.add('hidden');
-                photoArea.style.border = "none";
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    // Creiamo un canvas per ridimensionare
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Max dimensioni (es. 800x800 è sufficiente per avatar)
+                    const MAX_WIDTH = 800;
+                    const MAX_HEIGHT = 800;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Converti in JPG compresso (0.7 qualità)
+                    photoBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                    
+                    // Mostra anteprima
+                    imgPreview.src = photoBase64;
+                    imgPreview.classList.remove('hidden');
+                    placeholder.classList.add('hidden');
+                    photoArea.style.border = "none";
+                };
+                img.src = event.target.result;
             };
             reader.readAsDataURL(file);
         }
@@ -193,8 +220,9 @@ document.getElementById('btn-finish').addEventListener('click', async () => {
         const age = document.getElementById('inp-age').value.trim();
         
         // Obiettivo
-        const goalEl = document.querySelector('#grid-goals .selected');
-        const goal = goalEl ? goalEl.dataset.val : "Generico";
+        const goalsArr = [];
+        document.querySelectorAll('#grid-goals .selected').forEach(el => goalsArr.push(el.dataset.val));
+        const goalString = goalsArr.length > 0 ? goalsArr.join(', ') : "Generico";
 
         // Sport (Multiplo)
         const sports = [];
@@ -226,7 +254,7 @@ document.getElementById('btn-finish').addEventListener('click', async () => {
             status: "pending",       // Stato fondamentale per la logica di approvazione
             
             // Anamnesi
-            goals: goal,
+            goals: goalString,
             history: sports.join(', '),
             injuries: `${injuriesArr.join(', ')} ${injuryDetail ? '- ' + injuryDetail : ''}`,
             posture: postureArr.join(', '),

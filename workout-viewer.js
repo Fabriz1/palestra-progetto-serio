@@ -42,11 +42,26 @@ let timerInterval = null;
 let secondsLeft = 0;
 let totalTime = 90;
 
-// 1. INIT
+// SEMAFORO PER EVITARE SOVRASCRITTURE
+let isRestoring = false; 
+
+const STORAGE_KEY = `workout_session_${currentWorkoutId}_day_${currentDay}`;
+const TIMER_KEY = `workout_timer_start_${currentWorkoutId}_day_${currentDay}`;
+
+// 1. INIT & PAGE SHOW (Fix per navigazione Back/Forward)
+window.addEventListener('pageshow', async (event) => {
+    // Se la pagina viene caricata dalla cache (bfcache), ricarichiamo i dati
+    if (event.persisted && auth.currentUser) {
+        console.log("Ripristino da cache rilevato...");
+        await loadData();
+    }
+});
+
 onAuthStateChanged(auth, async (user) => {
     if (!user) window.location.href = "login.html";
+    // Caricamento iniziale
     await loadData();
-    initSlideToFinish(); // Attiva lo slider
+    initSlideToFinish();
 });
 
 async function loadData() {
@@ -61,11 +76,19 @@ async function loadData() {
         }
 
         workoutData = snap.data();
-        dayTitle.textContent = `${workoutData.name} - Giorno ${currentDay}`;
-
-        // Fix string/number keys
+        
+        // 1. Header Fisso: VUOTO (Solo timer e tasto indietro)
+        dayTitle.textContent = `Giorno ${currentDay}`; 
+        
+        // 2. Titolone Pagina: SCRITTO QUI
+        
+        
         const exercises = workoutData.data[currentDay] || workoutData.data[String(currentDay)] || [];
+        
+        
+
         renderList(exercises);
+        restoreSession();
 
     } catch (e) { console.error(e); }
 }
@@ -84,20 +107,18 @@ function renderList(exercises) {
         card.className = 'ex-card';
         card.dataset.idx = idx;
 
-        // --- CALCOLO SUMMARY (Cosa mostrare chiuso) ---
+        // --- CALCOLO SUMMARY ---
         let summaryText = "";
         if (ex.technique === "Top set + back-off") {
             summaryText = `Top Set + ${ex.backSets || 2} Backoff`;
         } else if (ex.technique === "Myo-reps") {
             summaryText = "Activation + Myo Series";
         } else {
-            // Standard
             const s = parseInt(ex.val1) || 3;
             const r = ex.val2 || "10";
             summaryText = `${s} Serie x ${r} Reps`;
         }
 
-        // Summary Header
         let summaryHtml = `
             <div class="ex-summary" onclick="toggleCard(this)">
                 <div class="ex-info">
@@ -111,7 +132,6 @@ function renderList(exercises) {
             </div>
         `;
 
-        // Details Body
         let detailsHtml = `<div class="ex-details"><div class="details-content">`;
         if (ex.notes) detailsHtml += `<div class="coach-tip">💡 ${ex.notes}</div>`;
         detailsHtml += generateInputRows(ex);
@@ -131,13 +151,11 @@ function renderList(exercises) {
     });
 }
 
-// TOGGLE ACCORDION
 window.toggleCard = (header) => {
     const card = header.parentElement;
     card.classList.toggle('active');
 };
 
-// GENERATORE RIGHE
 function generateInputRows(ex) {
     let html = '';
     const rest = ex.rest || 90;
@@ -161,8 +179,6 @@ function generateInputRows(ex) {
 
 function createRow(label, targetReps, rest) {
     const isSpecial = (String(label).length > 2);
-    // Pulizia reps (es "12-15" -> prende 12 per calcolo prudente, o salviamo stringa e gestiamo dopo)
-    // Per ora salviamo la stringa target nel dataset
     return `
         <div class="set-row" data-rest="${rest}" data-reps="${targetReps}">
             <div class="set-info">
@@ -170,20 +186,26 @@ function createRow(label, targetReps, rest) {
                 <span class="set-target">${targetReps} reps</span>
             </div>
             <div class="set-input-area">
-                <input type="number" class="input-kg" placeholder="Kg">
+                <input type="number" class="input-kg" placeholder="Kg" oninput="window.autoSaveSession()">
             </div>
             <button class="btn-check" onclick="toggleSet(this)"><i class="ph ph-check"></i></button>
         </div>
     `;
 }
+
 // LOGICA INTERATTIVA
 window.toggleSet = (btn) => {
     const row = btn.closest('.set-row');
     btn.classList.toggle('done');
+    
+    // Se è done, vibra e parte timer
     if (btn.classList.contains('done')) {
         startTimer(row.dataset.rest);
         if (navigator.vibrate) navigator.vibrate(50);
     }
+    
+    // Salva stato
+    window.autoSaveSession();
 };
 
 window.smartCopy = (btn) => {
@@ -191,13 +213,23 @@ window.smartCopy = (btn) => {
     const inputs = card.querySelectorAll('.input-kg');
     const firstVal = inputs[0].value;
     if (firstVal) {
-        inputs.forEach((inp, i) => { if (i > 0 && !inp.value) inp.value = firstVal; });
+        inputs.forEach((inp, i) => { 
+            // Copia solo se vuoto
+            if (i > 0 && !inp.value) {
+                inp.value = firstVal; 
+            }
+        });
+        
+        // Feedback visivo
         btn.innerHTML = `<i class="ph ph-check"></i> Fatto!`;
         setTimeout(() => btn.innerHTML = `<i class="ph ph-copy"></i> Copia peso su tutti i set`, 1500);
+        
+        // Forza salvataggio
+        window.autoSaveSession();
     }
 };
 
-// TIMER
+// TIMER DI RECUPERO
 function startTimer(seconds) {
     totalTime = parseInt(seconds) || 90;
     secondsLeft = totalTime;
@@ -227,6 +259,84 @@ btnSkip.addEventListener('click', () => { clearInterval(timerInterval); restOver
 btnAdd30.addEventListener('click', () => { secondsLeft += 30; totalTime += 30; updateCircle(); });
 
 // =========================================
+// AUTO-SAVE & RESTORE SYSTEM (Fixato)
+// =========================================
+
+function autoSaveSession() {
+    // 1. IL SEMAFORO: Se stiamo ripristinando, NON salvare
+    if (isRestoring) return;
+
+    // --- NUOVO: AVVIO TIMER AL PRIMO TOCCO ---
+    if (!localStorage.getItem(TIMER_KEY)) {
+        const now = Date.now();
+        localStorage.setItem(TIMER_KEY, now);
+        sessionStartTime = now; // Aggiorna la variabile globale del timer
+    }
+    // -----------------------------------------
+
+    const sessionState = {};
+
+    document.querySelectorAll('.ex-card').forEach(card => {
+        const idx = card.dataset.idx;
+        const inputs = card.querySelectorAll('.input-kg');
+        const checks = card.querySelectorAll('.btn-check');
+
+        sessionState[idx] = { sets: [] };
+
+        inputs.forEach((inp, setIndex) => {
+            sessionState[idx].sets.push({
+                kg: inp.value,
+                done: checks[setIndex].classList.contains('done')
+            });
+        });
+    });
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionState));
+    
+    // Salva metadati per la dashboard
+    localStorage.setItem('active_workout_status', 'running');
+    localStorage.setItem('active_workout_meta', JSON.stringify({
+        name: workoutData?.name || 'Allenamento',
+        day: currentDay,
+        id: currentWorkoutId
+    }));
+}
+
+function restoreSession() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    
+    // NOTA: Ho rimosso l'avvio forzato del timer qui. 
+    // Ora il timer parte solo se c'è già nel localStorage o se l'utente scrive.
+
+    if (!saved) return;
+
+    // ATTIVA SEMAFORO
+    isRestoring = true;
+
+    try {
+        const state = JSON.parse(saved);
+
+        document.querySelectorAll('.ex-card').forEach(card => {
+            const idx = card.dataset.idx;
+            if (state[idx]) {
+                const inputs = card.querySelectorAll('.input-kg');
+                const checks = card.querySelectorAll('.btn-check');
+
+                state[idx].sets.forEach((set, i) => {
+                    if (inputs[i] && set.kg) inputs[i].value = set.kg;
+                    if (checks[i] && set.done) checks[i].classList.add('done');
+                });
+            }
+        });
+        console.log("Sessione ripristinata.");
+    } catch (e) {
+        console.error("Errore ripristino:", e);
+    } finally {
+        isRestoring = false;
+    }
+}
+
+// =========================================
 // SLIDE TO FINISH (Logica Touch)
 // =========================================
 function initSlideToFinish() {
@@ -235,96 +345,75 @@ function initSlideToFinish() {
     let containerWidth = 0;
     let maxDrag = 0;
 
-    // Supporto Touch e Mouse
     const startDrag = (clientX) => {
         isDragging = true;
         startX = clientX;
         containerWidth = btnFinish.offsetWidth;
-        maxDrag = containerWidth - 60; // 60 = larghezza knob + padding
+        maxDrag = containerWidth - 60; 
         slideText.style.opacity = 0.5;
     };
 
     const moveDrag = (clientX) => {
         if (!isDragging) return;
         let moveX = clientX - startX;
-
         if (moveX < 0) moveX = 0;
         if (moveX > maxDrag) moveX = maxDrag;
-
         slideKnob.style.transform = `translateX(${moveX}px)`;
-
-        // Opacity testo svanisce mentre scorri
         slideText.style.opacity = 1 - (moveX / maxDrag);
     };
 
     const endDrag = async (clientX) => {
         if (!isDragging) return;
         isDragging = false;
-
         let moveX = clientX - startX;
+        
         if (moveX >= maxDrag - 10) {
-            // FINITO!
             slideKnob.style.transform = `translateX(${maxDrag}px)`;
             slideText.textContent = "SALVATAGGIO...";
             await saveWorkout();
         } else {
-            // Torna indietro
             slideKnob.style.transform = `translateX(0px)`;
             slideText.style.opacity = 1;
         }
     };
 
-    // Events Touch
     slideKnob.addEventListener('touchstart', (e) => startDrag(e.touches[0].clientX));
     document.addEventListener('touchmove', (e) => moveDrag(e.touches[0].clientX));
     document.addEventListener('touchend', (e) => endDrag(e.changedTouches[0].clientX));
-
-    // Events Mouse (per testare su PC)
+    
+    // Mouse fallback
     slideKnob.addEventListener('mousedown', (e) => startDrag(e.clientX));
     document.addEventListener('mousemove', (e) => moveDrag(e.clientX));
     document.addEventListener('mouseup', (e) => endDrag(e.clientX));
 }
 
-// SALVATAGGIO REALE
-// SALVATAGGIO REALE (Con Fix dayIndex per Analisi Coach)
-
+// SALVATAGGIO SU FIRESTORE
 async function saveWorkout() {
-
     const sessionLog = {
         workoutId: currentWorkoutId,
         workoutName: workoutData.name,
-        dayIndex: parseInt(currentDay) || 1, // <--- RIGA AGGIUNTA FONDAMENTALE
+        dayIndex: parseInt(currentDay) || 1,
         date: new Date().toISOString(),
         exercises: []
     };
 
-    // Dati originali per recuperare i muscoli
     const originalExercises = workoutData.data[currentDay] || workoutData.data[String(currentDay)] || [];
 
     document.querySelectorAll('.ex-card').forEach(card => {
         const idx = card.dataset.idx;
         const originalEx = originalExercises[idx];
-
         const name = card.querySelector('h3').textContent;
         const sets = [];
 
         card.querySelectorAll('.set-row').forEach(row => {
             const kg = parseFloat(row.querySelector('.input-kg').value) || 0;
             const done = row.querySelector('.btn-check').classList.contains('done');
-
-            // RECUPERA LE REPS DAL TARGET (visto che l'input non c'è)
-            // Se è un range "10-12", prendiamo il primo numero per i calcoli matematici
             let repsVal = row.dataset.reps;
             let repsNum = parseFloat(repsVal);
             if (isNaN(repsNum) && repsVal.includes('-')) repsNum = parseFloat(repsVal.split('-')[0]);
 
-            // Salva solo se c'è un peso o è fatto
             if (kg > 0 || done) {
-                sets.push({
-                    kg: kg,
-                    reps: repsNum || 0, // Ora salviamo le reps!
-                    done: done
-                });
+                sets.push({ kg: kg, reps: repsNum || 0, done: done });
             }
         });
 
@@ -339,52 +428,86 @@ async function saveWorkout() {
 
     try {
         await addDoc(collection(db, "users", auth.currentUser.uid, "logs"), sessionLog);
-        alert("Allenamento Completato! 🔥");
+        
+        // PULIZIA: Rimuovi dati locali solo dopo successo
+        clearSessionData();
+        
+        // Vai alla dashboard (che aggiornerà i grafici)
         window.location.href = "dashboard-client.html";
     } catch (e) {
         console.error(e);
-        alert("Errore salvataggio");
-        // Reset slider visuale
+        alert("Errore salvataggio. Riprova.");
+        // Reset slider
         const knob = document.querySelector('.slide-knob');
         if (knob) knob.style.transform = `translateX(0px)`;
+        slideText.textContent = "SCORRI PER FINIRE";
+        slideText.style.opacity = 1;
     }
 }
 
-btnBack.addEventListener('click', () => window.history.back());
+// CESTINO (ANNULLA)
+document.getElementById('btn-trash').addEventListener('click', () => {
+    if(confirm("Vuoi annullare l'allenamento? I dati inseriti oggi andranno persi.")) {
+        clearSessionData();
+        window.location.href = "dashboard-client.html";
+    }
+});
 
-// --- TIMER DURATA ALLENAMENTO (Super Fluido) ---
+function clearSessionData() {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(TIMER_KEY);
+    localStorage.removeItem('active_workout_status');
+    localStorage.removeItem('active_workout_meta');
+}
+
+// BACK BUTTON
+btnBack.addEventListener('click', () => {
+    // Tornando indietro, i dati restano nel localStorage.
+    // La Dashboard rileverà 'active_workout_status' e mostrerà la Dynamic Island.
+    window.location.href = "dashboard-client.html";
+});
+
+// TIMER GLOBALE DURATA (Visualizzazione)
 const sessionTimerEl = document.getElementById('session-timer');
 const sessionBox = document.getElementById('session-timer-box');
-const startTime = Date.now(); // Salva l'istante di inizio
+
+// Recupera data inizio (può essere null se non ancora iniziato)
+let sessionStartTime = localStorage.getItem(TIMER_KEY); 
+if(sessionStartTime) sessionStartTime = parseInt(sessionStartTime);
 
 function animateTimer() {
-    // Calcola il tempo passato esatto in millisecondi
+    // SE NON E' ANCORA INIZIATO (Nessun input inserito)
+    if (!sessionStartTime) {
+        if (sessionTimerEl) sessionTimerEl.textContent = "0m";
+        requestAnimationFrame(animateTimer);
+        return;
+    }
+
     const now = Date.now();
-    const diff = now - startTime;
+    const diff = now - sessionStartTime;
     const totalSeconds = Math.floor(diff / 1000);
 
-    // Calcolo Ore e Minuti (Testo)
     const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
-
-    // Aggiorna testo solo se cambia (per performance)
+    
     const hDisplay = h > 0 ? `${h}h ` : '';
     const mDisplay = `${m}m`;
     const text = hDisplay + mDisplay;
-    if (sessionTimerEl.textContent !== text) {
+    
+    if (sessionTimerEl && sessionTimerEl.textContent !== text) {
         sessionTimerEl.textContent = text;
     }
-
-    // Bordo Verde FLUIDO (Basato sui millisecondi dentro il minuto corrente)
-    // 60000 ms in un minuto
-    const msInMinute = diff % 60000;
+    
+    // Animazione bordo
+    const msInMinute = diff % 60000; 
     const percentage = (msInMinute / 60000) * 100;
+    if(sessionBox) sessionBox.style.setProperty('--p', `${percentage.toFixed(2)}%`);
 
-    sessionBox.style.setProperty('--p', `${percentage.toFixed(2)}%`);
-
-    // Richiama al prossimo frame (60fps)
     requestAnimationFrame(animateTimer);
 }
-
-// Avvia
 requestAnimationFrame(animateTimer);
+
+// Export funzioni globali per HTML
+window.autoSaveSession = autoSaveSession;
+window.toggleSet = toggleSet;
+window.smartCopy = smartCopy;

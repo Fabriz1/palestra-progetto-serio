@@ -235,6 +235,7 @@ h2 { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #1D1D1F; }
 .client-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 15px 30px rgba(0,0,0,0.08);
+    z-index: 999;
 }
 
 /* Stile quando la card ha un colore (Glow Effect) */
@@ -298,7 +299,7 @@ h2 { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #1D1D1F; }
     border-radius: 50%; display: flex; align-items: center; justify-content: center;
     font-size: 20px; color: #86868B; cursor: pointer; z-index: 5; transition: all 0.2s;
 }
-.card-menu-btn:hover { background: #F2F2F7; color: #1D1D1F; transform: scale(1.1); }
+.card-menu-btn:hover { background: #F2F2F7; color: #1D1D1F; transform: scale(1.1); z-index: 101;}
 
 /* --- DROPDOWN MODERNO (Pallini) --- */
 .card-dropdown {
@@ -306,7 +307,7 @@ h2 { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #1D1D1F; }
     background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(20px);
     border-radius: 16px; border: 1px solid rgba(0,0,0,0.08);
     box-shadow: 0 20px 60px rgba(0,0,0,0.15);
-    width: 240px; z-index: 100;
+    width: 240px; z-index: 1000;
     display: none; flex-direction: column; padding: 16px;
     cursor: default;
 }
@@ -337,13 +338,70 @@ h2 { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #1D1D1F; }
 .label-input-row button:active { transform: scale(0.9); }
 
 /* LIST VIEW MODE TRANSFORMATION */
-.clients-grid.list-view-mode { display: flex; flex-direction: column; gap: 10px; }
-.clients-grid.list-view-mode .client-card {
-    display: flex; flex-direction: row; align-items: center; justify-content: space-between;
-    padding: 16px 24px; max-width: 100%; border: 1px solid #E5E5EA; box-shadow: none;
+.clients-grid.list-view-mode { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 12px; 
 }
+
+.clients-grid.list-view-mode .client-card {
+    display: flex; 
+    flex-direction: row; 
+    align-items: center; 
+    /* Togliamo space-between per gestire noi gli spazi */
+    justify-content: flex-start; 
+    gap: 20px;
+    padding: 12px 24px; 
+    max-width: 100%; 
+    border: 2px solid transparent; 
+    box-shadow: none;
+    background: white;
+}
+
+/* Forza il bordo colorato anche in lista */
+.clients-grid.list-view-mode .client-card[data-colored="true"] {
+    border-color: var(--card-color) !important;
+    background: linear-gradient(to right, rgba(255,255,255,0.9), white);
+}
+
+/* 1. L'intestazione (Avatar + Nome) deve essere la PRIMA cosa a sinistra */
+.clients-grid.list-view-mode .client-header {
+    order: 1; /* Primo posto */
+    margin-bottom: 0; /* Rimuove margine della griglia */
+    min-width: 250px; /* Larghezza minima per allineamento pulito */
+}
+
+/* 2. Il Tag deve stare SUBITO DOPO il nome */
+.clients-grid.list-view-mode .custom-label-badge { 
+    position: static; /* Smette di fluttuare */
+    order: 2; /* Secondo posto */
+    margin: 0;
+    box-shadow: none; 
+    font-size: 10px; 
+    padding: 5px 10px;
+    transform: none; /* Rimuove eventuali animazioni di ingresso */
+}
+
+/* 3. Il Bottone deve andare IN FONDO A DESTRA */
+.clients-grid.list-view-mode .btn-details { 
+    order: 3; /* Terzo posto */
+    margin-left: auto; /* Spinge tutto a destra */
+    width: auto; 
+    padding: 8px 20px; 
+    font-size: 12px; 
+}
+
+/* Nascondi elementi inutili in lista */
 .clients-grid.list-view-mode .mini-chart-area { display: none; }
-.clients-grid.list-view-mode .btn-details { width: auto; padding: 8px 16px; }
+.clients-grid.list-view-mode .card-menu-btn { 
+    /* Spostiamo anche i tre puntini in fondo, dopo il bottone */
+    position: static; 
+    order: 4; 
+    margin-left: 10px;
+}
+.clients-grid.list-view-mode .card-dropdown {
+    top: 50px; right: 10px; /* Aggiusta posizione menu a tendina */
+}
 
 @keyframes popInBadge { from { opacity: 0; transform: translateY(10px) scale(0.8); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes menuFadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
@@ -881,4 +939,69 @@ h2 { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #1D1D1F; }
 
 .btn-secondary-outline i {
     font-size: 16px;
+}
+/* Badge Rosso nella Sidebar (Globale) */
+
+
+.badge {
+    background-color: #FF3B30; /* Rosso Apple */
+    min-width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-left: 10px;
+    box-shadow: 0 0 0 1px white; /* Bordo bianco per stacco */
+}
+
+/* Badge Blu nella Lista Chat (Singola Conversazione) */
+.chat-list-item {
+    position: relative;
+}
+
+.unread-dot {
+    width: 10px;
+    height: 10px;
+    background-color: #0071E3; /* Blu iOS */
+    border-radius: 50%;
+    margin-left: auto; /* Lo spinge tutto a destra */
+    flex-shrink: 0;
+}
+
+.chat-preview p.unread-text {
+    font-weight: 700;
+    color: #1D1D1F;
+}
+
+/* FILTRI AVANZATI (Accanto alla ricerca) */
+.filters-row {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap; flex-grow: 1;
+}
+.filter-select {
+    padding: 10px 14px; border: 1px solid #D2D2D7; border-radius: 10px;
+    background: white; font-family: inherit; font-size: 13px; color: #1D1D1F;
+    cursor: pointer; outline: none; min-width: 120px;
+}
+.filter-select:hover { border-color: #0071E3; }
+
+/* AUTOCOMPLETE TAGS (Suggerimenti) */
+.tag-suggestions-area {
+    display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; max-height: 80px; overflow-y: auto;
+}
+.tag-chip {
+    font-size: 10px; background: #F2F2F7; padding: 4px 8px; border-radius: 12px;
+    color: #1D1D1F; cursor: pointer; border: 1px solid transparent;
+}
+.tag-chip:hover { background: #E5E5EA; border-color: #D2D2D7; }
+
+/* Input Tag Bello */
+.tag-input-wrapper {
+    position: relative; display: flex; align-items: center; 
+    background: #F9F9FA; border: 1px solid #E5E5EA; border-radius: 8px; padding: 2px;
+}
+.tag-input-wrapper input {
+    border: none; background: transparent; padding: 8px; width: 100%; font-size: 13px; outline: none;
+}
+.tag-input-wrapper button {
+    background: #0071E3; color: white; border: none; border-radius: 6px; 
+    width: 28px; height: 28px; cursor: pointer; margin-right: 2px;
+    display: flex; align-items: center; justify-content: center;
 }

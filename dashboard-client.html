@@ -1,26 +1,27 @@
 <!DOCTYPE html>
 <html lang="it">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dashboard Atleta</title>
-    <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0f172a">
+
 
     <!-- Font Inter & Icone -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
+
     <!-- Chart.js per i Grafici -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- CSS Specifico -->
     <link rel="stylesheet" href="client-style.css">
 </head>
+
 <body>
 
     <div class="app-wrapper">
-        
+
         <!-- HEADER FISSO -->
         <header class="app-header">
             <div class="header-user" onclick="switchTab('view-profile')"> <!-- Cliccando vai al profilo -->
@@ -30,20 +31,15 @@
                     <h2 id="header-name">Caricamento...</h2>
                 </div>
             </div>
-            <div class="header-actions">
-                <button class="icon-btn" id="btn-notifications">
-                    <i class="ph ph-bell"></i>
-                    <span class="badge-dot hidden"></span>
-                </button>
-            </div>
+            
         </header>
 
         <!-- AREA CONTENUTO SCROLLABILE -->
         <main class="content-area">
-            
+
             <!-- 1. HOME: PANORAMICA -->
             <section id="view-home" class="view-section active">
-                
+
                 <!-- Hero Card Scheda -->
                 <div class="hero-card" id="hero-workout-card">
                     <div class="hero-bg"></div>
@@ -95,11 +91,19 @@
 
             <!-- 2. SCHEDA: LISTA GIORNI -->
             <section id="view-program" class="view-section hidden">
-                <div class="page-title">
-                    <h2>Il tuo Allenamento</h2>
-                    <p>Seleziona la seduta da svolgere oggi.</p>
+
+                <!-- HEADER CON BOTTONE DETTAGLI -->
+                <div class="page-title-row">
+                    <div class="title-texts">
+                        <h2>Il tuo Allenamento</h2>
+                        <p>Seleziona la seduta da svolgere oggi.</p>
+                    </div>
+                    <!-- NUOVO BOTTONE DETTAGLI TECNICI -->
+                    <button class="btn-icon-stats" onclick="openProgramDetails()">
+                        <i class="ph ph-chart-pie-slice"></i>
+                    </button>
                 </div>
-                
+
                 <div id="workout-days-list" class="days-list-wrapper">
                     <!-- JS inserirà qui le card dei giorni -->
                     <div class="empty-state">
@@ -138,34 +142,40 @@
                         <button class="filter-chip" data-type="body">Peso Corporeo</button>
                     </div>
 
-                    <!-- 2. Selezione Specifica (es. quale esercizio?) -->
-                    <div class="control-row mt-10">
-                        <select id="chart-selector" class="chart-select">
-                            <option>Seleziona...</option>
-                        </select>
-                    </div>
-                </div>
 
-                <!-- Area Grafico -->
-                <div class="chart-card">
-                    <canvas id="progressChart"></canvas>
-                </div>
+                    <!-- 2. Selezione Specifica (CUSTOM DROPDOWN) -->
+                    <div class="dropdown-row-wrapper mt-10">
+                        <div class="custom-dropdown" id="chart-dropdown">
+                            <div class="dropdown-trigger" onclick="toggleChartDropdown()">
+                                <span id="dropdown-selected-text">Seleziona...</span>
+                                <i class="ph ph-caret-down"></i>
+                            </div>
+                            <div class="dropdown-options hidden" id="dropdown-list">
+                                <!-- JS riempie qui -->
+                            </div>
+                        </div>
+                    </div>
 
-                <!-- Statistiche Testuali sotto il grafico -->
-                <div class="chart-stats-grid" id="chart-stats-details">
-                    <div class="mini-stat">
-                        <label>Massimo</label>
-                        <strong>-</strong>
+                    <!-- Area Grafico -->
+                    <div class="chart-card">
+                        <canvas id="progressChart"></canvas>
                     </div>
-                    <div class="mini-stat">
-                        <label>Media</label>
-                        <strong>-</strong>
+
+                    <!-- Statistiche Testuali sotto il grafico -->
+                    <div class="chart-stats-grid" id="chart-stats-details">
+                        <div class="mini-stat">
+                            <label>Massimo</label>
+                            <strong>-</strong>
+                        </div>
+                        <div class="mini-stat">
+                            <label>Media</label>
+                            <strong>-</strong>
+                        </div>
+                        <div class="mini-stat">
+                            <label>Ultimo</label>
+                            <strong>-</strong>
+                        </div>
                     </div>
-                    <div class="mini-stat">
-                        <label>Ultimo</label>
-                        <strong>-</strong>
-                    </div>
-                </div>
             </section>
 
             <!-- 5. PROFILO (Editabile) -->
@@ -208,21 +218,39 @@
             </section>
 
         </main>
-
+        <!-- DYNAMIC ISLAND (Mini Player Allenamento) -->
+        <div id="active-workout-bar" class="workout-floating-bar hidden" onclick="resumeWorkout()">
+            <div class="pulsing-dot"></div>
+            <div class="floating-info">
+                <span class="f-label">ALLENAMENTO IN CORSO</span>
+                <strong id="floating-name">Giorno 1</strong>
+            </div>
+            <div class="floating-timer" id="floating-timer">00:00</div>
+            <i class="ph ph-caret-right"></i>
+        </div>
         <!-- BOTTOM NAV BAR -->
         <nav class="bottom-nav">
             <button class="nav-item active" data-target="view-home">
                 <i class="ph ph-house"></i>
                 <span>Home</span>
             </button>
-            <button class="nav-item" data-target="view-program">
-                <i class="ph ph-barbell"></i>
+            
+            <button class="nav-item" data-target="view-program" id="nav-btn-program">
+                <div class="icon-wrapper">
+                    <i class="ph ph-barbell"></i>
+                    <span id="badge-program" class="nav-badge hidden"></span> <!-- BADGE SCHEDA -->
+                </div>
                 <span>Scheda</span>
             </button>
-            <button class="nav-item" data-target="view-chat">
-                <i class="ph ph-chat-circle"></i>
+            
+            <button class="nav-item" data-target="view-chat" id="nav-btn-chat">
+                <div class="icon-wrapper">
+                    <i class="ph ph-chat-circle"></i>
+                    <span id="badge-chat" class="nav-badge hidden"></span> <!-- BADGE CHAT -->
+                </div>
                 <span>Chat</span>
             </button>
+            
             <button class="nav-item" data-target="view-progress">
                 <i class="ph ph-chart-line-up"></i>
                 <span>Progressi</span>
@@ -230,8 +258,67 @@
         </nav>
 
     </div>
+    <!-- BOTTOM SHEET PREVIEW -->
+    <div id="preview-overlay" class="sheet-overlay" onclick="closePreview(event)">
+        <div class="bottom-sheet" onclick="event.stopPropagation()"> <!-- Ferma il click per non chiudere -->
+            <div class="sheet-handle"></div>
 
+            <div class="sheet-content">
+                <h2 id="sheet-day-title" class="sheet-title">Giorno X</h2>
+                <p id="sheet-day-info" class="sheet-subtitle">Caricamento...</p>
+
+                <!-- NUOVO: QUI COMPARIRANNO GLI ESERCIZI -->
+                <div id="sheet-exercises-list" class="sheet-exercises-list">
+                    <!-- Javascript riempirà questo spazio -->
+                </div>
+
+                <!-- Bottone Principale -->
+                <button id="btn-sheet-start" class="btn-sheet-start">
+                    INIZIA ALLENAMENTO <i class="ph ph-play-circle"
+                        style="vertical-align: middle; margin-left: 5px;"></i>
+                </button>
+
+                <!-- Sezione Conflitto (Invariata) -->
+                <div id="sheet-conflict-box" class="sheet-warning">
+                    <!-- ... contenuto invariato ... -->
+                    <div class="warning-title"><i class="ph ph-warning-circle"></i> ATTENZIONE</div>
+                    <p class="warning-text">Hai già un allenamento in corso...</p>
+                    <div class="warning-actions">
+                        <button class="btn-warn-secondary" onclick="closePreview()">Annulla</button>
+                        <button class="btn-warn-danger" id="btn-force-start">Sovrascrivi</button>
+                    </div>
+                </div>
+            </div>
+            <!-- CONTENUTO ALTERNATIVO: DETTAGLI VOLUMI SCHEDA -->
+            <div id="sheet-program-stats" class="sheet-content hidden">
+                <h2 class="sheet-title">Analisi Scheda</h2>
+                <p class="sheet-subtitle">Distribuzione del volume settimanale</p>
+                <div class="chart-donut-wrapper">
+                    <canvas id="programVolumeChart"></canvas>
+                    <!-- Totale Set al centro (Opzionale) -->
+                    <div class="donut-center-text">
+                        <span id="total-sets-val">0</span>
+                        <small>Set Tot</small>
+                    </div>
+                </div>
+
+                <!-- LISTA VOLUMI -->
+                <div id="sheet-volume-list" class="volume-list-container">
+                    <!-- JS riempirà qui -->
+                </div>
+
+                <!-- MESSAGGIO COACH (Se presente) -->
+                <div id="sheet-coach-notes" class="coach-notes-box hidden">
+                    <strong>Note del Coach:</strong>
+                    <p id="coach-notes-text">...</p>
+                </div>
+
+                <button class="btn-sheet-close" onclick="closePreview()">Chiudi</button>
+            </div>
+        </div>
+    </div>
     <!-- SCRIPT -->
     <script type="module" src="dashboard-client.js"></script>
 </body>
+
 </html>

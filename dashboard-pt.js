@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-    getFirestore, doc, getDoc, updateDoc, collection, query, where, getDocs, orderBy, deleteDoc, addDoc, serverTimestamp, setDoc
+    getFirestore, doc, getDoc, updateDoc, collection, query, where, getDocs, orderBy, deleteDoc, addDoc, serverTimestamp, setDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // CONFIGURAZIONE
@@ -19,7 +19,9 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// DOM GLOBALE
+// =========================================
+// 0. DOM GLOBALE & VARIABILI (TUTTO QUI SOPRA)
+// =========================================
 const ptNameElement = document.getElementById('pt-name');
 const ptAvatarElement = document.getElementById('pt-avatar');
 const logoutBtn = document.getElementById('logout-btn');
@@ -30,9 +32,67 @@ const displayTrainerCode = document.getElementById('display-trainer-code');
 const copyCodeBtn = document.querySelector('.copy-btn');
 const pageTitle = document.getElementById('page-title');
 
-let currentUserData = null;
+// Variabili Gestione Clienti
+const clientsGrid = document.getElementById('clients-grid');
+const clientPanel = document.getElementById('client-detail-panel');
+const btnClosePanel = document.getElementById('btn-close-client');
+const toggleBtns = document.querySelectorAll('.toggle-btn');
 
+// Variabili Schede
+const tabActive = document.getElementById('tab-active-workouts');
+const tabArchive = document.getElementById('tab-archive-workouts');
+const viewActive = document.getElementById('view-active-workouts');
+const viewArchive = document.getElementById('view-archive-workouts');
+const listActive = document.getElementById('list-active-workouts');
+const listArchive = document.getElementById('list-archive-workouts');
+
+// Variabili Misure
+const viewMeasuresList = document.getElementById('view-measures-list');
+const viewMeasureForm = document.getElementById('view-measure-form');
+const btnShowAdd = document.getElementById('btn-show-add-measure');
+const btnCancelInput = document.getElementById('btn-cancel-input');
+const btnSaveFull = document.getElementById('btn-save-full-measure');
+
+// Variabili Chat
+const chatListContainer = document.querySelector('.chat-sidebar');
+const chatMessagesArea = document.querySelector('.messages-area');
+const chatInput = document.querySelector('.message-input-area input');
+const btnSend = document.querySelector('.send-btn');
+
+// Variabili Richieste
+const requestsList = document.getElementById('requests-list');
+const pendingCountEl = document.getElementById('pending-requests-count');
+const badgeHome = document.getElementById('requests-badge');
+
+// Variabili Settings
+const btnChangePhoto = document.getElementById('btn-change-photo');
+const inputPhotoFile = document.getElementById('input-photo-file');
+const previewAvatar = document.getElementById('settings-avatar-preview');
+const btnSaveAll = document.getElementById('btn-save-settings-all');
+const btnCreateWorkout = document.getElementById('btn-create-workout');
+
+// Stato Globale
+let currentUserData = null;
+let currentSelectedClientId = null;
+let allClientsCache = [];
+let uniqueTagsCache = new Set();
+let newPhotoBase64 = null;
+let editingMeasureId = null;
+let activeChatId = null;
+let unsubscribeMessages = null;
+
+// Stato Analisi
+let allClientLogs = [];
+let currentAnalysisLogs = [];
+let analysisType = 'exercise';
+let analysisSort = 'desc';
+const activeCharts = {};
+let currentWorkoutDays = 7;
+
+
+// =========================================
 // 1. AUTH & INIT
+// =========================================
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         const userRef = doc(db, "users", user.uid);
@@ -56,8 +116,8 @@ function initDashboard(user, dbData) {
     const displayName = dbData.customName || dbData.name || user.displayName;
     const displayPhoto = dbData.customPhoto || dbData.photoURL || user.photoURL;
 
-    ptNameElement.textContent = displayName;
-    ptAvatarElement.src = displayPhoto;
+    if(ptNameElement) ptNameElement.textContent = displayName;
+    if(ptAvatarElement) ptAvatarElement.src = displayPhoto;
 
     // Popola Settings
     const settingsName = document.getElementById('settings-name');
@@ -67,15 +127,19 @@ function initDashboard(user, dbData) {
     if (settingsBio) settingsBio.value = dbData.bio || "";
     if (settingsAvatar) settingsAvatar.src = displayPhoto;
 
-    currentDateElement.textContent = new Date().toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    if (dbData.trainerCode) displayTrainerCode.textContent = dbData.trainerCode;
+    if(currentDateElement) currentDateElement.textContent = new Date().toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    if (dbData.trainerCode && displayTrainerCode) displayTrainerCode.textContent = dbData.trainerCode;
 
     // Popola Volume
     if (dbData.volumeSettings) {
-        document.getElementById('vol-secondary').value = dbData.volumeSettings.secondary ?? 0.5;
-        document.getElementById('vol-tertiary').value = dbData.volumeSettings.tertiary ?? 0.3;
-        document.getElementById('vol-quaternary').value = dbData.volumeSettings.quaternary ?? 0.15;
-        document.getElementById('vol-other').value = dbData.volumeSettings.other ?? 0.1;
+        const v2 = document.getElementById('vol-secondary');
+        const v3 = document.getElementById('vol-tertiary');
+        const v4 = document.getElementById('vol-quaternary');
+        const vO = document.getElementById('vol-other');
+        if(v2) v2.value = dbData.volumeSettings.secondary ?? 0.5;
+        if(v3) v3.value = dbData.volumeSettings.tertiary ?? 0.3;
+        if(v4) v4.value = dbData.volumeSettings.quaternary ?? 0.15;
+        if(vO) vO.value = dbData.volumeSettings.other ?? 0.1;
     }
 
     loadWorkouts(user.uid);
@@ -84,17 +148,9 @@ function initDashboard(user, dbData) {
     loadPendingRequests(user.uid);
 }
 
+// =========================================
 // 2. NAVIGAZIONE
-navLinks.forEach(link => {
-    link.addEventListener('click', () => {
-        navLinks.forEach(l => l.classList.remove('active'));
-        link.classList.add('active');
-        sections.forEach(section => section.classList.add('hidden'));
-        const targetId = link.getAttribute('data-target');
-        document.getElementById(targetId).classList.remove('hidden');
-        updatePageTitle(targetId);
-    });
-});
+// =========================================
 
 function updatePageTitle(sectionId) {
     switch (sectionId) {
@@ -103,26 +159,42 @@ function updatePageTitle(sectionId) {
         case 'section-schede': pageTitle.textContent = "Gestione Schede"; break;
         case 'section-chat': pageTitle.textContent = "Messaggi"; break;
         case 'section-settings': pageTitle.textContent = "Impostazioni Profilo"; break;
+        default: pageTitle.textContent = "Dashboard";
     }
 }
 
-// 3. LOGOUT
-logoutBtn.addEventListener('click', async () => {
+navLinks.forEach(link => {
+    link.addEventListener('click', () => {
+        navLinks.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+
+        sections.forEach(section => section.classList.add('hidden'));
+        const targetId = link.getAttribute('data-target');
+        document.getElementById(targetId).classList.remove('hidden');
+
+        updatePageTitle(targetId);
+
+        if (targetId === 'section-chat') {
+            const badge = document.getElementById('chat-badge');
+            if (badge) badge.classList.add('hidden');
+        }
+    });
+});
+
+if(logoutBtn) logoutBtn.addEventListener('click', async () => {
     try { await signOut(auth); window.location.href = "login.html"; }
     catch (error) { console.error("Errore logout:", error); }
 });
 
-// 4. COPY CODE
 if (copyCodeBtn) {
     copyCodeBtn.addEventListener('click', () => {
         navigator.clipboard.writeText(displayTrainerCode.textContent).then(() => alert("Codice copiato!"));
     });
 }
 
-// 5. SALVATAGGIO SETTINGS
-const btnSaveSettings = document.querySelector('.btn-save');
-const btnSaveAll = document.getElementById('btn-save-settings-all');
-
+// =========================================
+// 3. SETTINGS
+// =========================================
 if (btnSaveAll) {
     btnSaveAll.addEventListener('click', async () => {
         btnSaveAll.textContent = "Salvataggio...";
@@ -157,8 +229,8 @@ if (btnSaveAll) {
 
             await updateDoc(doc(db, "users", currentUserData.uid), updateData);
 
-            ptNameElement.textContent = newName;
-            if (newPhotoBase64) ptAvatarElement.src = newPhotoBase64;
+            if(ptNameElement) ptNameElement.textContent = newName;
+            if (newPhotoBase64 && ptAvatarElement) ptAvatarElement.src = newPhotoBase64;
             alert("Salvato!");
         } catch (error) {
             console.error(error);
@@ -169,20 +241,6 @@ if (btnSaveAll) {
         }
     });
 }
-
-// 6. CREAZIONE NUOVA SCHEDA
-const btnCreateWorkout = document.getElementById('btn-create-workout');
-if (btnCreateWorkout) {
-    btnCreateWorkout.addEventListener('click', () => {
-        window.location.href = "workout-builder.html";
-    });
-}
-
-// 7. CARICAMENTO FOTO BASE64
-const btnChangePhoto = document.getElementById('btn-change-photo');
-const inputPhotoFile = document.getElementById('input-photo-file');
-const previewAvatar = document.getElementById('settings-avatar-preview');
-let newPhotoBase64 = null;
 
 if (btnChangePhoto) {
     btnChangePhoto.addEventListener('click', () => inputPhotoFile.click());
@@ -197,54 +255,47 @@ if (btnChangePhoto) {
     });
 }
 
-// --- GESTIONE SCHEDE ---
-const tabActive = document.getElementById('tab-active-workouts');
-const tabArchive = document.getElementById('tab-archive-workouts');
-const viewActive = document.getElementById('view-active-workouts');
-const viewArchive = document.getElementById('view-archive-workouts');
-const listActive = document.getElementById('list-active-workouts');
-const listArchive = document.getElementById('list-archive-workouts');
-
-if (tabActive && tabArchive) {
-    tabActive.addEventListener('click', () => {
-        tabActive.classList.add('active'); tabArchive.classList.remove('active');
-        viewActive.classList.remove('hidden'); viewArchive.classList.add('hidden');
-    });
-    tabArchive.addEventListener('click', () => {
-        tabArchive.classList.add('active'); tabActive.classList.remove('active');
-        viewArchive.classList.remove('hidden'); viewArchive.classList.add('hidden');
+// =========================================
+// 4. SCHEDE
+// =========================================
+if (btnCreateWorkout) {
+    btnCreateWorkout.addEventListener('click', () => {
+        window.location.href = "workout-builder.html";
     });
 }
 
+// =========================================
+// 4. SCHEDE
+// =========================================
+// ... (codice bottone crea scheda) ...
 
-// --- GESTIONE TABS SCHEDE (Attive vs Archivio) ---
-
-
+// GESTIONE TAB (Attive vs Archivio)
 if (tabActive && tabArchive) {
-    // Click su "Schede Clienti Attive"
+    // Click su TAB ATTIVE
     tabActive.addEventListener('click', () => {
-        // Aggiorna Stile Bottoni
+        console.log("Switch to Active"); // Debug
         tabActive.classList.add('active');
         tabArchive.classList.remove('active');
         
-        // Mostra/Nascondi Contenuto
-        viewActive.classList.remove('hidden');
-        viewArchive.classList.add('hidden');
+        // Gestione view
+        if(viewActive) viewActive.classList.remove('hidden');
+        if(viewArchive) viewArchive.classList.add('hidden');
     });
 
-    // Click su "Archivio"
+    // Click su TAB ARCHIVIO
     tabArchive.addEventListener('click', () => {
-        // Aggiorna Stile Bottoni
+        console.log("Switch to Archive"); // Debug
         tabArchive.classList.add('active');
         tabActive.classList.remove('active');
         
-        // Mostra/Nascondi Contenuto
-        viewArchive.classList.remove('hidden');
-        viewActive.classList.add('hidden');
+        // Gestione view
+        if(viewArchive) viewArchive.classList.remove('hidden');
+        if(viewActive) viewActive.classList.add('hidden');
     });
 }
 
 async function loadWorkouts(coachId) {
+    if(!listActive) return;
     listActive.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Caricamento...</div>';
     listArchive.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Caricamento...</div>';
 
@@ -298,44 +349,86 @@ window.useTemplate = (id) => { if (confirm("Creare nuova da questo modello?")) {
 window.deleteWorkout = async (id) => { if (confirm("Eliminare?")) { await deleteDoc(doc(db, "workouts", id)); loadWorkouts(currentUserData.uid); } };
 
 
-// --- GESTIONE CLIENTI & MISURE ---
-const clientsGrid = document.getElementById('clients-grid');
-const clientPanel = document.getElementById('client-detail-panel');
-const btnClosePanel = document.getElementById('btn-close-client');
-let currentSelectedClientId = null;
+// =========================================
+// 5. GESTIONE CLIENTI AVANZATA
+// =========================================
 
-const toggleBtns = document.querySelectorAll('.toggle-btn');
-if (toggleBtns.length > 0 && clientsGrid) {
-    toggleBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            toggleBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            if (btn.textContent.trim() === 'Lista') clientsGrid.classList.add('list-view-mode');
-            else clientsGrid.classList.remove('list-view-mode');
-        });
-    });
-}
-
-// 1. CARICA CLIENTI
+// 1. CARICAMENTO DATI (Fetch)
 async function loadClientsGrid(coachId) {
     if (!clientsGrid) return;
     clientsGrid.innerHTML = '<p style="padding:20px; color:#888;">Caricamento team...</p>';
 
-    const q = query(
-        collection(db, "users"),
-        where("coachId", "==", coachId)
-    );
-    const snap = await getDocs(q);
+    const q = query(collection(db, "users"), where("coachId", "==", coachId));
+    
+    // Listener Real-time per aggiornamenti automatici
+    onSnapshot(q, (snap) => {
+        allClientsCache = [];
+        uniqueTagsCache = new Set();
+        
+        snap.forEach(doc => {
+            const data = doc.data();
+            data.id = doc.id; // Salviamo l'ID nel blocco dati
+            allClientsCache.push(data);
+            
+            // Raccogli tag per i filtri e suggerimenti
+            if(data.customLabel) uniqueTagsCache.add(data.customLabel.trim());
+        });
 
-    if (snap.empty) {
-        clientsGrid.innerHTML = '<div style="padding:40px; text-align:center; color:#999;">Nessun atleta nel team.<br><small>Condividi il tuo codice invito!</small></div>';
+        updateTagFilterDropdown(); // Aggiorna il dropdown dei filtri
+        applyClientFilters(); // Renderizza la griglia
+    });
+}
+
+// 2. LOGICA FILTRI & RENDER
+window.applyClientFilters = () => {
+    const searchText = document.getElementById('search-client').value.toLowerCase();
+    const colorFilter = document.getElementById('filter-color').value;
+    const tagFilter = document.getElementById('filter-tag').value;
+
+    // Filtra l'array locale
+    const filtered = allClientsCache.filter(c => {
+        // Filtro Nome
+        const matchesName = (c.name || '').toLowerCase().includes(searchText);
+        
+        // Filtro Colore (Gestione codici esadecimali)
+        let matchesColor = true;
+        if (colorFilter !== 'all') {
+            const cColor = (c.labelColor || '').toLowerCase();
+            if (colorFilter === 'none') matchesColor = !c.labelColor;
+            else if (colorFilter === 'gold') matchesColor = cColor.includes('ffd700');
+            else if (colorFilter === 'silver') matchesColor = cColor.includes('c0c0c0');
+            else if (colorFilter === 'bronze') matchesColor = cColor.includes('cd7f32');
+            else if (colorFilter === 'blue') matchesColor = cColor.includes('0071e3');
+            else if (colorFilter === 'red') matchesColor = cColor.includes('ff3b30');
+        }
+
+        // Filtro Tag
+        let matchesTag = true;
+        if (tagFilter !== 'all') {
+            matchesTag = (c.customLabel === tagFilter);
+        }
+
+        return matchesName && matchesColor && matchesTag;
+    });
+
+    renderClients(filtered);
+};
+
+// 3. GENERAZIONE HTML (Griglia/Lista)
+function renderClients(clients) {
+    clientsGrid.innerHTML = '';
+    
+    if (clients.length === 0) {
+        clientsGrid.innerHTML = '<div style="padding:40px; text-align:center; color:#999; grid-column: 1/-1;">Nessun atleta trovato con questi filtri.</div>';
         return;
     }
 
-    clientsGrid.innerHTML = '';
-    snap.forEach(doc => {
-        const c = doc.data();
+    // Preparazione Suggerimenti Tag (HTML da riusare)
+    const suggestionsHTML = Array.from(uniqueTagsCache).map(tag => 
+        `<span class="tag-chip" onclick="fillTagInput(this, '${tag}')">${tag}</span>`
+    ).join('');
 
+    clients.forEach(c => {
         const color = c.labelColor || null;
         let styleAttr = '';
         let dataColored = 'false';
@@ -349,39 +442,47 @@ async function loadClientsGrid(coachId) {
         const card = document.createElement('div');
         card.className = 'client-card';
         if (color) card.setAttribute('data-colored', dataColored);
-        if (styleAttr) card.innerHTML = `<div style="display:none;"></div>`;
         card.setAttribute('style', styleAttr.replace('style="', '').replace('"', ''));
 
+        // HTML del Menu con Input Migliorato
         const menuHtml = `
-            <div class="card-dropdown" id="menu-${doc.id}" onclick="event.stopPropagation()">
+            <div class="card-dropdown" id="menu-${c.id}" onclick="event.stopPropagation()">
                 <div class="dropdown-section">
                     <h6>Evidenzia Card</h6>
                     <div class="colors-row">
-                        <div class="color-swatch" style="background:#FFD700" onclick="setClientColor('${doc.id}', '#FFD700')" title="Gold"></div>
-                        <div class="color-swatch" style="background:#C0C0C0" onclick="setClientColor('${doc.id}', '#C0C0C0')" title="Silver"></div>
-                        <div class="color-swatch" style="background:#CD7F32" onclick="setClientColor('${doc.id}', '#CD7F32')" title="Bronze"></div>
-                        <div class="color-swatch" style="background:#0071E3" onclick="setClientColor('${doc.id}', '#0071E3')" title="Blue"></div>
-                        <div class="color-swatch" style="background:#FF3B30" onclick="setClientColor('${doc.id}', '#FF3B30')" title="Red"></div>
-                        <div class="color-swatch remove" onclick="setClientColor('${doc.id}', null)" title="Rimuovi Colore"><i class="ph ph-prohibit"></i></div>
+                        <div class="color-swatch" style="background:#FFD700" onclick="setClientColor('${c.id}', '#FFD700')" title="Gold"></div>
+                        <div class="color-swatch" style="background:#C0C0C0" onclick="setClientColor('${c.id}', '#C0C0C0')" title="Silver"></div>
+                        <div class="color-swatch" style="background:#CD7F32" onclick="setClientColor('${c.id}', '#CD7F32')" title="Bronze"></div>
+                        <div class="color-swatch" style="background:#0071E3" onclick="setClientColor('${c.id}', '#0071E3')" title="Blue"></div>
+                        <div class="color-swatch" style="background:#FF3B30" onclick="setClientColor('${c.id}', '#FF3B30')" title="Red"></div>
+                        <div class="color-swatch remove" onclick="setClientColor('${c.id}', null)" title="Rimuovi"><i class="ph ph-prohibit"></i></div>
                     </div>
                 </div>
                 <div class="dropdown-section">
-                    <h6>Etichetta (es. VIP)</h6>
-                    <div class="label-input-row">
-                        <input type="text" id="label-input-${doc.id}" placeholder="Tag..." value="${c.customLabel || ''}" maxlength="10">
-                        <button onclick="setClientLabel('${doc.id}')"><i class="ph ph-check"></i></button>
+                    <h6>Etichetta (es. VIP, Agonista)</h6>
+                    <div class="tag-input-wrapper">
+                        <input type="text" id="label-input-${c.id}" placeholder="Scrivi tag..." value="${c.customLabel || ''}" maxlength="15">
+                        <button onclick="setClientLabel('${c.id}')"><i class="ph ph-check"></i></button>
+                    </div>
+                    <!-- SUGGERIMENTI TAG -->
+                    <div class="tag-suggestions-area">
+                        ${suggestionsHTML}
                     </div>
                 </div>
-                <button class="btn-delete-card" onclick="deleteClient('${doc.id}')">
-                    <i class="ph ph-trash"></i> Elimina dal Team
+                <button class="btn-delete-card" onclick="deleteClient('${c.id}')" style="margin-top:10px;">
+                    <i class="ph ph-trash" style="margin-right:5px"></i> Elimina dal Team
                 </button>
             </div>
         `;
 
         card.innerHTML = `
-            <button class="card-menu-btn" onclick="toggleCardMenu(event, '${doc.id}')"><i class="ph ph-dots-three-vertical"></i></button>
+            <button class="card-menu-btn" onclick="toggleCardMenu(event, '${c.id}')"><i class="ph ph-dots-three-vertical"></i></button>
+            
+            <!-- Etichetta visibile sia in griglia che lista -->
             ${c.customLabel ? `<span class="custom-label-badge" style="background:${color || '#1D1D1F'}">${c.customLabel}</span>` : ''}
+            
             ${menuHtml}
+            
             <div class="client-header">
                 <div class="client-avatar">${c.name ? c.name.charAt(0).toUpperCase() : '?'}</div>
                 <div>
@@ -392,56 +493,102 @@ async function loadClientsGrid(coachId) {
             <div class="mini-chart-area" style="font-size:12px; color:#ccc;">
                 <span>Analisi in arrivo...</span>
             </div>
-            <button class="btn-details" onclick="openClientDetail('${doc.id}')">Scheda Atleta</button>
+            <button class="btn-details" onclick="openClientDetail('${c.id}')">Scheda Atleta</button>
         `;
         clientsGrid.appendChild(card);
     });
 }
 
-window.setClientColor = async (id, color) => {
-    const menu = document.getElementById(`menu-${id}`);
-    if (menu) {
-        const card = menu.closest('.client-card');
-        if (card) {
-            if (color) {
-                card.setAttribute('data-colored', 'true');
-                card.style.setProperty('--card-color', color);
-                card.style.setProperty('--card-glow', color + '40');
-            } else {
-                card.setAttribute('data-colored', 'false');
-                card.style.removeProperty('--card-color');
-                card.style.removeProperty('--card-glow');
-            }
-        }
-    }
-    try {
-        await updateDoc(doc(db, "users", id), { labelColor: color || null });
-        setTimeout(() => loadClientsGrid(auth.currentUser.uid), 500);
-    } catch (e) { console.error(e); }
-};
+// 4. FUNZIONI TAG & SUGGERIMENTI
+function updateTagFilterDropdown() {
+    const select = document.getElementById('filter-tag');
+    if(!select) return;
+    
+    // Salva selezione corrente per non resettarla
+    const currentVal = select.value;
+    
+    // Ricostruisci opzioni
+    select.innerHTML = '<option value="all">🏷️ Tutte le Etichette</option>';
+    uniqueTagsCache.forEach(tag => {
+        select.innerHTML += `<option value="${tag}">${tag}</option>`;
+    });
+    
+    select.value = currentVal;
+}
 
-window.toggleCardMenu = (e, id) => {
-    e.stopPropagation();
-    document.querySelectorAll('.card-dropdown').forEach(d => d.classList.remove('active'));
-    document.getElementById(`menu-${id}`)?.classList.add('active');
+// Funzione helper per cliccare un suggerimento
+window.fillTagInput = (chip, value) => {
+    // Trova l'input nel genitore più vicino (dropdown corrente)
+    const container = chip.closest('.dropdown-section');
+    const input = container.querySelector('input');
+    if(input) {
+        input.value = value;
+    }
 };
-document.addEventListener('click', (e) => { if (!e.target.closest('.card-menu-btn')) document.querySelectorAll('.card-dropdown').forEach(d => d.classList.remove('active')); });
 
 window.setClientLabel = async (id) => {
     const input = document.getElementById(`label-input-${id}`);
     const text = input.value.trim();
     try {
-        await updateDoc(doc(db, "users", id), { customLabel: text });
-        loadClientsGrid(auth.currentUser.uid);
+        await updateDoc(doc(db, "users", id), { customLabel: text || null });
+        // Chiudi menu
+        document.querySelectorAll('.card-dropdown').forEach(d => d.classList.remove('active'));
     } catch (e) { console.error(e); }
 };
 
-window.deleteClient = async (id) => { if (confirm("Eliminare?")) alert("Implementare logica delete."); };
+// 5. HELPER VIEW (Griglia/Lista)
+window.setGridView = () => {
+    clientsGrid.classList.remove('list-view-mode');
+    document.querySelectorAll('.toggle-btn')[0].classList.add('active');
+    document.querySelectorAll('.toggle-btn')[1].classList.remove('active');
+};
 
-// 2. APRI DETTAGLIO
+window.setListView = () => {
+    clientsGrid.classList.add('list-view-mode');
+    document.querySelectorAll('.toggle-btn')[0].classList.remove('active');
+    document.querySelectorAll('.toggle-btn')[1].classList.add('active');
+};
+
+// ... Resto funzioni Colore/Elimina restano invariate ...
+window.setClientColor = async (id, color) => {
+    // Chiudi il menu per pulizia visiva immediata
+    document.querySelectorAll('.card-dropdown').forEach(d => d.classList.remove('active'));
+    try {
+        await updateDoc(doc(db, "users", id), { labelColor: color || null });
+    } catch (e) { console.error(e); }
+};
+
+window.toggleCardMenu = (e, id) => {
+    e.stopPropagation();
+    // Chiudi altri menu
+    document.querySelectorAll('.card-dropdown').forEach(d => {
+        if (d.id !== `menu-${id}`) d.classList.remove('active');
+    });
+    document.getElementById(`menu-${id}`)?.classList.toggle('active');
+};
+
+document.addEventListener('click', (e) => { 
+    if (!e.target.closest('.card-dropdown') && !e.target.closest('.card-menu-btn')) {
+        document.querySelectorAll('.card-dropdown').forEach(d => d.classList.remove('active'));
+    }
+});
+
+window.deleteClient = async (id) => { 
+    if (confirm("Sei sicuro di voler eliminare questo atleta dal team?")) {
+        try {
+            await updateDoc(doc(db, "users", id), { coachId: null, pendingCoachId: null, status: null });
+            alert("Atleta rimosso dal team.");
+        } catch(e) { console.error(e); alert("Errore rimozione."); }
+    }
+};
+
+// =========================================
+// 6. DETTAGLIO & MISURE
+// =========================================
+
 window.openClientDetail = async (clientId) => {
     currentSelectedClientId = clientId;
-    clientPanel.classList.remove('hidden');
+    if(clientPanel) clientPanel.classList.remove('hidden');
     const snap = await getDoc(doc(db, "users", clientId));
     const data = snap.data();
     document.getElementById('detail-client-name').textContent = data.name || "Cliente";
@@ -455,6 +602,7 @@ window.openClientDetail = async (clientId) => {
     loadClientCharts(clientId);
     loadMeasurements(clientId);
 };
+
 if (btnClosePanel) btnClosePanel.addEventListener('click', () => clientPanel.classList.add('hidden'));
 
 const cTabs = document.querySelectorAll('.c-tab');
@@ -465,14 +613,6 @@ cTabs.forEach(tab => {
         document.getElementById(tab.dataset.tab).classList.remove('hidden');
     });
 });
-
-// --- MISURE ---
-const viewMeasuresList = document.getElementById('view-measures-list');
-const viewMeasureForm = document.getElementById('view-measure-form');
-const btnShowAdd = document.getElementById('btn-show-add-measure');
-const btnCancelInput = document.getElementById('btn-cancel-input');
-const btnSaveFull = document.getElementById('btn-save-full-measure');
-let editingMeasureId = null;
 
 if (btnShowAdd) btnShowAdd.addEventListener('click', () => {
     viewMeasuresList.classList.add('hidden'); viewMeasureForm.classList.remove('hidden');
@@ -586,17 +726,8 @@ async function loadMeasurements(cid) {
 }
 
 // =========================================
-// GESTIONE CHAT REAL-TIME
+// 7. CHAT & RICHIESTE
 // =========================================
-
-const chatListContainer = document.querySelector('.chat-sidebar');
-const chatMessagesArea = document.querySelector('.messages-area');
-const chatInput = document.querySelector('.message-input-area input');
-const btnSend = document.querySelector('.send-btn');
-let activeChatId = null;
-let unsubscribeMessages = null;
-
-import { onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 function initChatSystem(userUid) {
     const q = query(
@@ -606,36 +737,106 @@ function initChatSystem(userUid) {
     );
 
     onSnapshot(q, (snapshot) => {
-        chatListContainer.innerHTML = '';
+        if(chatListContainer) chatListContainer.innerHTML = '';
+        
+        let globalUnreadCount = 0;
+        const readHistory = JSON.parse(localStorage.getItem('chatReadHistory') || '{}');
+        const isChatSectionOpen = !document.getElementById('section-chat').classList.contains('hidden');
 
-        if (snapshot.empty) {
+        if (snapshot.empty && chatListContainer) {
             chatListContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#999; font-size:13px;">Nessuna conversazione.</div>';
             return;
         }
 
         snapshot.forEach(doc => {
             const chat = doc.data();
-            const otherUserName = chat.participantNames ? chat.participantNames.find(n => n !== currentUserData.name) : "Utente";
-            const lastMsg = chat.lastMessage || "Inizia a scrivere...";
+            
+            // LOGICA NOME
+            let otherUserName = "Utente";
+            if (chat.participants && chat.participantNames) {
+                const myIndex = chat.participants.indexOf(userUid);
+                const otherIndex = myIndex === 0 ? 1 : 0;
+                otherUserName = chat.participantNames[otherIndex] || "Utente";
+            }
 
-            const div = document.createElement('div');
-            div.className = `chat-list-item ${activeChatId === doc.id ? 'active' : ''}`;
-            div.onclick = () => openChat(doc.id, otherUserName);
-            div.innerHTML = `
-                <div class="avatar-small">${otherUserName.charAt(0).toUpperCase()}</div>
-                <div class="chat-preview">
-                    <h5>${otherUserName}</h5>
-                    <p>${lastMsg}</p>
-                </div>
-            `;
-            chatListContainer.appendChild(div);
+            const lastMsg = chat.lastMessage || "Inizia a scrivere...";
+            let msgTime = 0;
+            if (chat.lastMessageTime) {
+                msgTime = chat.lastMessageTime.seconds ? chat.lastMessageTime.seconds * 1000 : Date.now();
+            }
+
+            // --- DIAGNOSI PALLINO ---
+            const lastReadTimeForThisChat = readHistory[doc.id] || 0;
+            const isMeSender = chat.lastSenderId === userUid;
+            const isUnread = (msgTime > lastReadTimeForThisChat) && !isMeSender;
+
+            // STAMPA IN CONSOLE I DETTAGLI (Premi F12 per vedere)
+            console.log(`CHAT: ${otherUserName}`);
+            console.log(`- Messaggio del: ${new Date(msgTime).toLocaleString()}`);
+            console.log(`- Ultima lettura salvata: ${new Date(lastReadTimeForThisChat).toLocaleString()}`);
+            console.log(`- L'ho mandato io? ${isMeSender}`);
+            console.log(`- DECISIONE PALLINO: ${isUnread ? "✅ SI" : "❌ NO"}`);
+            console.log("--------------------------------");
+
+            if (isUnread) globalUnreadCount++;
+
+            if(chatListContainer) {
+                const div = document.createElement('div');
+                div.id = `chat-item-${doc.id}`;
+                div.className = `chat-list-item ${activeChatId === doc.id ? 'active' : ''}`;
+                div.onclick = () => openChat(doc.id, otherUserName);
+
+                const textStyle = isUnread ? 'font-weight:700; color:#000;' : 'color:#86868B;';
+                const dotHtml = isUnread ? '<div class="unread-dot"></div>' : '';
+
+                div.innerHTML = `
+                    <div class="avatar-small">${otherUserName.charAt(0).toUpperCase()}</div>
+                    <div class="chat-preview" style="flex-grow:1;">
+                        <h5 style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                            ${otherUserName}
+                            ${dotHtml}
+                        </h5>
+                        <p style="${textStyle}">${lastMsg}</p>
+                    </div>
+                `;
+                chatListContainer.appendChild(div);
+            }
         });
+
+        // BADGE SIDEBAR
+        const chatBadge = document.getElementById('chat-badge');
+        if (chatBadge) {
+            if (globalUnreadCount > 0 && !isChatSectionOpen) {
+                chatBadge.classList.remove('hidden');
+            } else {
+                chatBadge.classList.add('hidden');
+            }
+        }
     });
 }
 
 window.openChat = (chatId, chatTitle) => {
+    // SAVE READ
+    const readHistory = JSON.parse(localStorage.getItem('chatReadHistory') || '{}');
+    readHistory[chatId] = Date.now();
+    localStorage.setItem('chatReadHistory', JSON.stringify(readHistory));
+
+    // UI UPDATE
+    const chatItem = document.getElementById(`chat-item-${chatId}`);
+    if (chatItem) {
+        const dot = chatItem.querySelector('.unread-dot');
+        if (dot) dot.remove();
+        const previewText = chatItem.querySelector('.chat-preview p');
+        if (previewText) {
+            previewText.style.fontWeight = '400';
+            previewText.style.color = '#86868B';
+        }
+    }
+
     activeChatId = chatId;
     document.querySelectorAll('.chat-list-item').forEach(el => el.classList.remove('active'));
+    if (chatItem) chatItem.classList.add('active');
+    
     chatMessagesArea.innerHTML = '';
     if (unsubscribeMessages) unsubscribeMessages();
 
@@ -670,8 +871,17 @@ const sendMessage = async () => {
     if (!text || !activeChatId) return;
     chatInput.value = '';
     try {
-        await addDoc(collection(db, "chats", activeChatId, "messages"), { text: text, senderId: auth.currentUser.uid, timestamp: serverTimestamp() });
-        await updateDoc(doc(db, "chats", activeChatId), { lastMessage: text, lastMessageTime: serverTimestamp() });
+        await addDoc(collection(db, "chats", activeChatId, "messages"), {
+            text: text,
+            senderId: auth.currentUser.uid,
+            timestamp: serverTimestamp()
+        });
+
+        await updateDoc(doc(db, "chats", activeChatId), {
+            lastMessage: text,
+            lastMessageTime: serverTimestamp(),
+            lastSenderId: auth.currentUser.uid
+        });
     } catch (e) { console.error("Errore invio:", e); }
 };
 
@@ -696,13 +906,6 @@ window.startChatWithClient = async (clientId, clientName) => {
     document.querySelector('[data-target="section-chat"]').click();
     setTimeout(() => openChat(chatDocId, clientName), 500);
 };
-
-// =========================================
-// GESTIONE RICHIESTE IN ATTESA
-// =========================================
-const requestsList = document.getElementById('requests-list');
-const pendingCountEl = document.getElementById('pending-requests-count');
-const badgeHome = document.getElementById('requests-badge');
 
 async function loadPendingRequests(coachId) {
     if (!requestsList) return;
@@ -751,54 +954,41 @@ window.rejectRequest = async (clientId) => {
 };
 
 // =========================================
-// ANALISI AVANZATA (Coach) - TOTALE
+// 8. ANALISI & LOGS
 // =========================================
 
-let allClientLogs = [];
-let currentAnalysisLogs = [];
-let analysisType = 'exercise';
-let analysisSort = 'desc'; 
-const activeCharts = {}; 
-
-let currentWorkoutDays = 7; // Giorni previsti dalla scheda
-
-// 1. CARICA STORICO SCHEDE
 async function loadClientCharts(clientId) {
     const historyContainer = document.getElementById('workout-history-list');
-    
+
     document.getElementById('view-history').classList.remove('hidden');
     document.getElementById('view-analysis').classList.add('hidden');
-    if(historyContainer) historyContainer.innerHTML = '<p class="empty-msg">Ricerca storico...</p>';
+    if (historyContainer) historyContainer.innerHTML = '<p class="empty-msg">Ricerca storico...</p>';
 
-    // A. Scheda Attiva
     const clientSnap = await getDoc(doc(db, "users", clientId));
     const activeId = clientSnap.exists() ? clientSnap.data().activeWorkoutId : null;
 
-    // B. Schede
     const qWorkouts = query(collection(db, "workouts"), where("assignedTo", "==", clientId), orderBy("createdAt", "desc"));
     const snapWorkouts = await getDocs(qWorkouts);
 
-    // C. Log
     const qLogs = query(collection(db, "users", clientId, "logs"), orderBy("date", "asc"));
     const snapLogs = await getDocs(qLogs);
     allClientLogs = [];
     snapLogs.forEach(doc => allClientLogs.push(doc.data()));
-    
-    if(historyContainer) {
+
+    if (historyContainer) {
         historyContainer.innerHTML = '';
         if (snapWorkouts.empty) { historyContainer.innerHTML = '<p class="empty-msg">Nessuna scheda assegnata.</p>'; return; }
 
         snapWorkouts.forEach(doc => {
             const w = doc.data();
             const count = allClientLogs.filter(l => l.workoutId === doc.id).length;
-            const dateStr = w.createdAt ? new Date(w.createdAt.seconds*1000).toLocaleDateString() : '-';
+            const dateStr = w.createdAt ? new Date(w.createdAt.seconds * 1000).toLocaleDateString() : '-';
             const isActive = (doc.id === activeId);
 
             const card = document.createElement('div');
             card.className = 'history-card';
-            // Passo anche i giorni totali (w.days)
             card.onclick = () => openWorkoutAnalysis(doc.id, w.name, w.days);
-            
+
             card.innerHTML = `
                 <div class="hc-info"><h4>${w.name}</h4><span>Creata: ${dateStr} &bull; ${count} Allenamenti</span></div>
                 <div style="display:flex; align-items:center; gap:10px;">
@@ -811,14 +1001,13 @@ async function loadClientCharts(clientId) {
     }
 }
 
-// 2. APRI SCHEDA
 window.openWorkoutAnalysis = (workoutId, workoutName, days) => {
     document.getElementById('view-history').classList.add('hidden');
     document.getElementById('view-analysis').classList.remove('hidden');
     document.getElementById('analysis-title').textContent = workoutName;
 
     currentAnalysisLogs = allClientLogs.filter(l => l.workoutId === workoutId);
-    currentWorkoutDays = parseInt(days) || 7; // Salva giorni totali per Fill Gap
+    currentWorkoutDays = parseInt(days) || 7; 
 
     analysisType = 'exercise';
     updateToggleButtons();
@@ -830,7 +1019,6 @@ window.closeWorkoutAnalysis = () => {
     document.getElementById('view-history').classList.remove('hidden');
 };
 
-// UI BUTTONS
 window.setAnalysisType = (btnElement, type) => {
     analysisType = type;
     updateToggleButtons();
@@ -851,12 +1039,9 @@ window.toggleSortOrder = () => {
     renderAnalysisList();
 };
 
-
-// 3. MOTORE ANALITICO (FIXATO)
-// 2. MOTORE ANALITICO (Logica Sequenziale CORRETTA)
 function renderAnalysisList() {
     const container = document.getElementById('analysis-list-container');
-    if(!container) return;
+    if (!container) return;
     container.innerHTML = '';
 
     if (!currentAnalysisLogs || currentAnalysisLogs.length === 0) {
@@ -864,52 +1049,37 @@ function renderAnalysisList() {
         return;
     }
 
-    let statsMap = {}; 
-    
-    // Ordina logs per data (fondamentale)
-    const sortedLogs = [...currentAnalysisLogs].sort((a,b) => new Date(a.date) - new Date(b.date));
+    let statsMap = {};
+    const sortedLogs = [...currentAnalysisLogs].sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    // =========================================================
-    // 1. ESERCIZI (Max Kg del set migliore)
-    // =========================================================
     if (analysisType === 'exercise') {
         sortedLogs.forEach(log => {
-            if(!log.exercises) return;
+            if (!log.exercises) return;
             log.exercises.forEach(ex => {
-                if(!ex.sets) return;
-                
-                // Trova il set con i Kg più alti (Max Kg)
+                if (!ex.sets) return;
                 let maxKg = 0;
                 ex.sets.forEach(s => {
                     const k = parseFloat(s.kg) || 0;
                     if (k > maxKg) maxKg = k;
                 });
-
                 if (maxKg > 0) {
                     if (!statsMap[ex.name]) statsMap[ex.name] = { name: ex.name, history: [] };
-                    statsMap[ex.name].history.push({ 
-                        date: log.date, 
+                    statsMap[ex.name].history.push({
+                        date: log.date,
                         val: maxKg,
-                        label: new Date(log.date).toLocaleDateString('it-IT', {day:'2-digit', month:'2-digit'})
+                        label: new Date(log.date).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })
                     });
                 }
             });
         });
     }
-    
-    // =========================================================
-    // 2. MUSCOLI (Microcicli + Fill Gap + Somma Max Kg Primari)
-    // =========================================================
     else if (analysisType === 'muscle') {
-        
-        // A. Auto-Detect Giorni Scheda
         let maxDayInLogs = 0;
-        sortedLogs.forEach(l => { if(l.dayIndex > maxDayInLogs) maxDayInLogs = l.dayIndex; });
+        sortedLogs.forEach(l => { if (l.dayIndex > maxDayInLogs) maxDayInLogs = l.dayIndex; });
         const limitDays = (typeof currentWorkoutDays !== 'undefined' && currentWorkoutDays > 0) ? currentWorkoutDays : (maxDayInLogs || 7);
 
-        // B. Raggruppa in Cicli
         let cycles = [];
-        let currentCycle = { id: 1, dayLogs: {} }; 
+        let currentCycle = { id: 1, dayLogs: {} };
         let daysSeenInCycle = new Set();
         let lastDate = null;
         let lastDay = null;
@@ -917,60 +1087,41 @@ function renderAnalysisList() {
         sortedLogs.forEach(log => {
             const dIndex = parseInt(log.dayIndex) || 1;
             const sDate = new Date(log.date).toDateString();
-            
-            // Se stessa data e stesso giorno = Update (non nuovo ciclo)
             const isUpdate = (lastDate === sDate && lastDay === dIndex);
 
-            // NUOVO CICLO SE: Giorno ripetuto (es. ho fatto 1..3 e rifaccio 1)
             if (daysSeenInCycle.has(dIndex) && !isUpdate) {
                 cycles.push(currentCycle);
                 currentCycle = { id: currentCycle.id + 1, dayLogs: {} };
                 daysSeenInCycle = new Set();
             }
 
-            if(!isUpdate) daysSeenInCycle.add(dIndex);
-            
+            if (!isUpdate) daysSeenInCycle.add(dIndex);
             if (!currentCycle.dayLogs[dIndex]) currentCycle.dayLogs[dIndex] = [];
-            currentCycle.dayLogs[dIndex].push(log); // Aggiungi log al giorno
-
+            currentCycle.dayLogs[dIndex].push(log);
             lastDate = sDate;
             lastDay = dIndex;
         });
-        cycles.push(currentCycle); 
+        cycles.push(currentCycle);
 
-        // C. Calcolo Valori con Fill The Gap
-        let memory = {}; // Tiene l'ultimo valore valido per giorno
-
+        let memory = {};
         cycles.forEach(cycle => {
-            let cycleMuscleStats = {}; 
-
-            // Itera tutti i giorni teorici (1..N)
+            let cycleMuscleStats = {};
             for (let d = 1; d <= limitDays; d++) {
                 const logsForDay = cycle.dayLogs[d];
-                
                 if (logsForDay && logsForDay.length > 0) {
-                    // DATO PRESENTE: Calcola somma massimali muscoli primari
-                    // Prendi l'ultimo log valido per quel giorno
-                    const log = logsForDay[logsForDay.length - 1]; 
-                    
-                    if(log.exercises) {
+                    const log = logsForDay[logsForDay.length - 1];
+                    if (log.exercises) {
                         log.exercises.forEach(ex => {
-                            // Controllo Muscolo Primario (index 0)
                             if (ex.muscles && ex.muscles.length > 0) {
-                                const primaryMuscle = ex.muscles[0]; // Solo il primo
-                                
-                                // Trova Max Kg dell'esercizio
+                                const primaryMuscle = ex.muscles[0];
                                 let maxSetKg = 0;
-                                if(ex.sets) ex.sets.forEach(s => {
-                                    const k = parseFloat(s.kg)||0;
-                                    if(k > maxSetKg) maxSetKg = k;
+                                if (ex.sets) ex.sets.forEach(s => {
+                                    const k = parseFloat(s.kg) || 0;
+                                    if (k > maxSetKg) maxSetKg = k;
                                 });
-
-                                if(maxSetKg > 0) {
+                                if (maxSetKg > 0) {
                                     if (!cycleMuscleStats[primaryMuscle]) cycleMuscleStats[primaryMuscle] = 0;
                                     cycleMuscleStats[primaryMuscle] += maxSetKg;
-                                    
-                                    // Aggiorna Memoria
                                     if (!memory[primaryMuscle]) memory[primaryMuscle] = {};
                                     memory[primaryMuscle][d] = maxSetKg;
                                 }
@@ -978,7 +1129,6 @@ function renderAnalysisList() {
                         });
                     }
                 } else {
-                    // GAP: Usa Memoria
                     Object.keys(memory).forEach(mName => {
                         if (memory[mName][d]) {
                             if (!cycleMuscleStats[mName]) cycleMuscleStats[mName] = 0;
@@ -987,13 +1137,11 @@ function renderAnalysisList() {
                     });
                 }
             }
-
-            // Pusha punto nel grafico
             if (Object.keys(cycleMuscleStats).length > 0) {
                 Object.keys(cycleMuscleStats).forEach(mName => {
                     if (!statsMap[mName]) statsMap[mName] = { name: mName, history: [] };
-                    statsMap[mName].history.push({ 
-                        date: new Date().toISOString(), // Data fittizia
+                    statsMap[mName].history.push({
+                        date: new Date().toISOString(),
                         val: cycleMuscleStats[mName],
                         label: `Ciclo ${cycle.id}`
                     });
@@ -1001,76 +1149,62 @@ function renderAnalysisList() {
             }
         });
     }
-
-    // =========================================================
-    // 3. SEDUTE (Tonnellaggio Giornaliero)
-    // =========================================================
     else if (analysisType === 'session') {
         sortedLogs.forEach(log => {
             if (!log.dayIndex) return;
-
             let sessionVol = 0;
-            if(log.exercises) {
+            if (log.exercises) {
                 log.exercises.forEach(ex => {
-                    if(ex.sets) {
-                        ex.sets.forEach(s => { 
-                            // Tonnellaggio = Kg * Reps
-                            sessionVol += (parseFloat(s.kg)||0) * (parseFloat(s.reps)||0); 
+                    if (ex.sets) {
+                        ex.sets.forEach(s => {
+                            sessionVol += (parseFloat(s.kg) || 0) * (parseFloat(s.reps) || 0);
                         });
                     }
                 });
             }
-            
             let key = `Giorno ${log.dayIndex}`;
             if (sessionVol > 0) {
                 if (!statsMap[key]) statsMap[key] = { name: key, history: [] };
-                statsMap[key].history.push({ 
-                    date: log.date, 
+                statsMap[key].history.push({
+                    date: log.date,
                     val: sessionVol,
-                    label: new Date(log.date).toLocaleDateString('it-IT', {day:'2-digit', month:'2-digit'})
+                    label: new Date(log.date).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })
                 });
             }
         });
     }
 
-    // =========================================================
-    // RENDER HTML (Ripristinato stile originale)
-    // =========================================================
     let items = Object.values(statsMap).map(item => {
         const hist = item.history;
-        if(!hist || hist.length < 1) return null;
-        
+        if (!hist || hist.length < 1) return null;
         const startVal = hist[0].val;
-        const endVal = hist[hist.length-1].val;
+        const endVal = hist[hist.length - 1].val;
         const perc = startVal > 0 ? (((endVal - startVal) / startVal) * 100) : 0;
-        
         return { ...item, start: startVal, end: endVal, perc: parseFloat(perc.toFixed(1)) };
     }).filter(x => x !== null);
 
     items.sort((a, b) => analysisSort === 'desc' ? b.perc - a.perc : a.perc - b.perc);
-    
+
     const searchVal = document.getElementById('analysis-search')?.value.toLowerCase() || '';
-    if(searchVal) items = items.filter(i => i.name.toLowerCase().includes(searchVal));
+    if (searchVal) items = items.filter(i => i.name.toLowerCase().includes(searchVal));
 
     if (items.length === 0) {
         let msg = '<p class="empty-msg">Nessun risultato.</p>';
-        if(analysisType === 'muscle') msg = '<p class="empty-msg">Dati insufficienti per i microcicli.</p>';
+        if (analysisType === 'muscle') msg = '<p class="empty-msg">Dati insufficienti per i microcicli.</p>';
         container.innerHTML = msg;
         return;
     }
 
     items.forEach(item => {
-        // Ripristinate classi CSS originali (up / down)
         let badgeClass = 'flat'; let icon = 'minus';
         if (item.perc >= 2.5) { badgeClass = 'up'; icon = 'trend-up'; }
         else if (item.perc <= -2.5) { badgeClass = 'down'; icon = 'trend-down'; }
-        
-        const formatVal = (v) => (analysisType === 'session') ? (v/1000).toFixed(2)+'t' : v+'kg';
+
+        const formatVal = (v) => (analysisType === 'session') ? (v / 1000).toFixed(2) + 't' : v + 'kg';
         const dateLabel = analysisType === 'muscle' ? 'Ciclo' : 'Inizio';
 
         const card = document.createElement('div');
         card.className = 'analysis-card';
-        // HTML Struttura Originale
         card.innerHTML = `
             <div class="ac-header" onclick="toggleChart(this, '${item.name.replace(/'/g, "\\'")}')">
                 <div class="ac-info"><h4>${item.name}</h4><span>${dateLabel}: ${formatVal(item.start)} &bull; Attuale: ${formatVal(item.end)}</span></div>
@@ -1080,7 +1214,7 @@ function renderAnalysisList() {
                 </div>
             </div>
             <div class="ac-body">
-                <div class="chart-wrapper-inner"><canvas id="chart-${item.name.replace(/[^a-zA-Z0-9]/g,'')}"></canvas></div>
+                <div class="chart-wrapper-inner"><canvas id="chart-${item.name.replace(/[^a-zA-Z0-9]/g, '')}"></canvas></div>
             </div>
         `;
         container.appendChild(card);
@@ -1088,17 +1222,16 @@ function renderAnalysisList() {
     });
 }
 
-// 4. CHART.JS
 window.toggleChart = (header, name) => {
     const card = header.parentElement;
     const wasOpen = card.classList.contains('open');
-    const safeName = name.replace(/[^a-zA-Z0-9]/g,'');
+    const safeName = name.replace(/[^a-zA-Z0-9]/g, '');
     const canvasId = `chart-${safeName}`;
 
     document.querySelectorAll('.analysis-card.open').forEach(c => {
         c.classList.remove('open');
-        const oldId = `chart-${c.querySelector('h4').textContent.replace(/[^a-zA-Z0-9]/g,'')}`;
-        if(activeCharts[oldId]) { activeCharts[oldId].destroy(); delete activeCharts[oldId]; }
+        const oldId = `chart-${c.querySelector('h4').textContent.replace(/[^a-zA-Z0-9]/g, '')}`;
+        if (activeCharts[oldId]) { activeCharts[oldId].destroy(); delete activeCharts[oldId]; }
     });
 
     if (!wasOpen) {
@@ -1110,8 +1243,8 @@ window.toggleChart = (header, name) => {
 
 function drawAnalysisChart(canvasId, data, label) {
     const canvas = document.getElementById(canvasId);
-    if(!canvas) return;
-    if(activeCharts[canvasId]) { activeCharts[canvasId].destroy(); delete activeCharts[canvasId]; }
+    if (!canvas) return;
+    if (activeCharts[canvasId]) { activeCharts[canvasId].destroy(); delete activeCharts[canvasId]; }
 
     const ctx = canvas.getContext('2d');
     const isVolume = (analysisType === 'session' || analysisType === 'muscle');
@@ -1119,7 +1252,7 @@ function drawAnalysisChart(canvasId, data, label) {
     activeCharts[canvasId] = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: data.map(d => analysisType === 'muscle' ? d.label : new Date(d.date).toLocaleDateString(undefined, {day:'numeric', month:'numeric'})),
+            labels: data.map(d => analysisType === 'muscle' ? d.label : new Date(d.date).toLocaleDateString(undefined, { day: 'numeric', month: 'numeric' })),
             datasets: [{
                 label: isVolume ? 'Volume Totale' : 'Max Carico (kg)',
                 data: data.map(d => d.val),
@@ -1132,68 +1265,49 @@ function drawAnalysisChart(canvasId, data, label) {
             responsive: true, maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
-                y: { beginAtZero: false, ticks: { callback: (v) => isVolume ? (v/1000).toFixed(1)+'t' : v+'kg' } },
+                y: { beginAtZero: false, ticks: { callback: (v) => isVolume ? (v / 1000).toFixed(1) + 't' : v + 'kg' } },
                 x: { grid: { display: false } }
             }
         }
     });
 }
-/* =========================================================
-   DIARIO LOG (STORICO CRUDO)
-   ========================================================= */
 
-// Apertura Pannello
 window.openLogHistoryPanel = () => {
     const panel = document.getElementById('log-history-panel');
     const container = document.getElementById('log-history-body');
-    if(!panel || !container) {
+    if (!panel || !container) {
         console.error("Elementi pannello non trovati nel DOM");
         return;
     }
-    // 1. Apri pannello (animazione CSS)
-    panel.classList.remove('hidden'); // Rimuove hidden display:none
-    setTimeout(() => {
-        panel.classList.add('open');
-    }, 10);
-    // Piccolo timeout per permettere al browser di renderizzare prima di animare
-    requestAnimationFrame(() => {
-        panel.classList.add('open');
-    });
+    panel.classList.remove('hidden'); 
+    setTimeout(() => { panel.classList.add('open'); }, 10);
+    requestAnimationFrame(() => { panel.classList.add('open'); });
 
-    // 2. Controllo Dati
     if (!currentAnalysisLogs || currentAnalysisLogs.length === 0) {
         container.innerHTML = '<div style="text-align:center; padding:40px; color:#999;">Nessun registro disponibile.</div>';
         return;
     }
 
-    // 3. Generazione HTML (Ordina: Dal più recente al più vecchio)
-    const logsDesc = [...currentAnalysisLogs].sort((a,b) => new Date(b.date) - new Date(a.date));
-    
+    const logsDesc = [...currentAnalysisLogs].sort((a, b) => new Date(b.date) - new Date(a.date));
     let html = '';
-    
+
     logsDesc.forEach(log => {
-        // Data leggibile (es. "Lun 16 Gen 2024")
         const dateObj = new Date(log.date);
-        const dateStr = dateObj.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit' });
+        const dateStr = dateObj.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
         const dayLabel = log.dayIndex ? `Giorno ${log.dayIndex}` : 'Allenamento';
 
-        // Costruisci lista esercizi
         let exercisesHtml = '';
-        if(log.exercises) {
+        if (log.exercises) {
             log.exercises.forEach(ex => {
                 let setsHtml = '';
-                if(ex.sets) {
+                if (ex.sets) {
                     ex.sets.forEach((s, idx) => {
-                        // Mostriamo esattamente quello che ha scritto: Kg x Reps
-                        // Se vuoi puoi aggiungere un'icona se s.done è true
-                        const check = s.done ? '✓' : ''; 
+                        const check = s.done ? '✓' : '';
                         const kg = parseFloat(s.kg) || 0;
                         const reps = parseFloat(s.reps) || 0;
-                        
-                        setsHtml += `<span class="set-pill">${idx+1}) <b>${kg}</b>kg x <b>${reps}</b> ${check}</span>`;
+                        setsHtml += `<span class="set-pill">${idx + 1}) <b>${kg}</b>kg x <b>${reps}</b> ${check}</span>`;
                     });
                 }
-                
                 exercisesHtml += `
                     <div class="log-ex-item">
                         <div class="log-ex-name">${ex.name}</div>
@@ -1203,7 +1317,6 @@ window.openLogHistoryPanel = () => {
             });
         }
 
-        // Assembla la Card
         html += `
             <div class="log-entry-card">
                 <div class="log-date-row">
@@ -1216,114 +1329,20 @@ window.openLogHistoryPanel = () => {
             </div>
         `;
     });
-
     container.innerHTML = html;
 };
 
-// Chiusura Pannello
 window.closeLogHistoryPanel = () => {
     const panel = document.getElementById('log-history-panel');
     panel.classList.remove('open');
-    // Aspetta la fine della transizione (0.3s) per nascondere
-    setTimeout(() => {
-        panel.classList.add('hidden');
-    }, 300);
-};
-/* =========================================================
-   DIARIO LOG (STORICO CRUDO) - FUNZIONI MANCANTI
-   ========================================================= */
-
-// Rendi le funzioni disponibili globalmente (per l'onclick nell'HTML)
-window.openLogHistoryPanel = () => {
-    const panel = document.getElementById('log-history-panel');
-    const container = document.getElementById('log-history-body');
-    
-    if(!panel || !container) {
-        console.error("Elementi pannello non trovati nel DOM");
-        return;
-    }
-
-    // 1. Apri pannello
-    panel.classList.remove('hidden'); 
-    requestAnimationFrame(() => {
-        panel.classList.add('open');
-    });
-
-    // 2. Controllo Dati
-    if (!currentAnalysisLogs || currentAnalysisLogs.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:40px; color:#999;">Nessun registro disponibile.</div>';
-        return;
-    }
-
-    // 3. Generazione HTML (Ordina: Dal più recente al più vecchio)
-    const logsDesc = [...currentAnalysisLogs].sort((a,b) => new Date(b.date) - new Date(a.date));
-    
-    let html = '';
-    
-    logsDesc.forEach(log => {
-        const dateObj = new Date(log.date);
-        const dateStr = dateObj.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit' });
-        // Fallback se manca dayIndex
-        const dayLabel = log.dayIndex ? `Giorno ${log.dayIndex}` : 'Allenamento';
-
-        let exercisesHtml = '';
-        if(log.exercises) {
-            log.exercises.forEach(ex => {
-                let setsHtml = '';
-                if(ex.sets) {
-                    ex.sets.forEach((s, idx) => {
-                        const check = s.done ? '<span style="color:#34C759">✓</span>' : ''; 
-                        const kg = parseFloat(s.kg) || 0;
-                        const reps = parseFloat(s.reps) || 0;
-                        
-                        setsHtml += `<span class="set-pill">${idx+1}) <b>${kg}</b>kg x <b>${reps}</b> ${check}</span>`;
-                    });
-                }
-                
-                exercisesHtml += `
-                    <div class="log-ex-item">
-                        <div class="log-ex-name">${ex.name}</div>
-                        <div class="log-sets-row">${setsHtml}</div>
-                    </div>
-                `;
-            });
-        }
-
-        html += `
-            <div class="log-entry-card">
-                <div class="log-date-row">
-                    <span class="log-date">${dateStr}</span>
-                    <span class="log-day-badge">${dayLabel}</span>
-                </div>
-                <div class="log-body">
-                    ${exercisesHtml || '<i style="font-size:12px; color:#999;">Nessun esercizio registrato</i>'}
-                </div>
-            </div>
-        `;
-    });
-
-    container.innerHTML = html;
+    setTimeout(() => { panel.classList.add('hidden'); }, 300);
 };
 
-window.closeLogHistoryPanel = () => {
-    const panel = document.getElementById('log-history-panel');
-    if(panel) {
-        panel.classList.remove('open');
-        setTimeout(() => {
-            panel.classList.add('hidden');
-        }, 300);
-    }
-};
-/* =========================================================
-   SHORTCUT PROFILO -> IMPOSTAZIONI
-   ========================================================= */
 const miniProfileBtn = document.querySelector('.user-mini-profile');
 const settingsNavLink = document.querySelector('.nav-link[data-target="section-settings"]');
 
 if (miniProfileBtn && settingsNavLink) {
     miniProfileBtn.addEventListener('click', () => {
-        // Simula il click sul tasto del menu "Impostazioni"
-        // Così gestisce in automatico il cambio sezione e il tasto attivo
         settingsNavLink.click();
     });
 }

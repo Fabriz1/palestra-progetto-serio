@@ -4,6 +4,8 @@ body {
     font-family: 'Inter', sans-serif; background-color: #F5F5F7;
     height: 100vh; overflow: hidden; /* Blocca scroll pagina intera */
     display: flex; justify-content: center; align-items: center;
+    height: 100dvh; 
+    overflow: hidden;
 }
 
 .app-container {
@@ -32,10 +34,12 @@ body {
 
 /* STEP SINGOLO */
 .step-slide {
+    height: 100%;
     min-width: 100%; /* Ogni step occupa tutto lo schermo */
     padding: 20px 24px;
     display: flex; flex-direction: column;
     overflow-y: auto; /* Scroll interno se serve */
+    padding-bottom: 80px;
     opacity: 0.3; transition: opacity 0.4s; pointer-events: none; /* Disattivo se non attivo */
 }
 .step-slide.active { opacity: 1; pointer-events: all; }
@@ -107,6 +111,7 @@ p { font-size: 15px; color: #86868B; line-height: 1.5; margin-bottom: 30px; }
     padding: 20px 10px; text-align: center; cursor: pointer; transition: all 0.2s;
     display: flex; flex-direction: column; align-items: center; gap: 8px;
     font-size: 14px; font-weight: 600; color: #1D1D1F;
+    user-select: none;
 }
 .opt-card .emoji { font-size: 24px; }
 
@@ -119,7 +124,7 @@ p { font-size: 15px; color: #86868B; line-height: 1.5; margin-bottom: 30px; }
 .opt-card.small { padding: 12px; font-size: 13px; }
 
 /* FOOTER BOTTONE */
-.step-footer { padding-top: 20px; margin-top: auto; }
+.step-footer { padding-top: 20px 0; margin-top: auto; width: 100%; }
 
 .btn-primary {
     width: 100%; padding: 18px; border-radius: 16px; border: none;
