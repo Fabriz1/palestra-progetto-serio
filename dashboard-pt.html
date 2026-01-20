@@ -44,6 +44,10 @@
                     <i class="ph ph-chart-bar"></i>
                     <span>Stats & Clienti</span>
                 </button>
+                <button class="nav-link" data-target="section-calendar">
+                    <i class="ph ph-calendar-check"></i>
+                    <span>Calendario</span>
+                </button>
 
                 <button class="nav-link" data-target="section-schede">
                     <i class="ph ph-notebook"></i>
@@ -122,6 +126,10 @@
                         <select id="filter-tag" class="filter-select" onchange="applyClientFilters()">
                             <option value="all">Tutte le Etichette</option>
                             <!-- JS inserirà qui i tag usati nel team -->
+                        </select>
+                        <select id="sort-clients" class="filter-select" onchange="applyClientFilters()">
+                            <option value="name">🔤 Nome (A-Z)</option>
+                            <option value="renewal">📅 Scadenza (Prima i vicini)</option>
                         </select>
                     </div>
 
@@ -309,6 +317,20 @@
 
                 </div>
             </section>
+            <!-- SEZIONE 6: CALENDARIO / AGENDA -->
+            <section id="section-calendar" class="content-section hidden">
+                <div class="calendar-layout">
+                    <div class="calendar-header-block">
+                        <h3>Agenda Scadenze</h3>
+                        <p>Rinnovi schede e pacchetti in ordine cronologico.</p>
+                    </div>
+
+                    <!-- Qui il JS inietterà i gruppi (Oggi, Domani, ecc) -->
+                    <div id="calendar-agenda-container" class="agenda-wrapper">
+                        <p class="empty-msg">Caricamento agenda...</p>
+                    </div>
+                </div>
+            </section>
 
         </main>
     </div>
@@ -344,55 +366,74 @@
                 <!-- CONTENUTO 1: PANORAMICA -->
                 <!-- CONTENUTO 1: PANORAMICA (Anamnesi + Note Coach) -->
                 <!-- CONTENUTO 1: PANORAMICA -->
-<div id="c-tab-overview" class="c-tab-content">
-    
-    <!-- Sezione Note Coach -->
-    <div class="coach-notes-section" style="background: #FFF8E1; border: 1px solid #FFE082; border-radius: 12px; padding: 15px; margin-bottom: 20px;">
-        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-            <h4 style="margin:0; color:#F57F17; font-size:14px;">📝 Le tue Note Private</h4>
-            <span id="coach-notes-status" style="font-size:11px; color:#999; opacity:0; transition:opacity 0.3s;">Salvato!</span>
-        </div>
-        <textarea id="coach-notes-input" placeholder="Scrivi qui osservazioni private..." style="width:100%; min-height:80px; border:1px solid #ddd; padding:10px; border-radius:8px; font-family:inherit;"></textarea>
-        <div style="text-align:right; margin-top:5px;">
-            <button id="btn-save-coach-notes" class="btn-primary small" style="padding:6px 12px; font-size:12px;">Salva Note</button>
-        </div>
-    </div>
+                <div id="c-tab-overview" class="c-tab-content">
 
-    <!-- Griglia Dati -->
-    <h4 style="font-size:13px; text-transform:uppercase; color:#888; border-bottom:1px solid #eee; padding-bottom:5px; margin-bottom:15px;">Cartella Clinica & Anamnesi</h4>
-    
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-        <!-- Età -->
-        <div class="overview-card" style="background:#FAFAFC; border:1px solid #E5E5EA; padding:15px; border-radius:12px;">
-            <label style="display:block; font-size:11px; color:#888; font-weight:700; text-transform:uppercase;">Età</label>
-            <strong style="font-size:16px;" id="ov-age">-</strong>
-        </div>
+                    <!-- Sezione Note Coach -->
+                    <div class="coach-notes-section"
+                        style="background: #FFF8E1; border: 1px solid #FFE082; border-radius: 12px; padding: 15px; margin-bottom: 20px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                            <h4 style="margin:0; color:#F57F17; font-size:14px;">📝 Le tue Note Private</h4>
+                            <span id="coach-notes-status"
+                                style="font-size:11px; color:#999; opacity:0; transition:opacity 0.3s;">Salvato!</span>
+                        </div>
+                        <textarea id="coach-notes-input" placeholder="Scrivi qui osservazioni private..."
+                            style="width:100%; min-height:80px; border:1px solid #ddd; padding:10px; border-radius:8px; font-family:inherit;"></textarea>
+                        <div style="text-align:right; margin-top:5px;">
+                            <button id="btn-save-coach-notes" class="btn-primary small"
+                                style="padding:6px 12px; font-size:12px;">Salva Note</button>
+                        </div>
+                    </div>
 
-        <!-- Obiettivi -->
-        <div class="overview-card" style="background:#FAFAFC; border:1px solid #E5E5EA; padding:15px; border-radius:12px;">
-            <label style="display:block; font-size:11px; color:#888; font-weight:700; text-transform:uppercase;">Obiettivo</label>
-            <strong style="font-size:14px;" id="ov-goals">-</strong>
-        </div>
+                    <!-- Griglia Dati -->
+                    <h4
+                        style="font-size:13px; text-transform:uppercase; color:#888; border-bottom:1px solid #eee; padding-bottom:5px; margin-bottom:15px;">
+                        Cartella Clinica & Anamnesi</h4>
 
-        <!-- Sport -->
-        <div class="overview-card" style="grid-column: span 2; background:#FAFAFC; border:1px solid #E5E5EA; padding:15px; border-radius:12px;">
-            <label style="display:block; font-size:11px; color:#888; font-weight:700; text-transform:uppercase;">Storia Sportiva</label>
-            <p style="margin:0; font-size:14px;" id="ov-history">-</p>
-        </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <!-- Età -->
+                        <div class="overview-card"
+                            style="background:#FAFAFC; border:1px solid #E5E5EA; padding:15px; border-radius:12px;">
+                            <label
+                                style="display:block; font-size:11px; color:#888; font-weight:700; text-transform:uppercase;">Età</label>
+                            <strong style="font-size:16px;" id="ov-age">-</strong>
+                        </div>
 
-        <!-- Fisico (Infortuni) -->
-        <div id="card-physical" class="overview-card" style="grid-column: span 2; background:#FAFAFC; border:1px solid #E5E5EA; padding:15px; border-radius:12px;">
-            <label style="display:block; font-size:11px; color:#888; font-weight:700; text-transform:uppercase;">Condizione Fisica</label>
-            <p style="margin:0; font-size:14px;" id="ov-physical">-</p>
-        </div>
+                        <!-- Obiettivi -->
+                        <div class="overview-card"
+                            style="background:#FAFAFC; border:1px solid #E5E5EA; padding:15px; border-radius:12px;">
+                            <label
+                                style="display:block; font-size:11px; color:#888; font-weight:700; text-transform:uppercase;">Obiettivo</label>
+                            <strong style="font-size:14px;" id="ov-goals">-</strong>
+                        </div>
 
-        <!-- Note Cliente -->
-        <div class="overview-card" style="grid-column: span 2; background:#FAFAFC; border:1px solid #E5E5EA; padding:15px; border-radius:12px;">
-            <label style="display:block; font-size:11px; color:#888; font-weight:700; text-transform:uppercase;">Note dal Cliente</label>
-            <p style="margin:0; font-size:14px; font-style:italic;" id="ov-client-notes">-</p>
-        </div>
-    </div>
-</div>
+                        <!-- Sport -->
+                        <div class="overview-card"
+                            style="grid-column: span 2; background:#FAFAFC; border:1px solid #E5E5EA; padding:15px; border-radius:12px;">
+                            <label
+                                style="display:block; font-size:11px; color:#888; font-weight:700; text-transform:uppercase;">Storia
+                                Sportiva</label>
+                            <p style="margin:0; font-size:14px;" id="ov-history">-</p>
+                        </div>
+
+                        <!-- Fisico (Infortuni) -->
+                        <div id="card-physical" class="overview-card"
+                            style="grid-column: span 2; background:#FAFAFC; border:1px solid #E5E5EA; padding:15px; border-radius:12px;">
+                            <label
+                                style="display:block; font-size:11px; color:#888; font-weight:700; text-transform:uppercase;">Condizione
+                                Fisica</label>
+                            <p style="margin:0; font-size:14px;" id="ov-physical">-</p>
+                        </div>
+
+                        <!-- Note Cliente -->
+                        <div class="overview-card"
+                            style="grid-column: span 2; background:#FAFAFC; border:1px solid #E5E5EA; padding:15px; border-radius:12px;">
+                            <label
+                                style="display:block; font-size:11px; color:#888; font-weight:700; text-transform:uppercase;">Note
+                                dal Cliente</label>
+                            <p style="margin:0; font-size:14px; font-style:italic;" id="ov-client-notes">-</p>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- CONTENUTO 2: MISURE (Form e Tabella) -->
                 <div id="c-tab-body" class="c-tab-content hidden">

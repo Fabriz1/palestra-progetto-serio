@@ -1,6 +1,10 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFirestore, doc, getDoc, addDoc, collection } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { 
+     
+    query, where, orderBy, limit, getDocs // <--- AGGIUNTI QUESTI
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // CONFIGURAZIONE
 const firebaseConfig = {
@@ -64,8 +68,12 @@ onAuthStateChanged(auth, async (user) => {
     initSlideToFinish();
 });
 
+// Variabile globale per tenere i pesi vecchi
+let historyMap = {}; 
+
 async function loadData() {
     try {
+        // 1. Carica la Scheda (Come prima)
         const docRef = doc(db, "workouts", currentWorkoutId);
         const snap = await getDoc(docRef);
 
@@ -76,19 +84,40 @@ async function loadData() {
         }
 
         workoutData = snap.data();
-        
-        // 1. Header Fisso: VUOTO (Solo timer e tasto indietro)
-        dayTitle.textContent = `Giorno ${currentDay}`; 
-        
-        // 2. Titolone Pagina: SCRITTO QUI
-        
-        
-        const exercises = workoutData.data[currentDay] || workoutData.data[String(currentDay)] || [];
-        
-        
+        dayTitle.textContent = `Giorno ${currentDay}`;
 
+        // --- NUOVO: CARICA STORICO (PREVIOUS LIFTS) ---
+        try {
+            const logsRef = collection(db, "users", auth.currentUser.uid, "logs");
+            // Cerchiamo l'ultimo log DI QUESTO GIORNO DI QUESTA SCHEDA
+            const q = query(
+                logsRef, 
+                where("workoutId", "==", currentWorkoutId),
+                where("dayIndex", "==", parseInt(currentDay)),
+                orderBy("date", "desc"),
+                limit(1)
+            );
+            
+            const logSnap = await getDocs(q);
+            
+            if (!logSnap.empty) {
+                const lastLog = logSnap.docs[0].data();
+                // Creiamo una mappa facile da leggere: { "Panca": [100, 100, 90], "Squat": [120, 120] }
+                if (lastLog.exercises) {
+                    lastLog.exercises.forEach(ex => {
+                        // Salviamo solo i pesi (kg) in un array ordinato per set
+                        historyMap[ex.name] = ex.sets.map(s => s.kg);
+                    });
+                }
+            }
+        } catch (err) {
+            console.log("Nessun storico trovato o errore fetch:", err);
+        }
+        // ----------------------------------------------
+
+        const exercises = workoutData.data[currentDay] || workoutData.data[String(currentDay)] || [];
         renderList(exercises);
-        restoreSession();
+        restoreSession(); // Ripristina eventuale sessione in corso
 
     } catch (e) { console.error(e); }
 }
@@ -159,26 +188,42 @@ window.toggleCard = (header) => {
 function generateInputRows(ex) {
     let html = '';
     const rest = ex.rest || 90;
+    
+    // Recuperiamo lo storico per questo esercizio specifico (se esiste)
+    const historySets = historyMap[ex.name] || [];
 
     if (ex.technique === "Top set + back-off") {
-        html += createRow("TOP", ex.topReps, rest);
+        // Passiamo l'indice 0 per il primo set, 1 per il secondo, ecc...
+        html += createRow("TOP", ex.topReps, rest, historySets[0]); 
         const backs = parseInt(ex.backSets) || 2;
-        for (let i = 0; i < backs; i++) html += createRow("BACK", ex.backReps, rest);
+        for (let i = 0; i < backs; i++) {
+            html += createRow("BACK", ex.backReps, rest, historySets[i + 1]);
+        }
     }
     else if (ex.technique === "Myo-reps") {
-        html += createRow("ACT", "12-15", rest);
-        for (let i = 1; i <= 5; i++) html += createRow("MYO", "3-5", 15);
+        html += createRow("ACT", "12-15", rest, historySets[0]);
+        for (let i = 1; i <= 5; i++) {
+            html += createRow("MYO", "3-5", 15, historySets[i]);
+        }
     }
     else {
         const sets = parseInt(ex.val1) || 3;
         const reps = ex.val2 || "10";
-        for (let i = 1; i <= sets; i++) html += createRow(i, reps, rest);
+        for (let i = 1; i <= sets; i++) {
+            // L'indice dell'array parte da 0, quindi usiamo i-1
+            html += createRow(i, reps, rest, historySets[i - 1]);
+        }
     }
     return html;
 }
 
-function createRow(label, targetReps, rest) {
+// Aggiunto parametro 'prevVal'
+function createRow(label, targetReps, rest, prevVal) {
     const isSpecial = (String(label).length > 2);
+    
+    // Se c'è un valore precedente, crea l'HTML, altrimenti stringa vuota
+    const prevHtml = prevVal ? `<div class="prev-val">${prevVal}kg</div>` : '';
+
     return `
         <div class="set-row" data-rest="${rest}" data-reps="${targetReps}">
             <div class="set-info">
@@ -187,6 +232,7 @@ function createRow(label, targetReps, rest) {
             </div>
             <div class="set-input-area">
                 <input type="number" class="input-kg" placeholder="Kg" oninput="window.autoSaveSession()">
+                ${prevHtml} <!-- INSERITO QUI SOTTO L'INPUT -->
             </div>
             <button class="btn-check" onclick="toggleSet(this)"><i class="ph ph-check"></i></button>
         </div>

@@ -165,19 +165,23 @@ function updatePageTitle(sectionId) {
 
 navLinks.forEach(link => {
     link.addEventListener('click', () => {
+        // ... codice esistente (rimuove active, nasconde sezioni) ...
         navLinks.forEach(l => l.classList.remove('active'));
         link.classList.add('active');
-
         sections.forEach(section => section.classList.add('hidden'));
+        
         const targetId = link.getAttribute('data-target');
         document.getElementById(targetId).classList.remove('hidden');
 
         updatePageTitle(targetId);
 
-        if (targetId === 'section-chat') {
-            const badge = document.getElementById('chat-badge');
-            if (badge) badge.classList.add('hidden');
+        // --- AGGIUNTA NUOVA: Se clicco Calendario, ricarico la vista ---
+        if (targetId === 'section-calendar') {
+            renderCalendarView();
         }
+        
+        // ... codice esistente badge chat ...
+        if (targetId === 'section-chat') { /*...*/ }
     });
 });
 
@@ -384,13 +388,13 @@ window.applyClientFilters = () => {
     const searchText = document.getElementById('search-client').value.toLowerCase();
     const colorFilter = document.getElementById('filter-color').value;
     const tagFilter = document.getElementById('filter-tag').value;
+    
+    // NUOVO: Lettura select ordinamento (se non esiste nel DOM, fallback su 'name')
+    const sortMode = document.getElementById('sort-clients') ? document.getElementById('sort-clients').value : 'name';
 
-    // Filtra l'array locale
-    const filtered = allClientsCache.filter(c => {
-        // Filtro Nome
+    // 1. Filtra l'array locale (Logica esistente)
+    let filtered = allClientsCache.filter(c => {
         const matchesName = (c.name || '').toLowerCase().includes(searchText);
-        
-        // Filtro Colore (Gestione codici esadecimali)
         let matchesColor = true;
         if (colorFilter !== 'all') {
             const cColor = (c.labelColor || '').toLowerCase();
@@ -401,15 +405,25 @@ window.applyClientFilters = () => {
             else if (colorFilter === 'blue') matchesColor = cColor.includes('0071e3');
             else if (colorFilter === 'red') matchesColor = cColor.includes('ff3b30');
         }
-
-        // Filtro Tag
         let matchesTag = true;
         if (tagFilter !== 'all') {
             matchesTag = (c.customLabel === tagFilter);
         }
-
         return matchesName && matchesColor && matchesTag;
     });
+
+    // 2. Ordinamento (NUOVA LOGICA)
+    if (sortMode === 'renewal') {
+        filtered.sort((a, b) => {
+            // Chi non ha data va in fondo
+            if (!a.renewalDate) return 1; 
+            if (!b.renewalDate) return -1;
+            return new Date(a.renewalDate) - new Date(b.renewalDate); // Data più vicina prima
+        });
+    } else {
+        // Default: Nome A-Z
+        filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
 
     renderClients(filtered);
 };
@@ -419,66 +433,109 @@ function renderClients(clients) {
     clientsGrid.innerHTML = '';
     
     if (clients.length === 0) {
-        clientsGrid.innerHTML = '<div style="padding:40px; text-align:center; color:#999; grid-column: 1/-1;">Nessun atleta trovato con questi filtri.</div>';
+        clientsGrid.innerHTML = '<div style="padding:40px; text-align:center; color:#999; grid-column: 1/-1;">Nessun atleta trovato.</div>';
         return;
     }
 
-    // Preparazione Suggerimenti Tag (HTML da riusare)
+    // HTML per suggerimenti tag (rimane uguale)
     const suggestionsHTML = Array.from(uniqueTagsCache).map(tag => 
         `<span class="tag-chip" onclick="fillTagInput(this, '${tag}')">${tag}</span>`
     ).join('');
 
     clients.forEach(c => {
+        // --- 1. LOGICA SEMAFORO SCADENZA ---
+        let renewalBadgeHTML = '';
+        if (c.renewalDate) {
+            const today = new Date(); 
+            today.setHours(0,0,0,0); // Reset orario per confronto puro
+            const rDate = new Date(c.renewalDate);
+            const diffTime = rDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); // Giorni di differenza
+
+            let badgeClass = 'status-green';
+            let badgeText = `${diffDays} giorni`;
+            let badgeIcon = '📅';
+
+            if (diffDays < 0) {
+                badgeClass = 'status-red';
+                badgeText = `Scaduta (${Math.abs(diffDays)}gg fa)`;
+                badgeIcon = '⚠️';
+            } else if (diffDays === 0) {
+                badgeClass = 'status-orange';
+                badgeText = 'Scade OGGI';
+                badgeIcon = '⏳';
+            } else if (diffDays <= 7) {
+                badgeClass = 'status-orange';
+                badgeText = `Scade tra ${diffDays}gg`;
+                badgeIcon = '⏳';
+            } else {
+                // Verde (> 7 giorni)
+                badgeText = `Rinnovo: ${new Date(c.renewalDate).toLocaleDateString('it-IT', {day:'2-digit', month:'2-digit'})}`;
+            }
+
+            renewalBadgeHTML = `<div class="renewal-badge ${badgeClass}">${badgeIcon} ${badgeText}</div>`;
+        }
+
+        // --- STILI CARD ESISTENTI ---
         const color = c.labelColor || null;
         let styleAttr = '';
         let dataColored = 'false';
-
         if (color && color !== 'transparent') {
             dataColored = 'true';
             const glowColor = color + '40';
             styleAttr = `style="--card-color: ${color}; --card-glow: ${glowColor};"`;
         }
 
-        const card = document.createElement('div');
-        card.className = 'client-card';
-        if (color) card.setAttribute('data-colored', dataColored);
-        card.setAttribute('style', styleAttr.replace('style="', '').replace('"', ''));
-
-        // HTML del Menu con Input Migliorato
+        // --- 2. MENU DROPDOWN AGGIORNATO (Nuova sezione Data) ---
         const menuHtml = `
             <div class="card-dropdown" id="menu-${c.id}" onclick="event.stopPropagation()">
+                
+                <!-- SEZIONE 1: SCADENZA / CALENDARIO (Nuova) -->
+                <div class="dropdown-section">
+                    <h6>📅 Scadenza Scheda / Pacchetto</h6>
+                    <div class="date-input-row">
+                        <input type="date" id="renewal-input-${c.id}" value="${c.renewalDate || ''}">
+                        <button onclick="setClientRenewal('${c.id}')" title="Salva Scadenza"><i class="ph ph-check"></i></button>
+                    </div>
+                </div>
+
+                <!-- SEZIONE 2: EVIDENZIATORE (Esistente) -->
                 <div class="dropdown-section">
                     <h6>Evidenzia Card</h6>
                     <div class="colors-row">
-                        <div class="color-swatch" style="background:#FFD700" onclick="setClientColor('${c.id}', '#FFD700')" title="Gold"></div>
-                        <div class="color-swatch" style="background:#C0C0C0" onclick="setClientColor('${c.id}', '#C0C0C0')" title="Silver"></div>
-                        <div class="color-swatch" style="background:#CD7F32" onclick="setClientColor('${c.id}', '#CD7F32')" title="Bronze"></div>
-                        <div class="color-swatch" style="background:#0071E3" onclick="setClientColor('${c.id}', '#0071E3')" title="Blue"></div>
-                        <div class="color-swatch" style="background:#FF3B30" onclick="setClientColor('${c.id}', '#FF3B30')" title="Red"></div>
-                        <div class="color-swatch remove" onclick="setClientColor('${c.id}', null)" title="Rimuovi"><i class="ph ph-prohibit"></i></div>
+                        <div class="color-swatch" style="background:#FFD700" onclick="setClientColor('${c.id}', '#FFD700')"></div>
+                        <div class="color-swatch" style="background:#C0C0C0" onclick="setClientColor('${c.id}', '#C0C0C0')"></div>
+                        <div class="color-swatch" style="background:#CD7F32" onclick="setClientColor('${c.id}', '#CD7F32')"></div>
+                        <div class="color-swatch" style="background:#0071E3" onclick="setClientColor('${c.id}', '#0071E3')"></div>
+                        <div class="color-swatch" style="background:#FF3B30" onclick="setClientColor('${c.id}', '#FF3B30')"></div>
+                        <div class="color-swatch remove" onclick="setClientColor('${c.id}', null)"><i class="ph ph-prohibit"></i></div>
                     </div>
                 </div>
+
+                <!-- SEZIONE 3: ETICHETTA (Esistente) -->
                 <div class="dropdown-section">
                     <h6>Etichetta (es. VIP, Agonista)</h6>
-                    <div class="tag-input-wrapper">
-                        <input type="text" id="label-input-${c.id}" placeholder="Scrivi tag..." value="${c.customLabel || ''}" maxlength="15">
+                    <div class="label-input-row">
+                        <input type="text" id="label-input-${c.id}" placeholder="Tag..." value="${c.customLabel || ''}" maxlength="15">
                         <button onclick="setClientLabel('${c.id}')"><i class="ph ph-check"></i></button>
                     </div>
-                    <!-- SUGGERIMENTI TAG -->
-                    <div class="tag-suggestions-area">
-                        ${suggestionsHTML}
-                    </div>
+                    <div class="tag-suggestions-area">${suggestionsHTML}</div>
                 </div>
+
                 <button class="btn-delete-card" onclick="deleteClient('${c.id}')" style="margin-top:10px;">
                     <i class="ph ph-trash" style="margin-right:5px"></i> Elimina dal Team
                 </button>
             </div>
         `;
 
+        const card = document.createElement('div');
+        card.className = 'client-card';
+        if (color) card.setAttribute('data-colored', dataColored);
+        card.setAttribute('style', styleAttr.replace('style="', '').replace('"', ''));
+
         card.innerHTML = `
             <button class="card-menu-btn" onclick="toggleCardMenu(event, '${c.id}')"><i class="ph ph-dots-three-vertical"></i></button>
             
-            <!-- Etichetta visibile sia in griglia che lista -->
             ${c.customLabel ? `<span class="custom-label-badge" style="background:${color || '#1D1D1F'}">${c.customLabel}</span>` : ''}
             
             ${menuHtml}
@@ -486,13 +543,21 @@ function renderClients(clients) {
             <div class="client-header">
                 <div class="client-avatar">${c.name ? c.name.charAt(0).toUpperCase() : '?'}</div>
                 <div>
-                    <h4>${c.name || "Senza Nome"}</h4>
-                    <span class="status-badge positive">Attivo</span>
+                    <h4 style="margin-bottom:0;">${c.name || "Senza Nome"}</h4>
+                    
+                    <!-- Badge Scadenza Inserito Qui -->
+                    ${renewalBadgeHTML}
+
+                    <!-- Status "Attivo" spostato o mantenuto piccolo sotto se non c'è badge scadenza -->
+                    ${!renewalBadgeHTML ? '<span class="status-badge positive" style="margin-top:4px;">Attivo</span>' : ''}
                 </div>
             </div>
-            <div class="mini-chart-area" style="font-size:12px; color:#ccc;">
+
+            <!-- Area Grafico (Placeholder) -->
+            <div class="mini-chart-area">
                 <span>Analisi in arrivo...</span>
             </div>
+            
             <button class="btn-details" onclick="openClientDetail('${c.id}')">Scheda Atleta</button>
         `;
         clientsGrid.appendChild(card);
@@ -1458,3 +1523,135 @@ if (miniProfileBtn && settingsNavLink) {
         settingsNavLink.click();
     });
 }
+// Funzione per salvare la data di rinnovo
+window.setClientRenewal = async (id) => {
+    const input = document.getElementById(`renewal-input-${id}`);
+    const dateVal = input.value; // YYYY-MM-DD
+    
+    // Chiudi menu per pulizia
+    document.querySelectorAll('.card-dropdown').forEach(d => d.classList.remove('active'));
+
+    try {
+        // Salviamo su Firebase (campo renewalDate)
+        await updateDoc(doc(db, "users", id), { renewalDate: dateVal || null });
+        // La griglia si aggiornerà da sola grazie al listener onSnapshot
+    } catch (e) { 
+        console.error("Errore salvataggio data:", e); 
+        alert("Errore salvataggio scadenza"); 
+    }
+};
+// =========================================
+// 9. LOGICA CALENDARIO / AGENDA
+// =========================================
+function renderCalendarView() {
+    const container = document.getElementById('calendar-agenda-container');
+    if (!container) return;
+
+    // Filtra solo chi ha una data di rinnovo
+    const clientsWithDates = allClientsCache.filter(c => c.renewalDate);
+
+    if (clientsWithDates.length === 0) {
+        container.innerHTML = `
+            <div style="text-align:center; padding:60px; color:#86868B;">
+                <i class="ph ph-calendar-x" style="font-size:48px; margin-bottom:10px; display:block;"></i>
+                <p>Nessuna scadenza impostata.</p>
+                <small>Imposta una data di rinnovo dalle card dei clienti nella sezione Stats.</small>
+            </div>
+        `;
+        return;
+    }
+
+    // Ordina per data (dal più vecchio/scaduto al futuro)
+    clientsWithDates.sort((a, b) => new Date(a.renewalDate) - new Date(b.renewalDate));
+
+    // Struttura Gruppi
+    const groups = {
+        expired: { title: "⚠️ Scaduti / In Ritardo", list: [] },
+        today: { title: "⭐ Oggi", list: [] },
+        tomorrow: { title: "Domani", list: [] },
+        week: { title: "Questa Settimana", list: [] },
+        month: { title: "Questo Mese", list: [] },
+        future: { title: "Più Avanti", list: [] }
+    };
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    // Smistamento Clienti nei Gruppi
+    clientsWithDates.forEach(c => {
+        const rDate = new Date(c.renewalDate);
+        rDate.setHours(0,0,0,0); // Normalizza orario
+        
+        const diffTime = rDate - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) groups.expired.list.push({ ...c, diff: diffDays });
+        else if (diffDays === 0) groups.today.list.push({ ...c, diff: diffDays });
+        else if (diffDays === 1) groups.tomorrow.list.push({ ...c, diff: diffDays });
+        else if (diffDays <= 7) groups.week.list.push({ ...c, diff: diffDays });
+        else if (diffDays <= 30) groups.month.list.push({ ...c, diff: diffDays });
+        else groups.future.list.push({ ...c, diff: diffDays });
+    });
+
+    // Generazione HTML
+    let finalHTML = '';
+
+    // Funzione helper per creare HTML di un gruppo
+    const createGroupHTML = (key, styleClass) => {
+        const group = groups[key];
+        if (group.list.length === 0) return '';
+
+        let itemsHTML = group.list.map(c => {
+            const dateStr = new Date(c.renewalDate).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' });
+            let labelText = '';
+            let badgeColorClass = 'bg-gray';
+
+            if (key === 'expired') { labelText = `Scaduta da ${Math.abs(c.diff)}gg`; badgeColorClass = 'bg-red'; }
+            else if (key === 'today') { labelText = 'Scade OGGI'; badgeColorClass = 'bg-orange'; }
+            else if (key === 'tomorrow') { labelText = 'Scade Domani'; badgeColorClass = 'bg-orange'; }
+            else { labelText = `Tra ${c.diff} giorni`; badgeColorClass = 'bg-blue'; }
+            
+            if (key === 'future') badgeColorClass = 'bg-gray';
+
+            // Cliccando apre il dettaglio (funzione esistente)
+            return `
+                <div class="agenda-card" onclick="openClientDetail('${c.id}')">
+                    <div class="ac-left">
+                        <div class="ac-avatar">${c.name.charAt(0).toUpperCase()}</div>
+                        <div class="ac-info">
+                            <h5>${c.name}</h5>
+                            <span>${c.activeWorkoutId ? 'Scheda Attiva' : 'Nessuna Scheda'}</span>
+                        </div>
+                    </div>
+                    <div class="ac-right">
+                        <span class="ac-date">${dateStr}</span>
+                        <span class="ac-days-left ${badgeColorClass}">${labelText}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        return `
+            <div class="agenda-group">
+                <h4>${group.title} <span class="count-badge">${group.list.length}</span></h4>
+                ${itemsHTML}
+            </div>
+        `;
+    };
+
+    // Ordine di visualizzazione
+    finalHTML += createGroupHTML('expired');
+    finalHTML += createGroupHTML('today');
+    finalHTML += createGroupHTML('tomorrow');
+    finalHTML += createGroupHTML('week');
+    finalHTML += createGroupHTML('month');
+    finalHTML += createGroupHTML('future');
+
+    container.innerHTML = finalHTML;
+}
+
+// Aggiorna anche updatePageTitle per il titolo in alto
+// (Incolla questo pezzo dentro la tua funzione updatePageTitle esistente)
+/*
+   case 'section-calendar': pageTitle.textContent = "Calendario Scadenze"; break;
+*/

@@ -327,3 +327,20 @@ circle { fill: none; stroke-width: 6; stroke-linecap: round; }
 .btn-pill.secondary { background: rgba(255,255,255,0.2); color: white; }
 
 @keyframes scaleIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+/* Scrittina peso precedente */
+.prev-val {
+    font-size: 10px;
+    color: #98989D; /* Grigio Apple */
+    margin-top: 2px;
+    text-align: center;
+    font-weight: 500;
+    line-height: 1;
+}
+
+/* Assicuriamo che l'area input possa contenere input + scritta */
+.set-input-area {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
