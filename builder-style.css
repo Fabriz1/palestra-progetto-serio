@@ -1,4 +1,6 @@
-/* RESET E BASE (Specifico per il Builder) */
+/* ========================================= */
+/* === 1. RESET E BASE === */
+/* ========================================= */
 * {
     box-sizing: border-box;
     margin: 0;
@@ -6,24 +8,21 @@
 }
 
 body {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     background-color: #F5F5F7;
     height: 100vh;
-    overflow: hidden; /* Importante per l'effetto app */
+    overflow: hidden;
     color: #1D1D1F;
 }
 
 /* --- MOBILE BLOCKER --- */
 #mobile-blocker {
-    display: none; /* Default nascosto su PC */
+    display: none;
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: 0; left: 0; width: 100%; height: 100%;
     background: #1D1D1F;
     color: white;
-    z-index: 9999;
+    z-index: 99999;
     flex-direction: column;
     justify-content: center;
     align-items: center;
@@ -32,12 +31,8 @@ body {
 }
 
 @media (max-width: 1024px) {
-    #mobile-blocker {
-        display: flex; /* Visibile su schermi piccoli */
-    }
-    .builder-container {
-        display: none; /* Nascondi l'app vera */
-    }
+    #mobile-blocker { display: flex; }
+    .builder-container { display: none; }
 }
 
 .btn-back-home {
@@ -47,14 +42,15 @@ body {
     font-weight: 600;
 }
 
-/* --- LAYOUT GENERALE --- */
+/* ========================================= */
+/* === 2. LAYOUT APP E HEADER === */
+/* ========================================= */
 .builder-container {
     display: flex;
     flex-direction: column;
     height: 100vh;
 }
 
-/* HEADER */
 .builder-header {
     height: 70px;
     background: white;
@@ -64,99 +60,71 @@ body {
     justify-content: space-between;
     padding: 0 24px;
     flex-shrink: 0;
+    z-index: 50; /* Header sopra il contenuto */
 }
 
 .header-left, .header-center, .header-right {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    
+    display: flex; align-items: center; gap: 16px;
 }
 
-.header-center {
-    flex-grow: 1;
-    justify-content: center;
-}
+.header-center { flex-grow: 1; justify-content: center; }
 
 .icon-btn {
-    background: none;
-    border: none;
-    font-size: 24px;
-    cursor: pointer;
-    color: #1D1D1F;
+    background: none; border: none; font-size: 24px; cursor: pointer; color: #1D1D1F;
 }
 
 #workout-name {
-    font-size: 20px;
-    font-weight: 700;
+    font-size: 20px; font-weight: 700;
     border-bottom: 1px dashed transparent;
     padding-bottom: 2px;
-    
-    
-    
 }
-
 #workout-name:hover, #workout-name:focus {
-    border-bottom-color: #0071E3;
-    outline: none;
+    border-bottom-color: #0071E3; outline: none;
 }
 
-/* INPUT HEADER */
+/* Input Header */
 #client-select, #num-days {
     padding: 8px 12px;
     border: 1px solid #D2D2D7;
     border-radius: 8px;
-    font-family: inherit;
-    font-size: 14px;
+    font-family: inherit; font-size: 14px;
 }
 
+/* Bottoni Generali */
 .btn-primary {
-    background: #0071E3;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
+    background: #0071E3; color: white; border: none;
+    padding: 10px 20px; border-radius: 8px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
 }
 
 .btn-secondary {
-    background: white;
-    color: #1D1D1F;
-    border: 1px solid #D2D2D7;
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
+    background: white; color: #1D1D1F; border: 1px solid #D2D2D7;
+    padding: 10px 20px; border-radius: 8px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
 }
 
-/* WORKSPACE (GRID 2 COLONNE) */
+
+/* ========================================= */
+/* === 3. WORKSPACE E PANNELLI === */
+/* ========================================= */
 .workspace {
     flex-grow: 1;
     display: grid;
-    grid-template-columns: 3fr 1fr; /* 75% Editor, 25% Stats */
-    overflow: hidden; /* Contiene lo scroll */
-}
-
-/* --- COLONNA EDITOR (SINISTRA) --- */
-.editor-panel {
-    background: #F5F5F7;
-    border-right: 1px solid #E5E5EA;
-    display: flex;
-    flex-direction: column;
+    grid-template-columns: 3fr 1fr;
     overflow: hidden;
 }
 
-/* TABS GIORNI */
+/* --- PANNELLO SINISTRO (EDITOR) --- */
+.editor-panel {
+    background: #F5F5F7;
+    border-right: 1px solid #E5E5EA;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+}
+
+/* Tabs Giorni */
 .days-tabs {
-    display: flex;
-    gap: 2px;
+    display: flex; gap: 2px;
     background: white;
     padding: 12px 24px 0 24px;
     border-bottom: 1px solid #E5E5EA;
@@ -165,443 +133,331 @@ body {
 .tab-btn {
     padding: 10px 24px;
     background: #F5F5F7;
-    border: 1px solid #E5E5EA;
-    border-bottom: none;
+    border: 1px solid #E5E5EA; border-bottom: none;
     border-radius: 8px 8px 0 0;
-    cursor: pointer;
-    font-weight: 500;
-    color: #86868B;
+    cursor: pointer; font-weight: 500; color: #86868B;
     transition: all 0.2s;
 }
 
 .tab-btn.active {
-    background: #FFFFFF;
-    color: #0071E3;
-    font-weight: 600;
-    border-top: 2px solid #0071E3; /* Linea blu sopra */
+    background: #FFFFFF; color: #0071E3; font-weight: 600;
+    border-top: 2px solid #0071E3;
 }
 
-/* CONTENUTO GIORNO SCROLLABILE */
+/* Area Scrollabile Esercizi */
 .day-content {
     flex-grow: 1;
-    overflow-y: auto; /* Qui avviene lo scroll se la scheda è lunga */
+    overflow-y: auto;
     padding: 24px;
+    padding-bottom: 100px; /* Spazio extra in fondo */
 }
 
-/* STILE RIGA ESERCIZIO */
-.exercise-row {
-    background: white;
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 12px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
-    border: 1px solid #E5E5EA;
-    display: flex;
-    align-items: flex-start; /* Allinea in alto per input multilinea */
-    gap: 12px;
-    flex-wrap: wrap; /* Permette di andare a capo su schermi medi */
-}
-
-.drag-handle {
-    color: #C7C7CC;
-    cursor: grab;
-    padding-top: 10px;
-}
-
-/* INPUT DENTRO LA RIGA */
-.exercise-row input, .exercise-row select {
-    padding: 10px;
-    border: 1px solid #E5E5EA;
-    border-radius: 8px;
-    font-family: inherit;
-    font-size: 13px;
-    outline: none;
-}
-
-.exercise-row input:focus, .exercise-row select:focus {
-    border-color: #0071E3;
-    
-}
-
-
-/* Dimensioni specifiche input */
-.input-ex-name { flex-grow: 2; min-width: 200px; font-weight: 600; }
-.input-sets { width: 60px; text-align: center; }
-.input-reps { width: 80px; text-align: center; }
-.select-muscle { width: 140px; }
-.select-technique { width: 140px; color: #E056FD; font-weight: 500;} /* Colore viola per tecniche */
-
-/* TASTO CANCELLA RIGA */
-.btn-remove-row {
-    background: none;
-    border: none;
-    color: #FF3B30;
-    cursor: pointer;
-    font-size: 18px;
-    padding-top: 10px;
-}
-
-/* AREA BOTTONE AGGIUNGI */
-.btn-add-exercise {
-    width: 100%;
-    padding: 16px;
-    border: 2px dashed #D2D2D7;
-    background: transparent;
-    border-radius: 12px;
-    color: #86868B;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 20px;
-    transition: all 0.2s;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-}
-
-.btn-add-exercise:hover {
-    border-color: #0071E3;
-    color: #0071E3;
-    background: rgba(0, 113, 227, 0.05);
-}
-
-/* --- COLONNA STATS (DESTRA) --- */
+/* --- PANNELLO DESTRO (STATS) --- */
 .stats-panel {
     background: white;
     padding: 24px;
     border-left: 1px solid #E5E5EA;
-    display: flex;
-    flex-direction: column;
+    display: flex; flex-direction: column;
     overflow-y: auto;
 }
 
-.stats-panel h3 {
-    margin-bottom: 20px;
-    font-size: 18px;
-}
+.stats-panel h3 { margin-bottom: 20px; font-size: 18px; }
+.charts-container { margin-bottom: 30px; position: relative; height: 250px; }
+.stats-list { display: flex; flex-direction: column; gap: 10px; }
+.stat-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F5F5F7; font-size: 14px; }
+.muscle-label { font-weight: 500; }
+.volume-value { font-family: monospace; font-weight: 600; }
+.tips-box { margin-top: auto; background: #F2F2F7; padding: 12px; border-radius: 8px; font-size: 12px; color: #636366; }
 
-.charts-container {
-    margin-bottom: 30px;
-    position: relative;
-    height: 250px; /* Altezza fissa per il grafico */
-}
 
-.stats-list {
+/* ========================================= */
+/* === 4. NUOVO DESIGN CARD ESERCIZIO === */
+/* ========================================= */
+
+.exercise-row {
+    position: relative !important;
     display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.stat-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 0;
-    border-bottom: 1px solid #F5F5F7;
-    font-size: 14px;
-}
-
-.muscle-label {
-    font-weight: 500;
-}
-
-.volume-value {
-    font-family: monospace;
-    font-weight: 600;
-}
-
-.tips-box {
-    margin-top: auto; /* Spinge in basso */
-    background: #F2F2F7;
-    padding: 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    color: #636366;
-}
-
-/* NOTE AGGIUNTIVE SOTTO ESERCIZIO (Nascoste di default o toggle) */
-.row-extras {
-    width: 100%;
-    display: flex;
-    z-index: 1;;
-    gap: 10px;
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px dashed #E5E5EA;
-}
-
-.row-extras input {
-    flex-grow: 1;
-    font-size: 12px;
-}
-/* --- AGGIUNTE PER LOGICA AVANZATA --- */
-
-/* Etichette sopra gli input (es. "Sets", "Minuti") */
-.input-group-col {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.input-label {
-    font-size: 10px;
-    color: #86868B;
-    margin-bottom: 2px;
-    font-weight: 600;
-    text-transform: uppercase;
-}
-
-/* Container Muscoli Sinergici */
-.synergists-container {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    width: 100%;
-    margin-top: 8px;
-}
-
-.synergist-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 12px;
-}
-
-.synergist-badge {
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-weight: 700;
-    color: white;
-    font-size: 10px;
-}
-.bg-secondary { background: #FF9500; } /* Arancione */
-.bg-tertiary { background: #AF52DE; } /* Viola */
-.bg-quaternary { background: #5856D6; } /* Blu scuro */
-.bg-other { background: #8E8E93; } /* Grigio */
-
-.btn-add-synergist {
-    background: none;
-    border: 1px dashed #0071E3;
-    color: #0071E3;
-    font-size: 11px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-    width: fit-content;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.btn-add-synergist:hover {
-    background: #F0F8FF;
-}
-
-.btn-del-syn {
-    color: #FF3B30;
-    cursor: pointer;
-    font-size: 14px;
-}
-/* --- LAYOUT SPECIALI PER TECNICHE AVANZATE --- */
-
-/* Contenitore per i layout complessi (Top Set + Backoff) */
-.special-layout-container {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 6px;
-    background: #F2F2F7;
-    border-radius: 8px;
-    border: 1px dashed #D2D2D7;
-}
-
-.special-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.special-label {
-    font-size: 10px;
-    font-weight: 700;
-    color: #0071E3;
-    width: 60px; /* Larghezza fissa etichetta */
-    text-align: right;
-}
-
-.special-input {
-    padding: 6px;
-    border: 1px solid #E5E5EA;
-    border-radius: 6px;
-    font-size: 12px;
-    text-align: center;
-}
-
-/* Stile per la Select Metrica (RPE, RIR...) */
-.select-metric {
-    width: 80px;
-    font-weight: 600;
-    font-size: 11px;
-    color: #FF2D55; /* Colore diverso per risaltare */
-}
-
-/* Input valore intensità (es. "@ 8") */
-.input-intensity {
-    width: 50px;
-    text-align: center;
-    font-weight: 700;
-}
-/* --- MODALE SALVATAGGIO --- */
-.hidden { display: none !important; }
-
-.modal-overlay {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(5px); /* Effetto vetro sfocato Apple */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    animation: fadeIn 0.2s ease-out;
-}
-
-.modal-card {
-    background: white;
-    width: 450px;
-    border-radius: 20px;
-    padding: 24px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-    transform: scale(1);
-    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
+    flex-direction: column; /* Impilamento verticale dei "Deck" */
+    gap: 16px; /* Spazio tra i piani */
     
+    padding: 20px; 
+    padding-right: 50px !important; /* Spazio protetto per il cestino */
+    
+    background: white;
+    border-radius: 16px;
+    margin-bottom: 16px;
+    border: 1px solid #E5E5EA;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    
+    /* Gestione Stacking (Importante per i menu) */
+    z-index: 1;
+    overflow: visible !important;
+    transition: box-shadow 0.2s, z-index 0s;
 }
 
-.modal-header h3 { margin: 0; font-size: 20px; }
-
-.btn-icon-small {
-    background: none; border: none; font-size: 20px; cursor: pointer; color: #86868B;
+.exercise-row:hover {
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    z-index: 1000;
 }
 
-/* Opzioni di salvataggio */
-.save-option {
-    display: flex;
-    gap: 16px;
-    padding: 16px;
-    border: 2px solid #E5E5EA;
-    border-radius: 12px;
-    margin-bottom: 12px;
-    cursor: pointer;
-    transition: all 0.2s;
+/* CESTINO (Fisso in alto a destra) */
+.btn-remove-row {
+    position: absolute !important;
+    top: 16px;
+    right: 12px;
+    width: 32px; height: 32px;
+    color: #FF3B30; background: transparent;
+    border-radius: 8px; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 20;
+    transition: background 0.2s;
+}
+.btn-remove-row:hover { background: #FFF0F1; }
+
+/* DRAG HANDLE */
+.drag-handle {
+    position: absolute; top: 20px; left: 6px;
+    color: #C7C7CC; cursor: grab; display: flex;
 }
 
-.save-option:hover { border-color: #D2D2D7; background: #F9F9FA; }
-.save-option.active { border-color: #0071E3; background: #F0F8FF; }
-
-.radio-circle {
-    width: 20px; height: 20px;
-    border: 2px solid #C7C7CC;
-    border-radius: 50%;
-    flex-shrink: 0;
-    margin-top: 2px;
+/* STILI INPUT COMUNI */
+.tiny-label {
+    font-size: 10px; color: #86868B; font-weight: 700;
+    text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;
 }
+.input-wrapper { display: flex; flex-direction: column; }
 
-.save-option.active .radio-circle {
-    border-color: #0071E3;
-    background: #0071E3;
-    box-shadow: inset 0 0 0 4px white; /* Crea il pallino interno */
-}
-
-.opt-content h4 { margin: 0 0 4px 0; font-size: 15px; }
-.opt-content p { margin: 0 0 10px 0; font-size: 12px; color: #86868B; }
-
-.modal-select, .modal-input {
-    width: 100%;
-    padding: 8px;
+.exercise-row input, .exercise-row select, .exercise-row textarea {
+    padding: 9px 12px;
     border: 1px solid #D2D2D7;
     border-radius: 8px;
-    margin-top: 5px;
-}
-
-.full-width { width: 100%; justify-content: center; margin-top: 10px; }
-
-@keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-/* --- CUSTOM DROPDOWN MUSCOLI --- */
-
-/* Il contenitore che sostituisce la <select> */
-/* --- CUSTOM MEGA-DROPDOWN MUSCOLI --- */
-
-/* --- CUSTOM APPLE-STYLE DROPDOWN --- */
-
-/* Il contenitore principale resta fisso nel flusso */
-.custom-dropdown-wrapper {
-    position: relative; /* Ancora per il menu assoluto */
+    font-family: 'Inter', sans-serif; font-size: 13px;
+    background: white; outline: none; transition: border 0.2s;
     width: 100%;
-    min-width: 200px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    z-index: 10; /* Livello base */
 }
-
-/* Il Trigger (Il bottone che vedi sempre) */
-.dropdown-trigger {
-    padding: 12px 16px;
-    border: 1px solid #E5E5EA;
-    border-radius: 12px; /* Arrotondato */
-    background: white;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    color: #1D1D1F;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    user-select: none;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.02);
-    z-index: 100;
-}
-
-.dropdown-trigger:hover {
+.exercise-row input:focus, .exercise-row select:focus, .exercise-row textarea:focus {
     border-color: #0071E3;
-    background: #FAFAFC;
 }
 
-/* IL MENU FLOTTANTE */
+/* --- PIANO 1: TOP DECK (Nome + Box Volume) --- */
+.er-top-deck {
+    display: flex;
+    gap: 20px;
+    align-items: stretch; /* Allinea altezze */
+    width: 100%;
+    padding-left: 15px; /* Spazio drag handle */
+}
+
+/* Nome Esercizio */
+.ex-name-wrapper { flex-grow: 1; }
+.input-ex-name { font-weight: 600; font-size: 15px; height: 100%; }
+
+/* BOX VOLUME (Sfondo colorato e Cornicetta) */
+.volume-box {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end; /* Allinea inputs in basso */
+    
+    background: #F7F9FC; /* Grigio-Bluastro chiarissimo */
+    border: 1px solid #E1E6EB; /* Cornicetta */
+    padding: 10px 14px;
+    border-radius: 12px;
+}
+
+/* Wrapper dentro il box volume */
+.tech-wrapper { width: 130px; }
+.select-technique { color: #AF52DE; font-weight: 600; border-color: rgba(0,0,0,0.1); }
+
+.dynamic-inputs-area { display: flex; gap: 8px; }
+.input-sets, .input-reps { width: 55px; text-align: center; font-weight: 600; border-color: rgba(0,0,0,0.1); }
+
+/* Special Mode (Top Set) */
+.dynamic-inputs-area.special-mode { gap: 12px; }
+.special-group { display: flex; flex-direction: column; gap: 2px; align-items: center; }
+.special-input { width: 45px; padding: 4px; text-align: center; font-size: 12px; }
+
+
+/* --- PIANO 2: MID DECK (Recupero + Intensità) --- */
+.er-mid-deck {
+    display: flex;
+    gap: 20px;
+    align-items: flex-end;
+    padding-left: 15px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed #F2F2F7;
+}
+
+.rest-wrapper { width: 120px; }
+
+/* Gruppo Intensità (Rosso) */
+/* --- GRUPPO INTENSITÀ (Widget Ridisegnato) --- */
+
+.intensity-group {
+    display: flex;
+    align-items: flex-end; /* Allinea tutto sul fondo */
+    gap: 12px; /* Spazio tra Parametro e Target */
+    
+    background: #FFF0F3; /* Rosa molto pallido */
+    border: 1px solid #FFCCD5; /* Bordo rosa leggermente più scuro */
+    border-radius: 12px;
+    padding: 6px 12px 8px 12px; /* Spaziatura interna bilanciata */
+    height: fit-content;
+}
+
+/* Sovrascriviamo lo stile generico dei wrapper solo qui dentro */
+.intensity-group .input-wrapper {
+    gap: 2px; /* Avvicina etichetta e campo */
+}
+
+/* Le etichette "Parametro" e "Target" */
+.intensity-group .tiny-label {
+    color: #FF85A1; /* Rosa scuro invece che grigio, per coerenza */
+    font-size: 9px;
+    margin-bottom: 0;
+}
+
+/* Il menu a tendina (RPE, Kg, ecc) */
+.select-metric {
+    border: 1px dotted  !important;
+    border-color: #ff3a305a;
+    background: transparent !important;
+    padding: 0px 0px 0px 4px !important; /* Rimuove padding standard */
+    margin: 0;
+    
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    color: #FF2D55 !important;
+    
+    cursor: pointer;
+    height: 30px; /* Altezza fissa per allineamento */
+    width: auto !important;
+    min-width: 60px;
+    
+    /* Togliamo l'aspetto standard del browser */
+    -webkit-appearance: none; 
+    appearance: none;
+    /* Aggiungiamo una freccina personalizzata rossa */
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FF2D55%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0px center;
+    background-size: 10px;
+}
+
+/* Il box bianco del numero */
+.input-intensity-val {
+    width: 60px !important;
+    height: 30px !important; /* Stessa altezza del select */
+    
+    border: 1px solid #FFB3C1 !important; /* Bordo rosa più definito */
+    border-radius: 8px !important;
+    background: white !important;
+    
+    color: #FF2D55 !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
+    text-align: center;
+    padding: 0 !important;
+}
+
+.input-intensity-val:focus {
+    border-color: #FF2D55 !important;
+    box-shadow: 0 0 0 3px rgba(255, 45, 85, 0.1);
+}
+
+
+/* --- PIANO 3: BOT DECK (Muscoli + Note) --- */
+.er-bot-deck {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* 50% / 50% */
+    gap: 24px;
+    padding-left: 15px;
+}
+
+/* Colonna Muscoli */
+.er-col-muscles {
+    display: flex; flex-direction: column; gap: 10px;
+    position: relative; z-index: 50; /* Priorità Menu */
+}
+
+/* Colonna Note */
+.er-col-notes { display: flex; flex-direction: column; }
+.input-notes {
+    resize: none; height: 100%; min-height: 80px;
+    font-size: 13px; color: #444; line-height: 1.5;
+}
+
+/* Sinergici */
+.synergists-list { display: flex; flex-direction: column; gap: 8px; }
+
+.synergist-row {
+    display: flex; gap: 8px; align-items: center;
+    background: #FAFAFC; padding: 6px; border-radius: 8px;
+    border: 1px solid #F0F0F5;
+    position: relative; z-index: 20;
+}
+
+.synergist-row select { width: 110px; font-size: 12px; }
+
+.btn-add-synergist {
+    font-size: 12px; color: #0071E3; background: white;
+    border: 1px dashed #D2D2D7; padding: 10px; border-radius: 8px;
+    cursor: pointer; text-align: center; width: 100%; transition: all 0.2s;
+}
+.btn-add-synergist:hover { background: #F0F8FF; border-color: #0071E3; }
+
+.btn-del-syn { color: #999; cursor: pointer; font-size: 18px; padding: 4px; }
+.btn-del-syn:hover { color: #FF3B30; }
+
+
+/* ========================================= */
+/* === 5. CUSTOM DROPDOWN (APPLE STYLE) === */
+/* ========================================= */
+.custom-dropdown-wrapper {
+    position: relative; width: 100%; min-width: 200px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    z-index: 10;
+}
+
+.dropdown-trigger {
+    padding: 10px 14px;
+    border: 1px solid #D2D2D7; border-radius: 8px;
+    background: white; cursor: pointer;
+    font-size: 14px; font-weight: 500; color: #1D1D1F;
+    display: flex; justify-content: space-between; align-items: center;
+    user-select: none; transition: all 0.2s ease;
+    z-index: 1;
+}
+.dropdown-trigger:hover { border-color: #0071E3; background: #FAFAFC; }
+
+/* IL MENU FLOTTANTE (Fix Posizione) */
 .dropdown-menu {
     position: absolute;
-    top: calc(100% + 8px);
+    top: calc(100% + 6px);
     
-    /* MODIFICA QUI: Ancoraggio a destra per espandersi a sinistra */
-    left: auto;   /* Disabilita allineamento sinistro */
-    right: 0;     /* Allinea il bordo destro del menu col bordo destro del bottone */
+    /* MODIFICA QUI: Torniamo ad ancorarlo a SINISTRA */
+    left: 0;      /* Parte dal bordo sinistro del bottone */
+    right: auto;  /* Non lo forziamo più a destra */
     
-    width: 450px; /* Larghezza fissa */
-    max-width: 85vw;
+    width: 450px; 
+    max-width: 85vw; /* Si adatta se lo schermo è piccolo */
     
-    background: rgba(255, 255, 255, 0.98); /* Quasi opaco per coprire bene ciò che sta sotto */
+    background: rgba(255, 255, 255, 0.98);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     
     border: 1px solid rgba(0,0,0,0.1);
-    border-radius: 16px 0 16px 16px; /* Chicca di stile: l'angolo in alto a destra è dritto per seguire il bottone */
+    border-radius: 16px; /* Arrotondamento uniforme */
     
     box-shadow: 
-        0 10px 40px -10px rgba(0, 0, 0, 0.2), /* Ombra più forte per "staccarlo" */
-        0 0 0 1px rgba(0,0,0,0.05); /* Bordo sottile */
+        0 10px 40px -10px rgba(0, 0, 0, 0.2), 
+        0 0 0 1px rgba(0,0,0,0.05);
     
-    z-index: 99999; /* Z-index estremo */
+    z-index: 99999;
     
-    /* ANIMAZIONE */
     opacity: 0;
     transform: translateY(-10px) scale(0.98);
-    transform-origin: top right; /* L'animazione parte dall'angolo in alto a destra */
+    transform-origin: top left; /* L'animazione ora parte da sinistra */
+    
     pointer-events: none;
     visibility: hidden;
     
@@ -614,210 +470,117 @@ body {
     flex-direction: column;
 }
 
-/* STATO APERTO (Animazione) */
-.dropdown-menu.open {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    pointer-events: all;
-    visibility: visible;
-}
+.dropdown-menu.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: all; visibility: visible; }
 
-/* Barra di ricerca */
-.dropdown-search-box {
-    padding: 12px;
-    border-bottom: 1px solid rgba(0,0,0,0.05);
-    background: transparent;
-}
+.dropdown-search-box { padding: 12px; border-bottom: 1px solid rgba(0,0,0,0.05); background: transparent; z-index: 101; }
+.dropdown-search-box input { width: 100%; padding: 10px; border: 1px solid #D2D2D7; border-radius: 8px; font-size: 14px; outline: none; }
+.dropdown-search-box input:focus { border-color: #0071E3; }
 
-.dropdown-search-box input {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid #D2D2D7;
-    border-radius: 10px;
-    font-size: 14px;
-    background: rgba(255,255,255,0.8);
-    outline: none;
-    transition: border 0.2s;
-}
+.dropdown-items-container { max-height: 380px; overflow-y: auto; padding: 8px 0; z-index: 101; }
+.dropdown-items-container::-webkit-scrollbar { width: 6px; }
+.dropdown-items-container::-webkit-scrollbar-thumb { background: #C7C7CC; border-radius: 3px; }
 
-.dropdown-search-box input:focus {
-    border-color: #0071E3;
-    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.1);
-}
-
-/* Contenitore Scrollabile */
-.dropdown-items-container {
-    max-height: 380px;
-    overflow-y: auto;
-    padding: 8px 0;
-    z-index: 101;
-}
-
-/* Scrollbar invisibile ma funzionante (stile moderno) */
-.dropdown-items-container::-webkit-scrollbar {
-    width: 6px;
-}
-.dropdown-items-container::-webkit-scrollbar-thumb {
-    background: #C7C7CC;
-    border-radius: 3px;
-}
-
-/* --- LISTA E ELEMENTI --- */
-
-/* Intestazione Categoria (Padre) */
+/* Elementi Lista Dropdown */
 .group-header {
-    padding: 12px 16px;
-    color: #1D1D1F;
-    font-weight: 700;
-    font-size: 14px;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #F5F5F7;
-    background: white; /* Bianco pulito */
-    transition: background 0.1s;
+    padding: 12px 16px; color: #1D1D1F; font-weight: 700; font-size: 14px;
+    cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid #F5F5F7; background: white; transition: background 0.1s;
 }
+.group-header:hover { background: #F2F2F7; }
 
-.group-header:hover {
-    background: #F2F2F7; /* Grigio chiarissimo hover */
-}
-
-/* Icona Freccia */
 .arrow-icon {
-    font-size: 16px;
-    color: #0071E3;
-    background: #F0F8FF;
-    padding: 6px;
-    border-radius: 50%;
-    transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+    font-size: 16px; color: #0071E3; background: #F0F8FF; padding: 6px; border-radius: 50%;
+    transition: transform 0.3s;
 }
+.group-header.expanded .arrow-icon { transform: rotate(90deg); background: #0071E3; color: white; }
 
-.group-header.expanded .arrow-icon {
-    transform: rotate(90deg);
-    background: #0071E3;
-    color: white;
-}
-
-/* CONTENITORE FIGLI (GRID LAYOUT) */
 .group-children {
-    display: none;
-    background: #FAFAFC; /* Sfondo leggermente diverso per l'area interna */
-    padding: 8px;
-    border-bottom: 1px solid #F5F5F7;
-    
-    /* LA MAGIA: GRIGLIA A 2 COLONNE PER USARE SPAZIO ORIZZONTALE */
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
+    display: none; background: #FAFAFC; padding: 8px; border-bottom: 1px solid #F5F5F7;
+    grid-template-columns: 1fr 1fr; gap: 4px;
 }
+.group-children.visible { display: grid; animation: slideDown 0.2s ease-out; }
 
-.group-children.visible {
-    display: grid; /* Diventa grid quando visibile */
-    animation: slideDown 0.2s ease-out;
-}
-
-/* Elemento Figlio */
 .child-item {
-    padding: 8px 12px;
-    font-size: 13px;
-    color: #48484A;
-    cursor: pointer;
-    border-radius: 8px;
-    transition: all 0.1s;
+    padding: 8px 12px; font-size: 13px; color: #48484A; cursor: pointer; border-radius: 8px;
+}
+.child-item:hover { background: white; color: #0071E3; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.child-item.selected { background: #0071E3; color: white; font-weight: 600; }
+
+@keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
+
+/* ========================================= */
+/* === 6. Z-INDEX FIXES (IMPILAMENTO) === */
+/* ========================================= */
+
+/* Menu muscoli in primo piano su hover */
+.custom-dropdown-wrapper:hover, .custom-dropdown-wrapper:focus-within {
+    z-index: 99999 !important;
 }
 
-.child-item:hover {
-    background: white;
-    color: #0071E3;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    transform: translateX(2px);
+/* Righe sinergici */
+.synergist-row:hover {
+    z-index: 1000 !important;
 }
 
-.child-item.selected {
-    background: #0071E3;
-    color: white;
-    font-weight: 600;
+/* Colonna muscoli primari sopra a tutto */
+.er-col-muscles {
+    z-index: 200 !important;
 }
 
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-5px); }
-    to { opacity: 1; transform: translateY(0); }
+/* ========================================= */
+/* === 7. MODALI E EXTRA === */
+/* ========================================= */
+.modal-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(5px);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 1000; animation: fadeIn 0.2s ease-out;
 }
-/* --- LISTA STATISTICHE A FISARMONICA --- */
-.stat-group {
-    border-bottom: 1px solid #F5F5F7;
+.hidden { display: none !important; }
+.modal-card {
+    background: white; width: 450px; border-radius: 20px; padding: 24px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2); animation: popIn 0.3s;
 }
+.modal-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+.save-option {
+    display: flex; gap: 16px; padding: 16px; border: 2px solid #E5E5EA; border-radius: 12px;
+    margin-bottom: 12px; cursor: pointer; transition: all 0.2s;
+}
+.save-option:hover { border-color: #D2D2D7; background: #F9F9FA; }
+.save-option.active { border-color: #0071E3; background: #F0F8FF; }
+.radio-circle { width: 20px; height: 20px; border: 2px solid #C7C7CC; border-radius: 50%; margin-top: 2px; }
+.save-option.active .radio-circle { border-color: #0071E3; background: #0071E3; box-shadow: inset 0 0 0 4px white; }
+.modal-select, .modal-input { width: 100%; padding: 8px; border: 1px solid #D2D2D7; border-radius: 8px; margin-top: 5px; }
+.full-width { width: 100%; margin-top: 10px; }
 
-.stat-parent {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 0;
-    cursor: pointer;
-    font-weight: 600;
-    color: #1D1D1F;
-}
+/* Fisarmonica Statistiche */
+.stat-group { border-bottom: 1px solid #F5F5F7; }
+.stat-parent { display: flex; justify-content: space-between; padding: 10px 0; cursor: pointer; font-weight: 600; }
+.stat-arrow { font-size: 10px; margin-left: 8px; transition: transform 0.2s; }
+.stat-parent.active .stat-arrow { transform: rotate(90deg); }
+.stat-children { display: none; padding-bottom: 8px; padding-left: 12px; background: #FAFAFC; border-radius: 4px; }
+.stat-children.visible { display: block; animation: fadeIn 0.2s; }
+.child-stat { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; border-bottom: 1px dashed #E5E5EA; }
 
-.stat-parent:hover {
-    color: #0071E3;
-}
-
-.stat-arrow {
-    font-size: 10px;
-    margin-left: 8px;
-    transition: transform 0.2s;
-    color: #86868B;
-}
-
-.stat-parent.active .stat-arrow {
-    transform: rotate(90deg);
-}
-
-.stat-children {
-    display: none;
-    padding-bottom: 8px;
-    padding-left: 12px;
-    background: #FAFAFC;
-    border-radius: 4px;
-}
-
-.stat-children.visible {
-    display: block;
-    animation: fadeIn 0.2s;
-}
-
-.child-stat {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    color: #636366;
-    padding: 4px 0;
-    border-bottom: 1px dashed #E5E5EA;
-}
-
-/* --- GRAFICO INTERATTIVO --- */
-.chart-box {
-    position: relative; /* Fondamentale per posizionare il bottone sopra */
-}
-
+/* Grafico Back Button */
+.chart-box { position: relative; }
 #btn-chart-back {
-    position: absolute;
-    
-    
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(4px);
-    border: 1px solid #E5E5EA;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    z-index: 100;
-    display: none; /* Nascosto di default */
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(4px);
+    border: 1px solid #E5E5EA; padding: 6px 12px; border-radius: 12px;
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 100; color: #0071E3;
+    display: none;
 }
+#btn-chart-back:hover { background: #0071E3; color: white; }
 
-#btn-chart-back:hover {
-    background: #0071E3;
-    color: white;
+/* Aggiungi Esercizio */
+.btn-add-exercise {
+    width: 100%; padding: 16px; border: 2px dashed #D2D2D7; background: transparent;
+    border-radius: 12px; color: #86868B; font-weight: 600; cursor: pointer; margin-top: 20px;
 }
+.btn-add-exercise:hover { border-color: #0071E3; color: #0071E3; background: rgba(0, 113, 227, 0.05); }
+
+@keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

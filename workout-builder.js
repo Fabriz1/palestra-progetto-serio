@@ -450,272 +450,262 @@ function createExerciseRowHTML(container, data, index) {
     row.className = 'exercise-row';
     const primaryMuscle = data.muscles.find(m => m.type === 'primary')?.name || "";
 
+    // --- NUOVA STRUTTURA A 3 LIVELLI ---
     row.innerHTML = `
+        <!-- ELEMENTI FISSI (Drag & Drop + Cestino) -->
         <div class="drag-handle"><i class="ph ph-dots-six-vertical"></i></div>
-        <div class="input-group-col" style="flex-grow: 2; min-width: 150px;">
-            <span class="input-label">Esercizio</span>
-            <input type="text" class="input-ex-name" value="${data.name}" placeholder="Nome Esercizio" list="exercise-suggestions" autocomplete="off">
-        </div>
-        <div class="dynamic-inputs-area" style="display:flex; gap:10px; align-items:center;"></div>
-        <div class="input-group-col">
-            <span class="input-label">Tecnica</span>
-            <select class="select-technique" style="width: 110px;">
-                ${TECHNIQUES.map(t => `<option value="${t}" ${t === data.technique ? 'selected' : ''}>${t}</option>`).join('')}
-            </select>
-        </div>
-        <div class="input-group-col">
-            <span class="input-label">Intensità</span>
-            <select class="select-metric">
-                ${INTENSITY_METRICS.map(m => `<option value="${m}" ${m === data.metricType ? 'selected' : ''}>${m}</option>`).join('')}
-            </select>
-        </div>
-
-
-        <div class="input-group-col">
-            <span class="input-label">Muscolo</span>
-            <div class="muscle-dropdown-placeholder"></div> <!-- Placeholder per il nostro componente -->
-        </div>
-
-
         <button class="btn-remove-row"><i class="ph ph-trash"></i></button>
-        <div class="row-extras" style="width: 100%; display: flex; flex-direction: column;">
-            <div class="synergists-wrapper"><div class="synergists-list"></div><button class="btn-add-synergist" style="margin-top:5px;"><i class="ph ph-plus"></i> Sinergico</button></div>
-            <div style="display: flex; gap: 10px; margin-top: 10px; width: 100%;">
-                <input type="text" class="input-notes" value="${data.notes || ''}" placeholder="Note tecniche" style="flex-grow: 1;">
-                <input type="text" class="input-rest" value="${data.rest || ''}" placeholder="Recupero" style="width: 100px;">
+
+        <!-- PIANO 1: ESERCIZIO E VOLUMI -->
+        <div class="er-top-deck">
+            <div class="input-wrapper ex-name-wrapper">
+                <span class="tiny-label">Esercizio</span>
+                <input type="text" class="input-ex-name" value="${data.name}" placeholder="Nome Esercizio" list="exercise-suggestions" autocomplete="off">
+            </div>
+            
+            <!-- Area Dinamica (Sets/Reps) -->
+            <div class="dynamic-inputs-area"></div>
+
+            <div class="input-wrapper tech-wrapper">
+                <span class="tiny-label">Tecnica</span>
+                <select class="select-technique">
+                    ${TECHNIQUES.map(t => `<option value="${t}" ${t === data.technique ? 'selected' : ''}>${t}</option>`).join('')}
+                </select>
+            </div>
+        </div>
+
+        <!-- PIANO 2: RECUPERO E INTENSITÀ -->
+        <div class="er-mid-deck">
+            <div class="input-wrapper rest-wrapper">
+                <span class="tiny-label">Recupero</span>
+                <input type="text" class="input-rest" value="${data.rest || ''}" placeholder="es. 90''">
+            </div>
+
+            <div class="intensity-group">
+                <div class="input-wrapper">
+                    <span class="tiny-label">Parametro</span>
+                    <select class="select-metric">
+                        ${INTENSITY_METRICS.map(m => `<option value="${m}" ${m === data.metricType ? 'selected' : ''}>${m}</option>`).join('')}
+                    </select>
+                </div>
+                <!-- Il valore (es. @8) verrà iniettato qui dalla logica dinamica o sotto -->
+                <div class="input-wrapper">
+                     <span class="tiny-label">Target</span>
+                     <input type="text" class="input-intensity-val" value="${data.intensityVal || ''}" style="width: 50px; text-align: center; border-color: #FF2D55; font-weight:700;">
+                </div>
+            </div>
+        </div>
+
+        <!-- PIANO 3: MUSCOLI E NOTE -->
+        <div class="er-bot-deck">
+            <!-- Colonna Sinistra: Muscoli -->
+            <div class="er-col-muscles">
+                <span class="tiny-label">Focus Muscolare</span>
+                <div class="muscle-dropdown-placeholder"></div> <!-- Qui va il Custom Dropdown -->
+                
+                <div class="synergists-list"></div>
+                <button class="btn-add-synergist"><i class="ph ph-plus"></i> Sinergico</button>
+            </div>
+
+            <!-- Colonna Destra: Note -->
+            <div class="er-col-notes">
+                <span class="tiny-label">Note Tecniche per il Cliente</span>
+                <textarea class="input-notes" placeholder="Scrivi indicazioni sull'esecuzione...">${data.notes || ''}</textarea>
             </div>
         </div>
     `;
     container.appendChild(row);
 
-
-
-    // ... container.appendChild(row);
-
-    // --- INIZIALIZZA CUSTOM DROPDOWN ---
-    const muscleContainer = row.querySelector('.muscle-dropdown-placeholder');
-
-    // Callback: cosa succede quando seleziono un muscolo?
-    const onMuscleChange = (newValue) => {
-        // Aggiorna l'array muscles (rimuovi il vecchio primary e metti il nuovo)
-        data.muscles = data.muscles.filter(m => m.type !== 'primary');
-        if (newValue) data.muscles.unshift({ name: newValue, type: 'primary' });
-
-        updateData(); // Salva nello stato
-        updateLiveStats(); // Aggiorna grafici (anche se per ora userà logica vecchia, non rompe nulla)
-    };
-
-    // Crea componente
-    const dropdownEl = createMuscleDropdown(primaryMuscle, onMuscleChange);
-    muscleContainer.appendChild(dropdownEl);
-
-    // Riferimento per l'autofill (quando scrivi il nome esercizio)
-    // Salviamo il riferimento al componente DOM per poter chiamare .setValue() dopo
-    row.dataset.dropdownId = Math.random().toString(36).substr(2, 9); // ID temporaneo se serve, ma meglio:
-    row.dropdownComponent = dropdownEl; // Attacchiamo l'oggetto direttamente al DOM element della riga
-
-
-
+    // --- LOGICA JAVASCRIPT (Aggiornata ai nuovi selettori) ---
+    
+    // 1. Gestione Sets/Reps Dinamici
     const dynamicArea = row.querySelector('.dynamic-inputs-area');
-
+    
     const renderCentralInputs = () => {
         dynamicArea.innerHTML = '';
+        
         if (data.technique === "Top set + back-off") {
+            // Layout Speciale Top Set
+            dynamicArea.className = 'dynamic-inputs-area special-mode';
             dynamicArea.innerHTML = `
-                <div class="special-layout-container">
-                    <div class="special-row">
-                        <span class="special-label">TOP SET</span>
-                        <input type="text" disabled value="1" class="special-input" style="width:30px; background:#e0e0e0;" title="1 Set">
-                        <span>x</span>
-                        <input type="text" class="special-input input-top-reps" value="${data.topReps || ''}" placeholder="Reps" style="width:50px;">
-                        <span>@</span>
-                        <input type="text" class="special-input input-top-int" value="${data.topInt || ''}" placeholder="${data.metricType}" style="width:50px;">
+                <div class="special-group">
+                    <span class="tiny-label">TOP</span>
+                    <div style="display:flex; gap:2px; align-items:center;">
+                        <span style="font-size:11px; color:#888;">1 x</span>
+                        <input type="text" class="special-input input-top-reps" value="${data.topReps || ''}" placeholder="Reps">
+                        <span style="font-size:11px; color:#888;">@</span>
+                        <input type="text" class="special-input input-top-int" value="${data.topInt || ''}" placeholder="${data.metricType}">
                     </div>
-                    <div class="special-row">
-                        <span class="special-label">BACK-OFF</span>
-                        <input type="text" class="special-input input-back-sets" value="${data.backSets || ''}" placeholder="Sets" style="width:30px;">
-                        <span>x</span>
-                        <input type="text" class="special-input input-back-reps" value="${data.backReps || ''}" placeholder="Reps" style="width:50px;">
-                        <span>@</span>
-                        <input type="text" class="special-input input-back-int" value="${data.backInt || ''}" placeholder="${data.metricType}" style="width:50px;">
+                </div>
+                <div class="special-group">
+                    <span class="tiny-label">BACK</span>
+                    <div style="display:flex; gap:2px; align-items:center;">
+                        <input type="text" class="special-input input-back-sets" value="${data.backSets || ''}" placeholder="Sets">
+                        <span style="font-size:11px; color:#888;">x</span>
+                        <input type="text" class="special-input input-back-reps" value="${data.backReps || ''}" placeholder="Reps">
                     </div>
                 </div>`;
+                // Nascondi input intensità standard se siamo in top set (opzionale)
+                row.querySelector('.input-intensity-val').parentElement.style.display = 'none';
+
         } else {
+            // Layout Standard
+            dynamicArea.className = 'dynamic-inputs-area standard-mode';
             const layout = TECHNIQUE_LAYOUTS[data.technique] || TECHNIQUE_LAYOUTS["Standard"];
+            
             dynamicArea.innerHTML = `
-                <div class="input-group-col">
-                    <span class="input-label label-v1">${layout.label1}</span>
-                    <input type="text" class="input-sets" value="${data.val1 || ''}" style="width: 50px; text-align: center;">
+                <div class="input-wrapper">
+                    <span class="tiny-label">${layout.label1}</span>
+                    <input type="text" class="input-sets" value="${data.val1 || ''}">
                 </div>
-                <div class="input-group-col">
-                    <span class="input-label label-v2">${layout.label2}</span>
-                    <input type="text" class="input-reps" value="${data.val2 || ''}" style="width: 60px; text-align: center;">
+                <div class="input-wrapper">
+                    <span class="tiny-label">${layout.label2}</span>
+                    <input type="text" class="input-reps" value="${data.val2 || ''}">
                 </div>
-                <div class="input-group-col">
-                    <span class="input-label label-metric-val">@ ${data.metricType}</span>
-                    <input type="text" class="input-intensity-val" value="${data.intensityVal || ''}" style="width: 50px; text-align: center; border-color: #FF2D55;">
-                </div>`;
+            `;
+            // Mostra input intensità standard
+            const intValContainer = row.querySelector('.input-intensity-val').parentElement;
+            if(intValContainer) intValContainer.style.display = 'block';
         }
+        
+        // Riattacca listeners agli input dinamici
         dynamicArea.querySelectorAll('input').forEach(i => i.addEventListener('input', updateData));
     };
 
+    // 2. Funzione Update Data
     const updateData = () => {
         data.name = row.querySelector('.input-ex-name').value;
         data.technique = row.querySelector('.select-technique').value;
         data.metricType = row.querySelector('.select-metric').value;
         data.notes = row.querySelector('.input-notes').value;
         data.rest = row.querySelector('.input-rest').value;
-        /* const pVal = row.querySelector('.muscle-primary').value;
-        data.muscles = data.muscles.filter(m => m.type !== 'primary');
-        if (pVal) data.muscles.unshift({ name: pVal, type: 'primary' });
-        */
+        
+        // Input intensità standard (potrebbe essere nascosto in Top Set)
+        const intInput = row.querySelector('.input-intensity-val');
+        if(intInput) data.intensityVal = intInput.value;
 
         if (data.technique === "Top set + back-off") {
             data.topReps = row.querySelector('.input-top-reps')?.value;
             data.topInt = row.querySelector('.input-top-int')?.value;
             data.backSets = row.querySelector('.input-back-sets')?.value;
             data.backReps = row.querySelector('.input-back-reps')?.value;
-            data.backInt = row.querySelector('.input-back-int')?.value;
-            data.val1 = "";
+            data.backInt = row.querySelector('.input-back-int')?.value; // (se c'è)
+            data.val1 = ""; 
         } else {
             data.val1 = row.querySelector('.input-sets')?.value;
             data.val2 = row.querySelector('.input-reps')?.value;
-            data.intensityVal = row.querySelector('.input-intensity-val')?.value;
         }
         updateLiveStats();
     };
 
     renderCentralInputs();
 
+    // 3. Event Listeners Generali
     row.querySelector('.input-ex-name').addEventListener('input', updateData);
     row.querySelector('.input-notes').addEventListener('input', updateData);
     row.querySelector('.input-rest').addEventListener('input', updateData);
-    //row.querySelector('.muscle-primary').addEventListener('change', (e) => { updateData(); updateLiveStats(); });
-    row.querySelector('.select-technique').addEventListener('change', (e) => { data.technique = e.target.value; renderCentralInputs(); updateData(); });
-    row.querySelector('.select-metric').addEventListener('change', (e) => {
-        data.metricType = e.target.value;
-        const lbl = row.querySelector('.label-metric-val'); if (lbl) lbl.textContent = `@ ${data.metricType}`;
-        const inputs = row.querySelectorAll('.special-input'); if (inputs.length > 0) { row.querySelector('.input-top-int').placeholder = data.metricType; row.querySelector('.input-back-int').placeholder = data.metricType; }
+    row.querySelector('.input-intensity-val').addEventListener('input', updateData);
+
+    row.querySelector('.select-technique').addEventListener('change', (e) => { 
+        data.technique = e.target.value; 
+        renderCentralInputs(); 
+        updateData(); 
     });
-    row.querySelector('.btn-remove-row').addEventListener('click', () => { workoutData[currentDay].splice(index, 1); renderDay(currentDay); });
+    
+    row.querySelector('.select-metric').addEventListener('change', (e) => { 
+        data.metricType = e.target.value;
+        // Aggiorna placeholder input speciali se esistono
+        const topInt = row.querySelector('.input-top-int');
+        if(topInt) topInt.placeholder = data.metricType;
+    });
 
+    row.querySelector('.btn-remove-row').addEventListener('click', () => { 
+        workoutData[currentDay].splice(index, 1); 
+        renderDay(currentDay); 
+    });
+
+    // 4. Inizializzazione Custom Dropdown (Muscolo Primario)
+    const muscleContainer = row.querySelector('.muscle-dropdown-placeholder');
+    const onMuscleChange = (newValue) => {
+        data.muscles = data.muscles.filter(m => m.type !== 'primary');
+        if (newValue) data.muscles.unshift({ name: newValue, type: 'primary' });
+        updateData(); 
+        updateLiveStats(); 
+    };
+    const dropdownEl = createMuscleDropdown(primaryMuscle, onMuscleChange);
+    muscleContainer.appendChild(dropdownEl);
+    row.dropdownComponent = dropdownEl;
+
+    // 5. Gestione Sinergici
     const synList = row.querySelector('.synergists-list');
-
-
-
     const renderSynergists = () => {
         synList.innerHTML = '';
-        // Filtra solo i secondari/terziari (escludi primario)
         const syns = data.muscles.filter(m => m.type !== 'primary');
-        
         syns.forEach((m) => {
             const div = document.createElement('div');
             div.className = 'synergist-row';
-            div.style.marginTop = "5px";
-            div.style.alignItems = "flex-start"; // Allinea in alto perché il dropdown è alto
             
-            // 1. SELECT TIPO (Secondario, Terziario...) - Questa resta uguale
+            // Select Tipo
             const typeSelect = document.createElement('select'); 
-            typeSelect.style.width = "100px";
-            typeSelect.style.marginRight = "10px";
-            typeSelect.style.padding = "10px"; // Match stile dropdown
-            typeSelect.style.borderRadius = "8px";
-            typeSelect.style.border = "1px solid #E5E5EA";
-            
             typeSelect.innerHTML = `
                 <option value="secondary" ${m.type === 'secondary'?'selected':''}>Secondario</option>
                 <option value="tertiary" ${m.type === 'tertiary'?'selected':''}>Terziario</option>
-                <option value="quaternary" ${m.type === 'quaternary'?'selected':''}>Quaternario</option>
             `;
-            
-            // 2. NUOVO DROPDOWN MUSCOLO (Invece della vecchia select)
-            // Callback: quando cambi muscolo qui, aggiorna l'oggetto 'm' e ricalcola stats
-            const onSynChange = (newVal) => {
-                m.name = newVal;
-                updateLiveStats();
-            };
+            typeSelect.addEventListener('change', (e) => { m.type = e.target.value; updateLiveStats(); });
 
-            const dropdownEl = createMuscleDropdown(m.name, onSynChange);
+            // Dropdown Muscolo Sinergico
+            const onSynChange = (newVal) => { m.name = newVal; updateLiveStats(); };
+            const dd = createMuscleDropdown(m.name, onSynChange);
             
-            // Aggiustamenti CSS specifici per i sinergici (più compatti)
-            dropdownEl.style.width = "200px"; 
-            dropdownEl.style.flexGrow = "1";
-
-            // 3. BOTTONE ELIMINA
+            // Delete Btn
             const delBtn = document.createElement('i'); 
             delBtn.className = 'ph ph-x btn-del-syn'; 
-            delBtn.style.cursor="pointer";
-            delBtn.style.padding = "12px"; // Centrato col dropdown
-            
-            // EVENTI
-            typeSelect.addEventListener('change', (e) => { m.type = e.target.value; updateLiveStats(); });
-            
-            delBtn.addEventListener('click', () => { 
-                // Trova l'indice corretto nell'array originale data.muscles
+            delBtn.onclick = () => { 
                 const realIndex = data.muscles.indexOf(m); 
                 if (realIndex > -1) data.muscles.splice(realIndex, 1); 
                 renderSynergists(); 
                 updateLiveStats(); 
-            });
+            };
             
-            div.appendChild(typeSelect); 
-            div.appendChild(dropdownEl); // Inseriamo il dropdown invece della select
+            div.appendChild(typeSelect);
+            div.appendChild(dd);
             div.appendChild(delBtn);
             synList.appendChild(div);
         });
     };
-
-
-
-
     renderSynergists();
-    row.querySelector('.btn-add-synergist').addEventListener('click', () => { data.muscles.push({ name: "", type: "secondary" }); renderSynergists(); });
-    // ... dentro createExerciseRowHTML ...
+    row.querySelector('.btn-add-synergist').addEventListener('click', () => { 
+        data.muscles.push({ name: "", type: "secondary" }); 
+        renderSynergists(); 
+    });
 
-
+    // 6. Auto-Fill (Logica Ricerca)
     const nameInput = row.querySelector('.input-ex-name');
     nameInput.addEventListener('input', (e) => {
-        const val = e.target.value;
-        updateData();
-        if (val.endsWith(' ')) return; // Piccola ottimizzazione
+        const val = e.target.value; 
+        updateData(); 
+        if (val.endsWith(' ')) return;
 
-        // MODIFICA QUI: Uso l'indice di ricerca lowercase
         const searchKey = val.trim().toLowerCase();
         const foundExercise = exerciseSearchIndex[searchKey];
 
         if (foundExercise) {
-            // Se trovato tramite Alias, opzionalmente puoi sostituire il nome con quello ufficiale
-            // if (foundExercise.canonicalName !== val) { nameInput.value = foundExercise.canonicalName; data.name = foundExercise.canonicalName; }
-
-            // 1. Imposta Muscolo Primario
-            if (foundExercise.p) {
-                // Usa il metodo setValue che abbiamo aggiunto all'elemento nel passo 3
-                if (row.dropdownComponent && row.dropdownComponent.setValue) {
-                    row.dropdownComponent.setValue(foundExercise.p);
-
-                    // Dobbiamo aggiornare i dati manualmente perché setValue non lancia callback
-                    data.muscles = data.muscles.filter(m => m.type !== 'primary');
-                    data.muscles.unshift({ name: foundExercise.p, type: 'primary' });
-                    updateLiveStats();
-                }
+            if (foundExercise.p && row.dropdownComponent) {
+                row.dropdownComponent.setValue(foundExercise.p);
+                data.muscles = data.muscles.filter(m => m.type !== 'primary');
+                data.muscles.unshift({ name: foundExercise.p, type: 'primary' });
             }
 
-            // 2. Gestione Sinergici Intelligente
             const currentSyns = data.muscles.filter(m => m.type !== 'primary');
-
             if (currentSyns.length === 0 && foundExercise.s && foundExercise.s.length > 0) {
                 data.muscles = data.muscles.filter(m => m.type === 'primary');
-
                 foundExercise.s.forEach(item => {
-                    if (typeof item === 'string') {
-                        data.muscles.push({ name: item, type: 'secondary' });
-                    } else {
-                        data.muscles.push({ name: item.name, type: item.type });
-                    }
+                    if (typeof item === 'string') data.muscles.push({ name: item, type: 'secondary' });
+                    else data.muscles.push({ name: item.name, type: item.type });
                 });
-                renderSynergists();
-                updateLiveStats();
+                renderSynergists(); 
             }
+            updateLiveStats();
         }
     });
 }
@@ -834,32 +824,39 @@ function updateLiveStats() {
         // MAPPA COLORI PADRI (Tonalità HSL)
         // Definiamo un colore distintivo per ogni categoria
         // MAPPA COLORI PADRI (Gradi HSL: 0-360)
+        // MAPPA COLORI PADRI (Gradi HSL: 0-360)
+        // Logica: Muscoli sinergici hanno colori opposti nella ruota cromatica
         const CATEGORY_HUES = {
-            "Pettorali": 350,           // Rosso
-            "Deltoidi Anteriori": 10,   // Rosso Arancio
-            "Deltoidi Laterali": 30,    // Arancione
-            "Deltoidi Posteriori": 45,  // Giallo Oro
-            "Cuffia dei Rotatori": 60,  // Giallo
+            // --- GRUPPO SPINTA (Push) ---
+            "Pettorali": 355,           // Rosso Vivo
+            "Deltoidi Anteriori": 180,  // Ciano/Turchese (Opposto al rosso)
+            "Tricipiti": 140,           // Verde Prato (Ben distinto da entrambi)
+
+            // --- GRUPPO SPALLE (Isolamento) ---
+            "Deltoidi Laterali": 270,   // Viola
+            "Deltoidi Posteriori": 50,  // Giallo Oro (Per staccare dalla schiena blu)
+            "Cuffia dei Rotatori": 300, // Fuchsia
+
+            // --- GRUPPO TIRATA (Pull) ---
+            "Schiena (Ampiezza/Lats)": 215, // Blu Reale
+            "Schiena (Alta/Spessore)": 30,  // Arancione (Opposto al blu)
+            "Schiena (Bassa/Lombari)": 320, // Rosa Shocking (Ben visibile)
+            "Bicipiti": 60,             // Giallo Limone (Stacca forte sul blu)
+            "Avambracci": 0,            // Grigio Scuro (Neutro)
+
+            // --- GRUPPO GAMBE (Legs) ---
+            "Quadricipiti": 240,        // Blu Indaco/Notte
+            "Femorali (Ischiocrurali)": 15, // Rosso Ruggine (Opposto all'indaco)
+            "Glutei": 160,              // Verde Acqua/Menta
+            "Adduttori (Interno Coscia)": 290, // Lilla
+            "Abduttori (Esterno Coscia)": 200, // Azzurro Cielo
+
+            // --- PICCOLI GRUPPI ---
+            "Polpacci": 90,             // Verde Lime
+            "Tibiali": 110,             // Verde Smeraldo
             
-            "Schiena (Ampiezza/Lats)": 200, // Blu Classico
-            "Schiena (Alta/Spessore)": 220, // Blu Scuro
-            "Schiena (Bassa/Lombari)": 240, // Indaco
-            
-            "Quadricipiti": 120,        // Verde
-            "Femorali (Ischiocrurali)": 25, // Marrone/Arancio Scuro
-            "Glutei": 320,              // Rosa/Magenta
-            "Adduttori (Interno Coscia)": 150, // Verde Acqua
-            "Abduttori (Esterno Coscia)": 170, // Turchese Scuro
-            
-            "Polpacci": 80,             // Verde Lime
-            "Tibiali": 100,             // Verde Prato
-            
-            "Bicipiti": 180,            // Ciano
-            "Tricipiti": 270,           // Viola
-            "Avambracci": 300,          // Fuchsia
-            
-            "Addominali": 50,           // Oro
-            "Accessori & Cardio": 0     // Grigio
+            "Addominali": 25,           // Arancione Scuro
+            "Accessori & Cardio": 200   // Grigio/Azzurrino (Bassa saturazione nel codice)
         };
 
         if (currentChartFocus && hierarchyMap[currentChartFocus]) {

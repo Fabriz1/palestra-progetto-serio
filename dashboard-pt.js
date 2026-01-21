@@ -573,7 +573,7 @@ function updateTagFilterDropdown() {
     const currentVal = select.value;
     
     // Ricostruisci opzioni
-    select.innerHTML = '<option value="all">🏷️ Tutte le Etichette</option>';
+    select.innerHTML = '<option value="all">🏷️tag</option>';
     uniqueTagsCache.forEach(tag => {
         select.innerHTML += `<option value="${tag}">${tag}</option>`;
     });

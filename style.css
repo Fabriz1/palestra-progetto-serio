@@ -978,7 +978,8 @@ h2 { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #1D1D1F; }
 .filter-select {
     padding: 10px 14px; border: 1px solid #D2D2D7; border-radius: 10px;
     background: white; font-family: inherit; font-size: 13px; color: #1D1D1F;
-    cursor: pointer; outline: none; min-width: 120px;
+    cursor: pointer; outline: none; min-width: 8%;
+    width: 120px;
 }
 .filter-select:hover { border-color: #0071E3; }
 
