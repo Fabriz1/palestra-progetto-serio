@@ -70,6 +70,7 @@ body {
     display: flex;
     align-items: center;
     gap: 16px;
+    
 }
 
 .header-center {
@@ -90,6 +91,9 @@ body {
     font-weight: 700;
     border-bottom: 1px dashed transparent;
     padding-bottom: 2px;
+    
+    
+    
 }
 
 #workout-name:hover, #workout-name:focus {
@@ -476,6 +480,7 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
+    
 }
 
 .modal-header h3 { margin: 0; font-size: 20px; }
