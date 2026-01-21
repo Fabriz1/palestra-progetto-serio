@@ -467,7 +467,7 @@ async function saveWorkout() {
             sessionLog.exercises.push({
                 name,
                 sets,
-                muscles: originalEx?.muscles ? originalEx.muscles.map(m => m.name) : []
+                muscles: originalEx?.muscles ? originalEx.muscles : []
             });
         }
     });

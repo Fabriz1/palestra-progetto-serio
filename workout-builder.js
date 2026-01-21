@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { 
-    getFirestore, doc, getDoc, collection, query, where, getDocs, addDoc, updateDoc, serverTimestamp 
+import {
+    getFirestore, doc, getDoc, collection, query, where, getDocs, addDoc, updateDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { defaultExercises } from './exercise-db.js';
 
@@ -20,18 +20,93 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // --- COSTANTI ---
-const MUSCLES = [
-    "Pettorali", "Dorsali", "Quadricipiti", "Femorali", "Glutei", 
-    "Polpacci", "Spalle (Ant)", "Spalle (Lat)", "Spalle (Post)", 
-    "Bicipiti", "Tricipiti", "Addome", "Lombari", "Trapezio", "Avambracci", "Cardio"
-];
+// --- COSTANTI ---
+
+
+// --- COSTANTI AGGIORNATE ---
+
+const MUSCLE_STRUCTURE = {
+    // --- SPINTA (PETTO & SPALLE) ---
+    "Pettorali": [
+        "Gran Pettorale (Generale)", "Pettorale Alto (Clavicolare)", "Pettorale Basso (Sternocostale)", "Piccolo Pettorale", "Dentato Anteriore"
+    ],
+    "Deltoidi Anteriori": [
+        "Deltoide Anteriore"
+    ],
+    "Deltoidi Laterali": [
+        "Deltoide Laterale"
+    ],
+    "Deltoidi Posteriori": [
+        "Deltoide Posteriore"
+    ],
+    "Cuffia dei Rotatori": [
+        "Sovraspinato", "Sottospinato", "Piccolo Rotondo", "Sottoscapolare"
+    ],
+
+    // --- TIRATA (SCHIENA) ---
+    "Schiena (Alta/Spessore)": [
+        "Trapezio (Superiore)", "Trapezio (Medio)", "Trapezio (Inferiore)", "Romboidi", "Grande Rotondo"
+    ],
+    "Schiena (Ampiezza/Lats)": [
+        "Gran Dorsale (Lats)", "Dorso (Generale)"
+    ],
+    "Schiena (Bassa/Lombari)": [
+        "Erettori Spinali", "Quadrato dei Lombi", "Multifido", "Lombari (Generale)"
+    ],
+
+    // --- BRACCIA ---
+    "Bicipiti": [
+        "Bicipite Brachiale (Capo Lungo)", "Bicipite Brachiale (Capo Breve)", "Brachiale"
+    ],
+    "Tricipiti": [
+        "Tricipite (Capo Lungo)", "Tricipite (Capo Laterale)", "Tricipite (Capo Mediale)", "Anconeo"
+    ],
+    "Avambracci": [
+        "Brachioradiale", "Flessori del Polso", "Estensori del Polso"
+    ],
+
+    // --- GAMBE (PARTI ALTE) ---
+    "Quadricipiti": [
+        "Retto Femorale", "Vasto Laterale", "Vasto Mediale", "Vasto Intermedio", "Quadricipiti (Generale)"
+    ],
+    "Femorali (Ischiocrurali)": [
+        "Bicipite Femorale (Capo Lungo)", "Bicipite Femorale (Capo Breve)", "Semitendinoso", "Semimembranoso"
+    ],
+    "Glutei": [
+        "Grande Gluteo", "Medio Gluteo", "Piccolo Gluteo", "Piriforme"
+    ],
+    "Adduttori (Interno Coscia)": [
+        "Grande Adduttore", "Adduttore Lungo/Breve", "Gracile", "Pettineo"
+    ],
+    "Abduttori (Esterno Coscia)": [
+        "Tensore Fascia Lata (TFL)", "Sartorio"
+    ],
+
+    // --- GAMBE (PARTI BASSE) ---
+    "Polpacci": [
+        "Gastrocnemio (Gemelli)", "Soleo"
+    ],
+    "Tibiali": [
+        "Tibiale Anteriore"
+    ],
+
+    // --- CORE & ALTRO ---
+    "Addominali": [
+        "Retto dell'Addome", "Obliqui Esterni", "Obliqui Interni", "Trasverso"
+    ],
+    "Accessori & Cardio": [
+        "Collo (Sternocleidomastoideo)", "Cardio", "Full Body"
+    ]
+};
+
+// ... mantieni le altre costanti (TECHNIQUES, etc.) ...
 
 const TECHNIQUES = [
-    "Standard", "Top set + back-off", 
+    "Standard", "Top set + back-off",
     "Drop Set", "Double Drop Set", "Triple Drop Set", "Strip Set",
     "Rest-pause", "Myo-reps", "Cluster set", "Widowmaker set", "AMRAP set",
     "Density training", "Escalating density", "Time under tension", "Extended set",
-    "Back-off set", "Mechanical drop set", "Running the rack", 
+    "Back-off set", "Mechanical drop set", "Running the rack",
     "Descending sets", "Ascending sets", "Failure sets",
     "EMOM", "Tabata", "Circuit"
 ];
@@ -53,13 +128,31 @@ let currentDay = 1;
 let totalDays = 3;
 let userVolumeSettings = { secondary: 0.5, tertiary: 0.3, quaternary: 0.15, other: 0.1 };
 let volumeChartInstance = null;
-let workoutData = { 1: [], 2: [], 3: [] }; 
+let workoutData = { 1: [], 2: [], 3: [] };
 
 // EDIT MODE STATE
 let isEditMode = false;
 let editingWorkoutId = null;
 let originalAssignedTo = null; // Per gestire cambi assegnazione
 let globalExerciseLibrary = { ...defaultExercises };
+let exerciseSearchIndex = {}; // NUOVO: Indice per la ricerca (nome + alias)
+
+// NUOVA FUNZIONE: Costruisce l'indice di ricerca
+function rebuildSearchIndex() {
+    exerciseSearchIndex = {};
+    Object.entries(globalExerciseLibrary).forEach(([key, data]) => {
+        // 1. Aggiungi il nome ufficiale (lowercase)
+        exerciseSearchIndex[key.toLowerCase()] = { ...data, canonicalName: key };
+
+        // 2. Aggiungi tutti gli alias
+        if (data.aliases && Array.isArray(data.aliases)) {
+            data.aliases.forEach(alias => {
+                exerciseSearchIndex[alias.toLowerCase()] = { ...data, canonicalName: key };
+            });
+        }
+    });
+    console.log("Indice di ricerca ricostruito con alias.");
+}
 // DOM
 const daysTabsContainer = document.getElementById('days-tabs-container');
 const dayContentArea = document.getElementById('day-content-area');
@@ -71,33 +164,33 @@ const workoutNameEl = document.getElementById('workout-name');
 // --- INIT ---
 onAuthStateChanged(auth, async (user) => {
     if (!user) { window.location.href = "login.html"; return; }
-    
+
     // 1. CARICA SETTINGS E LIBRERIA COACH
     const userDoc = await getDoc(doc(db, "users", user.uid));
-    
-    if(userDoc.exists()) {
+
+    if (userDoc.exists()) {
         const userData = userDoc.data(); // Definisco userData qui per usarlo dopo
 
         // A. Volume Settings
-        if(userData.volumeSettings) {
+        if (userData.volumeSettings) {
             userVolumeSettings = { ...userVolumeSettings, ...userData.volumeSettings };
         }
-    
+
         // B. CARICA LIBRERIA PERSONALIZZATA (CORRETTO)
-        if(userData.exerciseLibrary) {
+        if (userData.exerciseLibrary) {
             // Unisce la bibbia standard con le personalizzazioni del coach
             globalExerciseLibrary = { ...defaultExercises, ...userData.exerciseLibrary };
             console.log("Libreria esercizi caricata e aggiornata.");
         }
     }
-    
+    rebuildSearchIndex();
     initChart();
     setupDatalist();
 
     // 2. CONTROLLA SE SIAMO IN EDIT MODE
     const editId = localStorage.getItem('editWorkoutId');
     const templateId = localStorage.getItem('templateSourceId');
-    
+
     if (editId) {
         await loadWorkoutToEdit(editId);
         localStorage.removeItem('editWorkoutId');
@@ -115,29 +208,29 @@ async function loadWorkoutToEdit(id, isCopy = false) {
     try {
         const docRef = doc(db, "workouts", id);
         const snap = await getDoc(docRef);
-        
+
         if (!snap.exists()) {
             alert("Scheda non trovata o eliminata.");
             return;
         }
 
         const data = snap.data();
-        
+
         // Popola variabili stato
         workoutData = data.data || {};
         totalDays = data.days || 3;
-        
+
         // UI
         workoutNameEl.textContent = isCopy ? `${data.name} (Copia)` : data.name;
         inputNumDays.value = totalDays;
-        
+
         if (!isCopy) {
             isEditMode = true;
             editingWorkoutId = id;
             originalAssignedTo = data.assignedTo;
             // Pre-imposta modalità salvataggio
             saveMode = data.isTemplate ? 'archive' : 'assign';
-            if(data.assignedTo) modalClientSelect.value = data.assignedTo; // Nota: modalClientSelect va popolato
+            if (data.assignedTo) modalClientSelect.value = data.assignedTo; // Nota: modalClientSelect va popolato
         }
 
         // Renderizza
@@ -166,20 +259,20 @@ function renderTabs() {
 function setupDatalist() {
     // Rimuovi se esiste già
     const existing = document.getElementById('exercise-suggestions');
-    if(existing) existing.remove();
+    if (existing) existing.remove();
 
     const datalist = document.createElement('datalist');
     datalist.id = 'exercise-suggestions';
-    
+
     // Ordina alfabeticamente
     const sortedKeys = Object.keys(globalExerciseLibrary).sort();
-    
+
     sortedKeys.forEach(exName => {
         const opt = document.createElement('option');
         opt.value = exName;
         datalist.appendChild(opt);
     });
-    
+
     document.body.appendChild(datalist);
 }
 
@@ -199,11 +292,11 @@ function renderDay(day) {
     addBtn.className = 'btn-add-exercise';
     addBtn.innerHTML = '<i class="ph ph-plus-circle"></i> Aggiungi Esercizio';
     addBtn.onclick = () => {
-        const newEx = { 
+        const newEx = {
             id: Date.now(), name: "", technique: "Standard", metricType: "RPE",
-            val1: "", val2: "", intensityVal: "", 
+            val1: "", val2: "", intensityVal: "",
             topReps: "", topInt: "", backSets: "", backReps: "", backInt: "",
-            notes: "", rest: "", muscles: [] 
+            notes: "", rest: "", muscles: []
         };
         workoutData[day].push(newEx);
         createExerciseRowHTML(listContainer, newEx, workoutData[day].length - 1);
@@ -212,6 +305,145 @@ function renderDay(day) {
     dayContentArea.appendChild(addBtn);
     updateLiveStats();
 }
+
+
+// --- FUNZIONE HELPER PER CREARE IL CUSTOM DROPDOWN ---
+function createMuscleDropdown(initialValue, onSelectCallback) {
+    const container = document.createElement('div');
+    container.className = 'custom-dropdown-wrapper';
+
+    // 1. Trigger (quello che vedi chiuso)
+    const trigger = document.createElement('div');
+    trigger.className = 'dropdown-trigger';
+    trigger.innerHTML = `<span>${initialValue || "Seleziona"}</span> <i class="ph ph-caret-down"></i>`;
+
+    // 2. Menu (nascosto)
+    const menu = document.createElement('div');
+    menu.className = 'dropdown-menu';
+
+    // 3. Search Box
+    const searchDiv = document.createElement('div');
+    searchDiv.className = 'dropdown-search-box';
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Cerca muscolo...';
+    searchDiv.appendChild(searchInput);
+
+    // 4. Container Lista
+    const listContainer = document.createElement('div');
+    listContainer.className = 'dropdown-items-container';
+
+    // Funzione interna per renderizzare la lista (usata anche dal search)
+    const renderList = (filterText = "") => {
+        listContainer.innerHTML = "";
+        const lowerFilter = filterText.toLowerCase();
+
+        Object.entries(MUSCLE_STRUCTURE).forEach(([parent, children]) => {
+            // Se c'è filtro, vediamo se matcha il padre o i figli
+            const matchesParent = parent.toLowerCase().includes(lowerFilter);
+            const matchingChildren = children.filter(c => c.toLowerCase().includes(lowerFilter));
+
+            // Se stiamo filtrando e non c'è match, saltiamo
+            if (filterText && !matchesParent && matchingChildren.length === 0) return;
+
+            // -- Creazione Riga Padre --
+            const parentDiv = document.createElement('div');
+            parentDiv.className = 'group-header';
+            parentDiv.innerHTML = `<span>${parent}</span> <i class="ph ph-caret-right arrow-icon"></i>`;
+
+            // -- Creazione Container Figli --
+            const childrenContainer = document.createElement('div');
+            childrenContainer.className = 'group-children';
+
+            // Logica click su Padre: SELEZIONA il padre (come categoria generale)
+            // MA se clicchi sulla freccia, espande solo
+            parentDiv.addEventListener('click', (e) => {
+                // Se clicco sulla freccia (o vicino), espando
+                if (e.target.classList.contains('arrow-icon') || e.target.closest('.arrow-icon')) {
+                    e.stopPropagation();
+                    childrenContainer.classList.toggle('visible');
+                    parentDiv.classList.toggle('expanded');
+                } else {
+                    // Altrimenti seleziono il valore del Padre
+                    selectValue(parent); // Il padre vale come "Generale"
+                }
+            });
+
+            // Se stiamo cercando, espandi tutto automatico
+            if (filterText) {
+                childrenContainer.classList.add('visible');
+                parentDiv.classList.add('expanded');
+            }
+
+            // -- Creazione Righe Figli --
+            const childrenToShow = filterText ? matchingChildren : children;
+
+            childrenToShow.forEach(child => {
+                const childDiv = document.createElement('div');
+                childDiv.className = 'child-item';
+                childDiv.textContent = child;
+                if (child === initialValue) childDiv.classList.add('selected');
+
+                childDiv.onclick = (e) => {
+                    e.stopPropagation();
+                    selectValue(child);
+                };
+                childrenContainer.appendChild(childDiv);
+            });
+
+            listContainer.appendChild(parentDiv);
+            listContainer.appendChild(childrenContainer);
+        });
+    };
+
+    // Azione di selezione
+    const selectValue = (val) => {
+        trigger.querySelector('span').textContent = val;
+        menu.classList.remove('open');
+        if (onSelectCallback) onSelectCallback(val);
+    };
+
+    // Events
+    trigger.onclick = (e) => {
+        // Chiudi altri dropdown aperti (opzionale ma consigliato)
+        document.querySelectorAll('.dropdown-menu.open').forEach(el => {
+            if (el !== menu) el.classList.remove('open');
+        });
+        menu.classList.toggle('open');
+        if (menu.classList.contains('open')) {
+            searchInput.value = '';
+            renderList();
+            searchInput.focus();
+        }
+    };
+
+    // Search Event
+    searchInput.addEventListener('input', (e) => renderList(e.target.value));
+
+    // Close on click outside
+    document.addEventListener('click', (e) => {
+        if (!container.contains(e.target)) {
+            menu.classList.remove('open');
+        }
+    });
+
+    renderList(); // Render iniziale
+
+    menu.appendChild(searchDiv);
+    menu.appendChild(listContainer);
+    container.appendChild(trigger);
+    container.appendChild(menu);
+
+    // Espone un metodo per aggiornare valore programticamente (utile per l'autofill)
+    container.setValue = (val) => {
+        trigger.querySelector('span').textContent = val;
+        // Non triggeriamo callback qui per evitare loop infiniti se necessario
+    };
+
+    return container;
+}
+
+
 
 function createExerciseRowHTML(container, data, index) {
     const row = document.createElement('div');
@@ -237,13 +469,14 @@ function createExerciseRowHTML(container, data, index) {
                 ${INTENSITY_METRICS.map(m => `<option value="${m}" ${m === data.metricType ? 'selected' : ''}>${m}</option>`).join('')}
             </select>
         </div>
+
+
         <div class="input-group-col">
             <span class="input-label">Muscolo</span>
-            <select class="select-muscle muscle-primary">
-                <option value="" disabled ${!primaryMuscle ? 'selected' : ''}>Seleziona</option>
-                ${MUSCLES.map(m => `<option value="${m}" ${m === primaryMuscle ? 'selected' : ''}>${m}</option>`).join('')}
-            </select>
+            <div class="muscle-dropdown-placeholder"></div> <!-- Placeholder per il nostro componente -->
         </div>
+
+
         <button class="btn-remove-row"><i class="ph ph-trash"></i></button>
         <div class="row-extras" style="width: 100%; display: flex; flex-direction: column;">
             <div class="synergists-wrapper"><div class="synergists-list"></div><button class="btn-add-synergist" style="margin-top:5px;"><i class="ph ph-plus"></i> Sinergico</button></div>
@@ -255,8 +488,36 @@ function createExerciseRowHTML(container, data, index) {
     `;
     container.appendChild(row);
 
+
+
+    // ... container.appendChild(row);
+
+    // --- INIZIALIZZA CUSTOM DROPDOWN ---
+    const muscleContainer = row.querySelector('.muscle-dropdown-placeholder');
+
+    // Callback: cosa succede quando seleziono un muscolo?
+    const onMuscleChange = (newValue) => {
+        // Aggiorna l'array muscles (rimuovi il vecchio primary e metti il nuovo)
+        data.muscles = data.muscles.filter(m => m.type !== 'primary');
+        if (newValue) data.muscles.unshift({ name: newValue, type: 'primary' });
+
+        updateData(); // Salva nello stato
+        updateLiveStats(); // Aggiorna grafici (anche se per ora userà logica vecchia, non rompe nulla)
+    };
+
+    // Crea componente
+    const dropdownEl = createMuscleDropdown(primaryMuscle, onMuscleChange);
+    muscleContainer.appendChild(dropdownEl);
+
+    // Riferimento per l'autofill (quando scrivi il nome esercizio)
+    // Salviamo il riferimento al componente DOM per poter chiamare .setValue() dopo
+    row.dataset.dropdownId = Math.random().toString(36).substr(2, 9); // ID temporaneo se serve, ma meglio:
+    row.dropdownComponent = dropdownEl; // Attacchiamo l'oggetto direttamente al DOM element della riga
+
+
+
     const dynamicArea = row.querySelector('.dynamic-inputs-area');
-    
+
     const renderCentralInputs = () => {
         dynamicArea.innerHTML = '';
         if (data.technique === "Top set + back-off") {
@@ -304,9 +565,10 @@ function createExerciseRowHTML(container, data, index) {
         data.metricType = row.querySelector('.select-metric').value;
         data.notes = row.querySelector('.input-notes').value;
         data.rest = row.querySelector('.input-rest').value;
-        const pVal = row.querySelector('.muscle-primary').value;
+        /* const pVal = row.querySelector('.muscle-primary').value;
         data.muscles = data.muscles.filter(m => m.type !== 'primary');
-        if(pVal) data.muscles.unshift({ name: pVal, type: 'primary' });
+        if (pVal) data.muscles.unshift({ name: pVal, type: 'primary' });
+        */
 
         if (data.technique === "Top set + back-off") {
             data.topReps = row.querySelector('.input-top-reps')?.value;
@@ -314,7 +576,7 @@ function createExerciseRowHTML(container, data, index) {
             data.backSets = row.querySelector('.input-back-sets')?.value;
             data.backReps = row.querySelector('.input-back-reps')?.value;
             data.backInt = row.querySelector('.input-back-int')?.value;
-            data.val1 = ""; 
+            data.val1 = "";
         } else {
             data.val1 = row.querySelector('.input-sets')?.value;
             data.val2 = row.querySelector('.input-reps')?.value;
@@ -328,83 +590,130 @@ function createExerciseRowHTML(container, data, index) {
     row.querySelector('.input-ex-name').addEventListener('input', updateData);
     row.querySelector('.input-notes').addEventListener('input', updateData);
     row.querySelector('.input-rest').addEventListener('input', updateData);
-    row.querySelector('.muscle-primary').addEventListener('change', (e) => { updateData(); updateLiveStats(); });
+    //row.querySelector('.muscle-primary').addEventListener('change', (e) => { updateData(); updateLiveStats(); });
     row.querySelector('.select-technique').addEventListener('change', (e) => { data.technique = e.target.value; renderCentralInputs(); updateData(); });
-    row.querySelector('.select-metric').addEventListener('change', (e) => { 
-        data.metricType = e.target.value; 
-        const lbl = row.querySelector('.label-metric-val'); if(lbl) lbl.textContent = `@ ${data.metricType}`;
-        const inputs = row.querySelectorAll('.special-input'); if(inputs.length > 0) { row.querySelector('.input-top-int').placeholder = data.metricType; row.querySelector('.input-back-int').placeholder = data.metricType; }
+    row.querySelector('.select-metric').addEventListener('change', (e) => {
+        data.metricType = e.target.value;
+        const lbl = row.querySelector('.label-metric-val'); if (lbl) lbl.textContent = `@ ${data.metricType}`;
+        const inputs = row.querySelectorAll('.special-input'); if (inputs.length > 0) { row.querySelector('.input-top-int').placeholder = data.metricType; row.querySelector('.input-back-int').placeholder = data.metricType; }
     });
     row.querySelector('.btn-remove-row').addEventListener('click', () => { workoutData[currentDay].splice(index, 1); renderDay(currentDay); });
 
     const synList = row.querySelector('.synergists-list');
+
+
+
     const renderSynergists = () => {
         synList.innerHTML = '';
+        // Filtra solo i secondari/terziari (escludi primario)
         const syns = data.muscles.filter(m => m.type !== 'primary');
+        
         syns.forEach((m) => {
             const div = document.createElement('div');
             div.className = 'synergist-row';
             div.style.marginTop = "5px";
+            div.style.alignItems = "flex-start"; // Allinea in alto perché il dropdown è alto
             
-            // Select Tipo (Secondario, etc)
-            const typeSelect = document.createElement('select'); typeSelect.style.width = "100px";
-            typeSelect.innerHTML = `<option value="secondary" ${m.type === 'secondary'?'selected':''}>Secondario</option><option value="tertiary" ${m.type === 'tertiary'?'selected':''}>Terziario</option><option value="quaternary" ${m.type === 'quaternary'?'selected':''}>Quaternario</option>`;
+            // 1. SELECT TIPO (Secondario, Terziario...) - Questa resta uguale
+            const typeSelect = document.createElement('select'); 
+            typeSelect.style.width = "100px";
+            typeSelect.style.marginRight = "10px";
+            typeSelect.style.padding = "10px"; // Match stile dropdown
+            typeSelect.style.borderRadius = "8px";
+            typeSelect.style.border = "1px solid #E5E5EA";
             
-            // Select Muscolo (FIX APPLICATO QUI)
-            const muscSelect = document.createElement('select');
-            // Aggiunto check: ${!m.name ? 'selected' : ''} nell'opzione placeholder
-            muscSelect.innerHTML = `<option value="" disabled ${!m.name ? 'selected' : ''}>Muscolo</option>` + 
-                                   MUSCLES.map(opt => `<option value="${opt}" ${opt === m.name ? 'selected' : ''}>${opt}</option>`).join('');
+            typeSelect.innerHTML = `
+                <option value="secondary" ${m.type === 'secondary'?'selected':''}>Secondario</option>
+                <option value="tertiary" ${m.type === 'tertiary'?'selected':''}>Terziario</option>
+                <option value="quaternary" ${m.type === 'quaternary'?'selected':''}>Quaternario</option>
+            `;
             
-            const delBtn = document.createElement('i'); delBtn.className = 'ph ph-x btn-del-syn'; delBtn.style.cursor="pointer";
+            // 2. NUOVO DROPDOWN MUSCOLO (Invece della vecchia select)
+            // Callback: quando cambi muscolo qui, aggiorna l'oggetto 'm' e ricalcola stats
+            const onSynChange = (newVal) => {
+                m.name = newVal;
+                updateLiveStats();
+            };
+
+            const dropdownEl = createMuscleDropdown(m.name, onSynChange);
             
+            // Aggiustamenti CSS specifici per i sinergici (più compatti)
+            dropdownEl.style.width = "200px"; 
+            dropdownEl.style.flexGrow = "1";
+
+            // 3. BOTTONE ELIMINA
+            const delBtn = document.createElement('i'); 
+            delBtn.className = 'ph ph-x btn-del-syn'; 
+            delBtn.style.cursor="pointer";
+            delBtn.style.padding = "12px"; // Centrato col dropdown
+            
+            // EVENTI
             typeSelect.addEventListener('change', (e) => { m.type = e.target.value; updateLiveStats(); });
-            muscSelect.addEventListener('change', (e) => { m.name = e.target.value; updateLiveStats(); });
-            delBtn.addEventListener('click', () => { const realIndex = data.muscles.indexOf(m); if (realIndex > -1) data.muscles.splice(realIndex, 1); renderSynergists(); updateLiveStats(); });
             
-            div.appendChild(typeSelect); div.appendChild(muscSelect); div.appendChild(delBtn);
+            delBtn.addEventListener('click', () => { 
+                // Trova l'indice corretto nell'array originale data.muscles
+                const realIndex = data.muscles.indexOf(m); 
+                if (realIndex > -1) data.muscles.splice(realIndex, 1); 
+                renderSynergists(); 
+                updateLiveStats(); 
+            });
+            
+            div.appendChild(typeSelect); 
+            div.appendChild(dropdownEl); // Inseriamo il dropdown invece della select
+            div.appendChild(delBtn);
             synList.appendChild(div);
         });
     };
+
+
+
+
     renderSynergists();
     row.querySelector('.btn-add-synergist').addEventListener('click', () => { data.muscles.push({ name: "", type: "secondary" }); renderSynergists(); });
     // ... dentro createExerciseRowHTML ...
 
-   
+
     const nameInput = row.querySelector('.input-ex-name');
     nameInput.addEventListener('input', (e) => {
-        const val = e.target.value; 
-        updateData(); 
-        if (val.endsWith(' ')) return;
-        if (globalExerciseLibrary[val]) {
-            const libData = globalExerciseLibrary[val];
-            
+        const val = e.target.value;
+        updateData();
+        if (val.endsWith(' ')) return; // Piccola ottimizzazione
+
+        // MODIFICA QUI: Uso l'indice di ricerca lowercase
+        const searchKey = val.trim().toLowerCase();
+        const foundExercise = exerciseSearchIndex[searchKey];
+
+        if (foundExercise) {
+            // Se trovato tramite Alias, opzionalmente puoi sostituire il nome con quello ufficiale
+            // if (foundExercise.canonicalName !== val) { nameInput.value = foundExercise.canonicalName; data.name = foundExercise.canonicalName; }
+
             // 1. Imposta Muscolo Primario
-            if (libData.p) {
-                row.querySelector('.select-muscle').value = libData.p;
-                row.querySelector('.select-muscle').dispatchEvent(new Event('change'));
+            if (foundExercise.p) {
+                // Usa il metodo setValue che abbiamo aggiunto all'elemento nel passo 3
+                if (row.dropdownComponent && row.dropdownComponent.setValue) {
+                    row.dropdownComponent.setValue(foundExercise.p);
+
+                    // Dobbiamo aggiornare i dati manualmente perché setValue non lancia callback
+                    data.muscles = data.muscles.filter(m => m.type !== 'primary');
+                    data.muscles.unshift({ name: foundExercise.p, type: 'primary' });
+                    updateLiveStats();
+                }
             }
 
             // 2. Gestione Sinergici Intelligente
             const currentSyns = data.muscles.filter(m => m.type !== 'primary');
-            
-            // Popola solo se l'utente non ha già messo mano ai sinergici
-            if (currentSyns.length === 0 && libData.s && libData.s.length > 0) {
-                // Pulisci
+
+            if (currentSyns.length === 0 && foundExercise.s && foundExercise.s.length > 0) {
                 data.muscles = data.muscles.filter(m => m.type === 'primary');
-                
-                // Aggiungi i nuovi (Gestisce sia Stringhe che Oggetti)
-                libData.s.forEach(item => {
+
+                foundExercise.s.forEach(item => {
                     if (typeof item === 'string') {
-                        // Formato Base (exercise-db.js): Default Secondario
                         data.muscles.push({ name: item, type: 'secondary' });
                     } else {
-                        // Formato Imparato (Firebase): Rispetta il tipo (es. tertiary)
                         data.muscles.push({ name: item.name, type: item.type });
                     }
                 });
-                
-                renderSynergists(); 
+                renderSynergists();
                 updateLiveStats();
             }
         }
@@ -412,35 +721,262 @@ function createExerciseRowHTML(container, data, index) {
 }
 
 function updateLiveStats() {
-    let volumeMap = {};
+    // 1. Struttura dati annidata: { "Schiena": { total: 0, children: { "Gran Dorsale": 0 } } }
+    let hierarchyMap = {};
+    
+    // Inizializza categorie vuote
+    Object.keys(MUSCLE_STRUCTURE).forEach(cat => {
+        hierarchyMap[cat] = { total: 0, children: {} };
+    });
+
+    // 2. Calcolo Volumi
     Object.keys(workoutData).forEach(dayKey => {
         workoutData[dayKey].forEach(ex => {
             let sets = 0;
-            if (ex.technique === "Top set + back-off") { const backSets = parseFloat(ex.backSets) || 0; sets = 1 + backSets; } 
-            else { sets = parseFloat(ex.val1) || 0; }
+            if (ex.technique === "Top set + back-off") { 
+                const backSets = parseFloat(ex.backSets) || 0; 
+                sets = 1 + backSets; 
+            } else { 
+                sets = parseFloat(ex.val1) || 0; 
+            }
             if (sets === 0) return;
+
             ex.muscles.forEach(m => {
                 if (!m.name) return;
+                
+                // Moltiplicatori
                 let mult = 0;
-                if (m.type === 'primary') mult = 1.0; else if (m.type === 'secondary') mult = userVolumeSettings.secondary; else if (m.type === 'tertiary') mult = userVolumeSettings.tertiary; else if (m.type === 'quaternary') mult = userVolumeSettings.quaternary; else mult = userVolumeSettings.other;
-                if (!volumeMap[m.name]) volumeMap[m.name] = 0;
-                volumeMap[m.name] += (sets * mult);
+                if (m.type === 'primary') mult = 1.0; 
+                else if (m.type === 'secondary') mult = userVolumeSettings.secondary; 
+                else if (m.type === 'tertiary') mult = userVolumeSettings.tertiary; 
+                else if (m.type === 'quaternary') mult = userVolumeSettings.quaternary; 
+                else mult = userVolumeSettings.other;
+
+                const volume = sets * mult;
+
+                // Trova Padre
+                let parent = "Altro";
+                for (const [cat, list] of Object.entries(MUSCLE_STRUCTURE)) {
+                    if (list.includes(m.name) || cat === m.name) {
+                        parent = cat;
+                        break;
+                    }
+                }
+                if (!hierarchyMap[parent]) hierarchyMap[parent] = { total: 0, children: {} };
+
+                // Aggiorna Totale Padre
+                hierarchyMap[parent].total += volume;
+
+                // Aggiorna Dettaglio Figlio
+                const childName = m.name;
+                if (!hierarchyMap[parent].children[childName]) hierarchyMap[parent].children[childName] = 0;
+                hierarchyMap[parent].children[childName] += volume;
             });
         });
     });
-    const statsList = document.getElementById('stats-breakdown'); statsList.innerHTML = '';
-    const sortedMuscles = Object.entries(volumeMap).sort((a,b) => b[1] - a[1]);
-    sortedMuscles.forEach(([muscle, vol]) => {
-        const div = document.createElement('div'); div.className = 'stat-item'; div.innerHTML = `<span class="muscle-label">${muscle}</span><span class="volume-value">${vol.toFixed(1)}</span>`; statsList.appendChild(div);
+
+    // 3. RENDER LISTA (Sempre Completa con Accordion)
+    const statsList = document.getElementById('stats-breakdown'); 
+    statsList.innerHTML = '';
+    
+    // Ordina padri per volume totale decrescente
+    const sortedParents = Object.entries(hierarchyMap)
+        .filter(([_, data]) => data.total > 0)
+        .sort((a,b) => b[1].total - a[1].total);
+
+    sortedParents.forEach(([parentName, data]) => {
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'stat-group';
+
+        // Riga Padre
+        const parentDiv = document.createElement('div');
+        parentDiv.className = 'stat-parent';
+        parentDiv.innerHTML = `
+            <span>${parentName}</span>
+            <div style="display:flex; align-items:center;">
+                <span class="volume-value">${data.total.toFixed(1)}</span>
+                <i class="ph ph-caret-right stat-arrow"></i>
+            </div>
+        `;
+        
+        // Container Figli
+        const childrenDiv = document.createElement('div');
+        childrenDiv.className = 'stat-children';
+
+        // Ordina figli
+        const sortedChildren = Object.entries(data.children).sort((a,b) => b[1] - a[1]);
+        sortedChildren.forEach(([childName, vol]) => {
+            const row = document.createElement('div');
+            row.className = 'child-stat';
+            row.innerHTML = `<span>${childName}</span><span>${vol.toFixed(1)}</span>`;
+            childrenDiv.appendChild(row);
+        });
+
+        // Click Event per aprire/chiudere
+        parentDiv.onclick = () => {
+            parentDiv.classList.toggle('active');
+            childrenDiv.classList.toggle('visible');
+        };
+
+        groupDiv.appendChild(parentDiv);
+        groupDiv.appendChild(childrenDiv);
+        statsList.appendChild(groupDiv);
     });
+
+    // 4. RENDER GRAFICO (Dipende dallo Zoom)
     if (volumeChartInstance) {
-        volumeChartInstance.data.labels = sortedMuscles.map(x => x[0]); volumeChartInstance.data.datasets[0].data = sortedMuscles.map(x => x[1]); volumeChartInstance.data.datasets[0].backgroundColor = sortedMuscles.map(() => `hsl(${Math.random() * 360}, 70%, 60%)`); volumeChartInstance.update();
+        let labels = [];
+        let dataValues = [];
+        let colors = [];
+
+        const btnBack = document.getElementById('btn-chart-back');
+
+        // MAPPA COLORI PADRI (Tonalità HSL)
+        // Definiamo un colore distintivo per ogni categoria
+        // MAPPA COLORI PADRI (Gradi HSL: 0-360)
+        const CATEGORY_HUES = {
+            "Pettorali": 350,           // Rosso
+            "Deltoidi Anteriori": 10,   // Rosso Arancio
+            "Deltoidi Laterali": 30,    // Arancione
+            "Deltoidi Posteriori": 45,  // Giallo Oro
+            "Cuffia dei Rotatori": 60,  // Giallo
+            
+            "Schiena (Ampiezza/Lats)": 200, // Blu Classico
+            "Schiena (Alta/Spessore)": 220, // Blu Scuro
+            "Schiena (Bassa/Lombari)": 240, // Indaco
+            
+            "Quadricipiti": 120,        // Verde
+            "Femorali (Ischiocrurali)": 25, // Marrone/Arancio Scuro
+            "Glutei": 320,              // Rosa/Magenta
+            "Adduttori (Interno Coscia)": 150, // Verde Acqua
+            "Abduttori (Esterno Coscia)": 170, // Turchese Scuro
+            
+            "Polpacci": 80,             // Verde Lime
+            "Tibiali": 100,             // Verde Prato
+            
+            "Bicipiti": 180,            // Ciano
+            "Tricipiti": 270,           // Viola
+            "Avambracci": 300,          // Fuchsia
+            
+            "Addominali": 50,           // Oro
+            "Accessori & Cardio": 0     // Grigio
+        };
+
+        if (currentChartFocus && hierarchyMap[currentChartFocus]) {
+            // --- VISTA DETTAGLIO (Figli) ---
+            // Qui usiamo sfumature dello stesso colore del padre
+            btnBack.style.display = 'block'; 
+            
+            const focusData = hierarchyMap[currentChartFocus].children;
+            const sortedFocus = Object.entries(focusData).sort((a,b) => b[1] - a[1]);
+            
+            labels = sortedFocus.map(x => x[0]);
+            dataValues = sortedFocus.map(x => x[1]);
+            
+            // Recupera il colore base del padre
+            const baseHue = CATEGORY_HUES[currentChartFocus] !== undefined ? CATEGORY_HUES[currentChartFocus] : 0;
+            const isGray = baseHue === 0 && currentChartFocus === "Altro";
+
+            // Genera gradazioni (dal più scuro al più chiaro o viceversa)
+            colors = dataValues.map((_, i) => {
+                // Calcola luminosità progressiva: parte da 50% e sale
+                const lightness = 45 + (i * 10); 
+                const saturation = isGray ? 0 : 75;
+                return `hsl(${baseHue}, ${saturation}%, ${lightness}%)`;
+            });
+
+        } else {
+            // --- VISTA TOTALE (Padri) ---
+            // Qui usiamo i colori distinti definiti nella mappa
+            btnBack.style.display = 'none'; 
+            currentChartFocus = null; 
+
+            labels = sortedParents.map(x => x[0]);
+            dataValues = sortedParents.map(x => x[1].total);
+            
+            colors = labels.map(label => {
+                const hue = CATEGORY_HUES[label] !== undefined ? CATEGORY_HUES[label] : 0; // Default a 0 se non trovato
+                const saturation = (hue === 0 && label === "Altro") ? 0 : 70; // Grigio per "Altro", colore vivo per il resto
+                return `hsl(${hue}, ${saturation}%, 55%)`; // Luminosità media fissa
+            });
+        }
+
+        volumeChartInstance.data.labels = labels;
+        volumeChartInstance.data.datasets[0].data = dataValues;
+        volumeChartInstance.data.datasets[0].backgroundColor = colors;
+        volumeChartInstance.update();
     }
 }
 
-function initChart() { const ctx = volumeChartCanvas.getContext('2d'); volumeChartInstance = new Chart(ctx, { type: 'doughnut', data: { labels: [], datasets: [{ data: [], borderWidth: 1 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } }); }
-inputNumDays.addEventListener('change', (e) => { totalDays = parseInt(e.target.value); for(let i=1; i<=totalDays; i++) if(!workoutData[i]) workoutData[i] = []; renderTabs(); });
-document.getElementById('btn-back').addEventListener('click', () => { if(confirm("Esci senza salvare?")) window.location.href = "dashboard-pt.html"; });
+// Helper per generare colori costanti per le stringhe
+function getStringHash(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return Math.abs(hash);
+}
+
+
+
+
+
+
+
+let currentChartFocus = null;
+function initChart() { 
+    const ctx = volumeChartCanvas.getContext('2d'); 
+    
+    volumeChartInstance = new Chart(ctx, { 
+        type: 'doughnut', 
+        data: { 
+            labels: [], 
+            datasets: [{ 
+                data: [], 
+                borderWidth: 2,
+                hoverOffset: 10
+            }] 
+        }, 
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            plugins: { 
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return ` ${context.label}: ${context.raw.toFixed(1)} Sets`;
+                        }
+                    }
+                }
+            },
+            // GESTIONE CLICK SULLE FETTE
+            onClick: (event, elements) => {
+                if (elements.length > 0) {
+                    const index = elements[0].index;
+                    const labelClicked = volumeChartInstance.data.labels[index];
+                    
+                    // Se clicco su una categoria Padre (e non sono già dentro)
+                    if (!currentChartFocus) {
+                        currentChartFocus = labelClicked;
+                        updateLiveStats(); // Ridisegna focalizzato
+                    }
+                }
+            }
+        } 
+    });
+
+    // Gestione Bottone Indietro
+    document.getElementById('btn-chart-back').addEventListener('click', () => {
+        currentChartFocus = null;
+        updateLiveStats();
+    });
+}
+
+
+
+inputNumDays.addEventListener('change', (e) => { totalDays = parseInt(e.target.value); for (let i = 1; i <= totalDays; i++) if (!workoutData[i]) workoutData[i] = []; renderTabs(); });
+document.getElementById('btn-back').addEventListener('click', () => { if (confirm("Esci senza salvare?")) window.location.href = "dashboard-pt.html"; });
 
 // --- MODALE E SAVE ---
 const modal = document.getElementById('save-modal');
@@ -456,10 +992,10 @@ let saveMode = 'assign';
 btnOpenSave.addEventListener('click', async () => {
     // 1. Validazione
     let hasExercises = false;
-    for(let i=1; i<=totalDays; i++) {
-        if(workoutData[i] && workoutData[i].length > 0) hasExercises = true;
+    for (let i = 1; i <= totalDays; i++) {
+        if (workoutData[i] && workoutData[i].length > 0) hasExercises = true;
     }
-    
+
     if (!hasExercises) {
         alert("La scheda è vuota! Aggiungi almeno un esercizio.");
         return;
@@ -478,7 +1014,7 @@ btnOpenSave.addEventListener('click', async () => {
         // Se la scheda era già assegnata a qualcuno, pre-selezionalo
         if (originalAssignedTo) {
             // Assicuriamoci che l'opzione "Assegna" sia attiva visivamente
-            optAssign.click(); 
+            optAssign.click();
             modalClientSelect.value = originalAssignedTo;
         } else {
             // Se era in archivio, mantieni la selezione "Archivio" ma la lista clienti è pronta se cambi idea
@@ -489,19 +1025,19 @@ btnOpenSave.addEventListener('click', async () => {
 btnCloseModal.addEventListener('click', () => modal.classList.add('hidden'));
 optAssign.addEventListener('click', () => { saveMode = 'assign'; optAssign.classList.add('active'); optArchive.classList.remove('active'); modalClientSelect.classList.remove('hidden'); modalTemplateName.classList.add('hidden'); });
 optArchive.addEventListener('click', () => { saveMode = 'archive'; optArchive.classList.add('active'); optAssign.classList.remove('active'); modalClientSelect.classList.add('hidden'); modalTemplateName.classList.remove('hidden'); modalTemplateName.value = document.getElementById('workout-name').textContent.trim(); });
-optAssign.classList.add('active'); 
+optAssign.classList.add('active');
 
 btnConfirmSave.addEventListener('click', async () => {
     const user = auth.currentUser; if (!user) return;
     btnConfirmSave.textContent = "Salvataggio..."; btnConfirmSave.disabled = true;
-     // ... dentro btnConfirmSave ... prima del try ...
+    // ... dentro btnConfirmSave ... prima del try ...
 
     // --- APPRENDIMENTO AUTOMATICO AVANZATO (Con Tipi) ---
     const newKnowledge = {};
     let hasNewKnowledge = false;
 
-    for(let i=1; i<=totalDays; i++) {
-        if(workoutData[i]) {
+    for (let i = 1; i <= totalDays; i++) {
+        if (workoutData[i]) {
             workoutData[i].forEach(ex => {
                 const name = ex.name.trim();
                 if (!name) return;
@@ -513,9 +1049,9 @@ btnConfirmSave.addEventListener('click', async () => {
                     .filter(m => m.type !== 'primary' && m.name)
                     .map(m => ({ name: m.name, type: m.type }));
 
-                if (!currentPrimary) return; 
+                if (!currentPrimary) return;
 
-                const known = globalExerciseLibrary[name];
+                const known = exerciseSearchIndex[name.toLowerCase()];
                 let isDifferent = false;
 
                 if (!known) {
@@ -527,7 +1063,7 @@ btnConfirmSave.addEventListener('click', async () => {
                     // 2. Confronta Sinergici (Normalizziamo il DB per il confronto)
                     // Il DB base ha stringhe ["Tri"], noi abbiamo [{name:"Tri", type:"sec"}]
                     // Dobbiamo convertire il DB base in formato oggetto per confrontare mele con mele.
-                    
+
                     let knownSynergistsNorm = [];
                     if (known.s) {
                         knownSynergistsNorm = known.s.map(item => {
@@ -545,9 +1081,9 @@ btnConfirmSave.addEventListener('click', async () => {
                         knownSynergistsNorm.sort(sortFn);
                         const currentSynsSorted = [...currentSynergists].sort(sortFn);
 
-                        for(let k=0; k < knownSynergistsNorm.length; k++) {
+                        for (let k = 0; k < knownSynergistsNorm.length; k++) {
                             // Se cambia il NOME o cambia il TIPO -> È diverso
-                            if (knownSynergistsNorm[k].name !== currentSynsSorted[k].name || 
+                            if (knownSynergistsNorm[k].name !== currentSynsSorted[k].name ||
                                 knownSynergistsNorm[k].type !== currentSynsSorted[k].type) {
                                 isDifferent = true;
                                 break;
@@ -558,8 +1094,8 @@ btnConfirmSave.addEventListener('click', async () => {
 
                 if (isDifferent) {
                     // SALVA LA DEFINIZIONE COMPLETA (Con i tipi!)
-                    newKnowledge[name] = { 
-                        p: currentPrimary, 
+                    newKnowledge[name] = {
+                        p: currentPrimary,
                         s: currentSynergists // Salva array di oggetti: [{name:'...', type:'tertiary'}]
                     };
                     hasNewKnowledge = true;
@@ -588,7 +1124,7 @@ btnConfirmSave.addEventListener('click', async () => {
 
         if (saveMode === 'assign') {
             assignedClientId = modalClientSelect.value;
-            if (!assignedClientId) { alert("Seleziona un atleta!"); btnConfirmSave.disabled=false; return; }
+            if (!assignedClientId) { alert("Seleziona un atleta!"); btnConfirmSave.disabled = false; return; }
         } else {
             finalName = modalTemplateName.value.trim() || finalName;
             isTemplate = true;
@@ -609,7 +1145,7 @@ btnConfirmSave.addEventListener('click', async () => {
             workoutPayload.createdAt = serverTimestamp();
             const ref = await addDoc(collection(db, "workouts"), workoutPayload);
             editingWorkoutId = ref.id; // Così se clicco ancora salva aggiorna
-            isEditMode = true; 
+            isEditMode = true;
         }
 
         if (assignedClientId) {

@@ -1,21 +1,23 @@
 <!DOCTYPE html>
 <html lang="it">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Workout Builder - PT Platform</title>
-    
+
 
     <!-- Font e Icone -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
+
     <!-- Chart.js per i grafici a torta -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- CSS (Useremo un file dedicato per non sporcare style.css generale) -->
     <link rel="stylesheet" href="builder-style.css">
 </head>
+
 <body>
 
     <!-- OVERLAY PER MOBILE (Blocca accesso da telefono) -->
@@ -28,14 +30,14 @@
 
     <!-- APP CONTAINER -->
     <div class="builder-container">
-        
+
         <!-- HEADER SUPERIORE -->
         <header class="builder-header">
             <div class="header-left">
                 <button id="btn-back" class="icon-btn"><i class="ph ph-arrow-left"></i></button>
                 <h1 contenteditable="true" id="workout-name">Nuova Scheda Allenamento</h1>
             </div>
-            
+
             <div class="header-center">
                 <select id="client-select">
                     <option value="" disabled selected>Seleziona Cliente...</option>
@@ -48,14 +50,16 @@
             </div>
 
             <div class="header-right">
-                <button class="btn-secondary" id="btn-import-excel"><i class="ph ph-microsoft-excel-logo"></i> Importa Excel</button>
-                <button class="btn-primary" id="btn-save-workout"><i class="ph ph-floppy-disk"></i> Salva Scheda</button>
+                <button class="btn-secondary" id="btn-import-excel"><i class="ph ph-microsoft-excel-logo"></i> Importa
+                    Excel</button>
+                <button class="btn-primary" id="btn-save-workout"><i class="ph ph-floppy-disk"></i> Salva
+                    Scheda</button>
             </div>
         </header>
 
         <!-- AREA DI LAVORO (GRID) -->
         <main class="workspace">
-            
+
             <!-- COLONNA SINISTRA: EDITOR ESERCIZI -->
             <section class="editor-panel">
                 <!-- TABS GIORNI (Giorno 1, Giorno 2...) -->
@@ -67,7 +71,7 @@
 
                 <!-- CONTENUTO DEL GIORNO CORRENTE -->
                 <div class="day-content" id="day-content-area">
-                    
+
                     <div class="exercises-list" id="exercises-list-day-1">
                         <!-- QUI VERRANNO INSERITE LE RIGHE DEGLI ESERCIZI -->
                         <!-- Esempio di riga esercizio (generata poi via JS) -->
@@ -86,16 +90,19 @@
                     <button class="btn-add-exercise" id="btn-add-ex">
                         <i class="ph ph-plus-circle"></i> Aggiungi Esercizio
                     </button>
-                    
+
                 </div>
             </section>
 
             <!-- COLONNA DESTRA: LIVE STATS -->
             <section class="stats-panel">
                 <h3>Analisi Volume Live</h3>
-                
+
                 <div class="charts-container">
                     <div class="chart-box">
+                        <button id="btn-chart-back">
+                            <i class="ph ph-arrow-u-up-left"></i> Torna al Totale
+                        </button>
                         <canvas id="volumeChart"></canvas> <!-- Grafico a Torta -->
                     </div>
                 </div>
@@ -110,23 +117,24 @@
 
                 <div class="tips-box">
                     <h4>Legenda Calcolo</h4>
-                    <p><small>Primario: 1.0 | Secondario: <span id="val-sec">0.5</span> | Terziario: <span id="val-ter">0.3</span></small></p>
+                    <p><small>Primario: 1.0 | Secondario: <span id="val-sec">0.5</span> | Terziario: <span
+                                id="val-ter">0.3</span></small></p>
                 </div>
             </section>
 
         </main>
     </div>
-<!-- MODALE DI SALVATAGGIO -->
+    <!-- MODALE DI SALVATAGGIO -->
     <div id="save-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <div class="modal-header">
                 <h3>Salva Scheda</h3>
                 <button id="btn-close-modal" class="btn-icon-small"><i class="ph ph-x"></i></button>
             </div>
-            
+
             <div class="modal-body">
                 <p>Dove vuoi destinare questa scheda?</p>
-                
+
                 <!-- Opzione 1: Assegna a Cliente -->
                 <div class="save-option" id="opt-assign">
                     <div class="radio-circle selected"></div>
@@ -146,7 +154,8 @@
                     <div class="opt-content">
                         <h4>Salva in Archivio / Modelli</h4>
                         <p>Salva come template riutilizzabile in futuro.</p>
-                        <input type="text" id="modal-template-name" placeholder="Nome Modello (es. Ipertrofia Base)" class="modal-input hidden">
+                        <input type="text" id="modal-template-name" placeholder="Nome Modello (es. Ipertrofia Base)"
+                            class="modal-input hidden">
                     </div>
                 </div>
             </div>
@@ -159,4 +168,5 @@
     <!-- JS BUILDER -->
     <script type="module" src="workout-builder.js"></script>
 </body>
+
 </html>

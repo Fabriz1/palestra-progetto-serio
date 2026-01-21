@@ -651,6 +651,10 @@ window.deleteClient = async (id) => {
 // 6. DETTAGLIO & MISURE
 // =========================================
 
+
+
+
+
 window.openClientDetail = async (clientId) => {
     console.log("Apertura dettaglio per:", clientId);
     currentSelectedClientId = clientId;
@@ -1134,6 +1138,107 @@ window.rejectRequest = async (clientId) => {
 // 8. ANALISI & LOGS
 // =========================================
 
+
+
+const ANALYSIS_MUSCLE_MAP = {
+    "Pettorali": [
+        "Gran Pettorale (Generale)", "Pettorale Alto (Clavicolare)", "Pettorale Basso (Sternocostale)", "Piccolo Pettorale", "Dentato Anteriore"
+    ],
+    "Deltoidi Anteriori": [
+        "Deltoide Anteriore"
+    ],
+    "Deltoidi Laterali": [
+        "Deltoide Laterale"
+    ],
+    "Deltoidi Posteriori": [
+        "Deltoide Posteriore"
+    ],
+    "Cuffia dei Rotatori": [
+        "Sovraspinato", "Sottospinato", "Piccolo Rotondo", "Sottoscapolare"
+    ],
+
+    // --- TIRATA (SCHIENA) ---
+    "Schiena (Alta/Spessore)": [
+        "Trapezio (Superiore)", "Trapezio (Medio)", "Trapezio (Inferiore)", "Romboidi", "Grande Rotondo"
+    ],
+    "Schiena (Ampiezza/Lats)": [
+        "Gran Dorsale (Lats)", "Dorso (Generale)"
+    ],
+    "Schiena (Bassa/Lombari)": [
+        "Erettori Spinali", "Quadrato dei Lombi", "Multifido", "Lombari (Generale)"
+    ],
+
+    // --- BRACCIA ---
+    "Bicipiti": [
+        "Bicipite Brachiale (Capo Lungo)", "Bicipite Brachiale (Capo Breve)", "Brachiale"
+    ],
+    "Tricipiti": [
+        "Tricipite (Capo Lungo)", "Tricipite (Capo Laterale)", "Tricipite (Capo Mediale)", "Anconeo"
+    ],
+    "Avambracci": [
+        "Brachioradiale", "Flessori del Polso", "Estensori del Polso"
+    ],
+
+    // --- GAMBE (PARTI ALTE) ---
+    "Quadricipiti": [
+        "Retto Femorale", "Vasto Laterale", "Vasto Mediale", "Vasto Intermedio", "Quadricipiti (Generale)"
+    ],
+    "Femorali (Ischiocrurali)": [
+        "Bicipite Femorale (Capo Lungo)", "Bicipite Femorale (Capo Breve)", "Semitendinoso", "Semimembranoso"
+    ],
+    "Glutei": [
+        "Grande Gluteo", "Medio Gluteo", "Piccolo Gluteo", "Piriforme"
+    ],
+    "Adduttori (Interno Coscia)": [
+        "Grande Adduttore", "Adduttore Lungo/Breve", "Gracile", "Pettineo"
+    ],
+    "Abduttori (Esterno Coscia)": [
+        "Tensore Fascia Lata (TFL)", "Sartorio"
+    ],
+
+    // --- GAMBE (PARTI BASSE) ---
+    "Polpacci": [
+        "Gastrocnemio (Gemelli)", "Soleo"
+    ],
+    "Tibiali": [
+        "Tibiale Anteriore"
+    ],
+
+    // --- CORE & ALTRO ---
+    "Addominali": [
+        "Retto dell'Addome", "Obliqui Esterni", "Obliqui Interni", "Trasverso"
+    ],
+    "Accessori & Cardio": [
+        "Collo (Sternocleidomastoideo)", "Cardio", "Full Body"
+    ]
+};
+
+// Funzione che prende un nome specifico (es. "Gran Dorsale") e restituisce il Padre (es. "Schiena")
+function getMuscleParent(specificName) {
+    if (!specificName) return "Sconosciuto";
+    
+    // Controlla se il nome è già una categoria padre
+    if (ANALYSIS_MUSCLE_MAP[specificName]) return specificName;
+
+    // Cerca nei figli
+    for (const [parent, children] of Object.entries(ANALYSIS_MUSCLE_MAP)) {
+        if (children.includes(specificName)) {
+            return parent;
+        }
+    }
+    
+    // Fallback intelligente: se contine "Dorso" o "Spalle" nel nome ma non è mappato
+    const lower = specificName.toLowerCase();
+    if (lower.includes('dorso') || lower.includes('schiena')) return "Schiena";
+    if (lower.includes('petto')) return "Pettorali";
+    if (lower.includes('gambe') || lower.includes('quad')) return "Gambe (Quadricipiti)";
+    if (lower.includes('glut') || lower.includes('femoral')) return "Gambe (Femorali/Glutei)";
+    if (lower.includes('bici') || lower.includes('trici')) return "Braccia";
+
+    return "Altro"; // Se proprio non lo trova
+}
+
+
 async function loadClientCharts(clientId) {
     const historyContainer = document.getElementById('workout-history-list');
 
@@ -1229,6 +1334,7 @@ function renderAnalysisList() {
     let statsMap = {};
     const sortedLogs = [...currentAnalysisLogs].sort((a, b) => new Date(a.date) - new Date(b.date));
 
+    // --- TIPO ESERCIZIO (Invariato) ---
     if (analysisType === 'exercise') {
         sortedLogs.forEach(log => {
             if (!log.exercises) return;
@@ -1250,11 +1356,14 @@ function renderAnalysisList() {
             });
         });
     }
+    
+    // --- TIPO MUSCOLO (MODIFICATO PER GERARCHIA) ---
     else if (analysisType === 'muscle') {
         let maxDayInLogs = 0;
         sortedLogs.forEach(l => { if (l.dayIndex > maxDayInLogs) maxDayInLogs = l.dayIndex; });
         const limitDays = (typeof currentWorkoutDays !== 'undefined' && currentWorkoutDays > 0) ? currentWorkoutDays : (maxDayInLogs || 7);
 
+        // 1. Raggruppamento in Cicli (Microcicli)
         let cycles = [];
         let currentCycle = { id: 1, dayLogs: {} };
         let daysSeenInCycle = new Set();
@@ -1280,52 +1389,87 @@ function renderAnalysisList() {
         });
         cycles.push(currentCycle);
 
-        let memory = {};
+        // 2. Calcolo Statistiche aggregando per PADRE
+        let memory = {}; // Serve per ricordare il carico dei giorni precedenti nel ciclo
+        
         cycles.forEach(cycle => {
-            let cycleMuscleStats = {};
+            let cycleMuscleStats = {}; // Qui accumuliamo per PADRE (es. Schiena)
+            
             for (let d = 1; d <= limitDays; d++) {
                 const logsForDay = cycle.dayLogs[d];
+                
                 if (logsForDay && logsForDay.length > 0) {
+                    // Prendi l'ultimo log valido del giorno
                     const log = logsForDay[logsForDay.length - 1];
+                    
                     if (log.exercises) {
                         log.exercises.forEach(ex => {
+                            // Controlla se ci sono muscoli definiti
                             if (ex.muscles && ex.muscles.length > 0) {
-                                const primaryMuscle = ex.muscles[0];
-                                let maxSetKg = 0;
-                                if (ex.sets) ex.sets.forEach(s => {
-                                    const k = parseFloat(s.kg) || 0;
-                                    if (k > maxSetKg) maxSetKg = k;
-                                });
-                                if (maxSetKg > 0) {
-                                    if (!cycleMuscleStats[primaryMuscle]) cycleMuscleStats[primaryMuscle] = 0;
-                                    cycleMuscleStats[primaryMuscle] += maxSetKg;
-                                    if (!memory[primaryMuscle]) memory[primaryMuscle] = {};
-                                    memory[primaryMuscle][d] = maxSetKg;
+                                
+                                // GESTIONE COMPATIBILITÀ (Stringa vs Oggetto)
+                                const rawMuscle = ex.muscles[0]; // Primario
+                                let specificName = "";
+                                
+                                if (typeof rawMuscle === 'object' && rawMuscle.name) {
+                                    specificName = rawMuscle.name; // Nuovo formato
+                                } else if (typeof rawMuscle === 'string') {
+                                    specificName = rawMuscle; // Vecchio formato
+                                }
+
+                                if (specificName) {
+                                    // *** IL PUNTO CHIAVE: CONVERTI IN PADRE ***
+                                    const parentName = getMuscleParent(specificName);
+
+                                    // Calcola carico massimo (o logica volume esistente)
+                                    let maxSetKg = 0;
+                                    if (ex.sets) ex.sets.forEach(s => {
+                                        const k = parseFloat(s.kg) || 0;
+                                        if (k > maxSetKg) maxSetKg = k;
+                                    });
+
+                                    if (maxSetKg > 0) {
+                                        if (!cycleMuscleStats[parentName]) cycleMuscleStats[parentName] = 0;
+                                        
+                                        // QUI SOMMIAMO: Se fai Lat Machine (Schiena) e Pulley (Schiena), 
+                                        // somma i massimali per dare un indice di "Intensità Totale Schiena"
+                                        cycleMuscleStats[parentName] += maxSetKg;
+                                        
+                                        if (!memory[parentName]) memory[parentName] = {};
+                                        memory[parentName][d] = maxSetKg;
+                                    }
                                 }
                             }
                         });
                     }
                 } else {
-                    Object.keys(memory).forEach(mName => {
-                        if (memory[mName][d]) {
-                            if (!cycleMuscleStats[mName]) cycleMuscleStats[mName] = 0;
-                            cycleMuscleStats[mName] += memory[mName][d];
+                    // Se in questo giorno del ciclo non ti sei allenato, usa la memoria del ciclo precedente
+                    // (Logica esistente preservata)
+                    Object.keys(memory).forEach(parentName => {
+                        if (memory[parentName][d]) {
+                            if (!cycleMuscleStats[parentName]) cycleMuscleStats[parentName] = 0;
+                            cycleMuscleStats[parentName] += memory[parentName][d];
                         }
                     });
                 }
             }
+            
+            // Salva nello storico globale usando il nome del PADRE
             if (Object.keys(cycleMuscleStats).length > 0) {
-                Object.keys(cycleMuscleStats).forEach(mName => {
-                    if (!statsMap[mName]) statsMap[mName] = { name: mName, history: [] };
-                    statsMap[mName].history.push({
-                        date: new Date().toISOString(),
-                        val: cycleMuscleStats[mName],
+                Object.keys(cycleMuscleStats).forEach(parentName => {
+                    if (!statsMap[parentName]) statsMap[parentName] = { name: parentName, history: [] };
+                    
+                    statsMap[parentName].history.push({
+                        date: new Date().toISOString(), // Data fittizia per ordinamento
+                        val: cycleMuscleStats[parentName],
                         label: `Ciclo ${cycle.id}`
                     });
                 });
             }
         });
     }
+    
+    // --- TIPO SEDUTA (Invariato) ---
     else if (analysisType === 'session') {
         sortedLogs.forEach(log => {
             if (!log.dayIndex) return;
@@ -1351,6 +1495,9 @@ function renderAnalysisList() {
         });
     }
 
+    // --- RESTO DELLA FUNZIONE (Rendering HTML) ---
+    // (Questa parte rimane identica al tuo codice originale)
+    
     let items = Object.values(statsMap).map(item => {
         const hist = item.history;
         if (!hist || hist.length < 1) return null;
@@ -1373,6 +1520,7 @@ function renderAnalysisList() {
     }
 
     items.forEach(item => {
+        // ... Logica rendering carte ...
         let badgeClass = 'flat'; let icon = 'minus';
         if (item.perc >= 2.5) { badgeClass = 'up'; icon = 'trend-up'; }
         else if (item.perc <= -2.5) { badgeClass = 'down'; icon = 'trend-down'; }
@@ -1380,12 +1528,27 @@ function renderAnalysisList() {
         const formatVal = (v) => (analysisType === 'session') ? (v / 1000).toFixed(2) + 't' : v + 'kg';
         const dateLabel = analysisType === 'muscle' ? 'Ciclo' : 'Inizio';
 
+        const isMuscle = analysisType === 'muscle';
+        const detailToggleHTML = isMuscle ? `
+            <div class="detail-toggle-wrapper" onclick="event.stopPropagation(); toggleDetailMode(this, '${item.name.replace(/'/g, "\\'")}')">
+                <input type="checkbox" class="detail-checkbox">
+                <span>Dettaglio</span>
+            </div>
+        ` : '';
+
         const card = document.createElement('div');
         card.className = 'analysis-card';
+        // Aggiungiamo un attributo per sapere se è in modalità dettaglio
+        card.dataset.detailMode = "false"; 
+        
         card.innerHTML = `
             <div class="ac-header" onclick="toggleChart(this, '${item.name.replace(/'/g, "\\'")}')">
-                <div class="ac-info"><h4>${item.name}</h4><span>${dateLabel}: ${formatVal(item.start)} &bull; Attuale: ${formatVal(item.end)}</span></div>
+                <div class="ac-info">
+                    <h4>${item.name}</h4>
+                    <span>${dateLabel}: ${formatVal(item.start)} &bull; Attuale: ${formatVal(item.end)}</span>
+                </div>
                 <div class="ac-stats">
+                    ${detailToggleHTML} <!-- Qui appare la checkbox solo se siamo in Muscoli -->
                     <div class="badge-perc ${badgeClass}"><i class="ph ph-${icon}"></i> ${item.perc > 0 ? '+' : ''}${item.perc}%</div>
                     <div class="ac-icon"><i class="ph ph-caret-down"></i></div>
                 </div>
@@ -1405,44 +1568,112 @@ window.toggleChart = (header, name) => {
     const safeName = name.replace(/[^a-zA-Z0-9]/g, '');
     const canvasId = `chart-${safeName}`;
 
+    // Chiudi altri (opzionale, mantengo la tua logica)
     document.querySelectorAll('.analysis-card.open').forEach(c => {
-        c.classList.remove('open');
-        const oldId = `chart-${c.querySelector('h4').textContent.replace(/[^a-zA-Z0-9]/g, '')}`;
-        if (activeCharts[oldId]) { activeCharts[oldId].destroy(); delete activeCharts[oldId]; }
+        if(c !== card) {
+            c.classList.remove('open');
+            // Distruggi istanze vecchie per risparmiare memoria
+            const oldId = `chart-${c.querySelector('h4').textContent.replace(/[^a-zA-Z0-9]/g, '')}`;
+            if (activeCharts[oldId]) { activeCharts[oldId].destroy(); delete activeCharts[oldId]; }
+        }
     });
 
     if (!wasOpen) {
         card.classList.add('open');
         const history = JSON.parse(card.dataset.history);
-        setTimeout(() => drawAnalysisChart(canvasId, history, name), 150);
+        
+        // Controlla se la modalità dettaglio era già attiva
+        const isDetailed = card.dataset.detailMode === "true";
+        
+        setTimeout(() => drawAnalysisChart(canvasId, history, name, isDetailed), 150);
+    } else {
+        card.classList.remove('open');
+        if (activeCharts[canvasId]) { activeCharts[canvasId].destroy(); delete activeCharts[canvasId]; }
     }
 };
 
-function drawAnalysisChart(canvasId, data, label) {
+function drawAnalysisChart(canvasId, defaultData, label, isDetailedMode = false) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
+    
+    // Distruggi grafico esistente
     if (activeCharts[canvasId]) { activeCharts[canvasId].destroy(); delete activeCharts[canvasId]; }
 
     const ctx = canvas.getContext('2d');
-    const isVolume = (analysisType === 'session' || analysisType === 'muscle');
+    const isVolume = (analysisType === 'session'); // Muscolo ora usa kg, sessione volume
+
+    let chartDatasets = [];
+    let labels = [];
+
+    if (isDetailedMode && analysisType === 'muscle') {
+        // --- MODALITÀ DETTAGLIO: MULTI LINEA ---
+        const detailedDataMap = getDetailedMuscleHistory(label);
+        
+        // Generatore colori dinamico
+        const colors = ['#FF3B30', '#FF9500', '#FFCC00', '#4CD964', '#5AC8FA', '#0071E3', '#5856D6', '#FF2D55'];
+        let colorIdx = 0;
+
+        Object.keys(detailedDataMap).forEach(childName => {
+            const childHistory = detailedDataMap[childName];
+            if (childHistory.length > 0) {
+                // Imposta label sull'asse X (prendiamo dal primo dataset valido)
+                if (labels.length === 0) labels = childHistory.map(d => d.label);
+
+                chartDatasets.push({
+                    label: childName, // Nome del figlio (es. Gran Dorsale)
+                    data: childHistory.map(d => d.val),
+                    borderColor: colors[colorIdx % colors.length],
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    tension: 0.3
+                });
+                colorIdx++;
+            }
+        });
+
+        if (chartDatasets.length === 0) {
+            // Fallback se qualcosa va storto
+            chartDatasets.push({ label: 'Nessun dettaglio', data: [] });
+        }
+
+    } else {
+        // --- MODALITÀ STANDARD: LINEA SINGOLA AGGREGATA ---
+        labels = defaultData.map(d => analysisType === 'muscle' ? d.label : new Date(d.date).toLocaleDateString(undefined, { day: 'numeric', month: 'numeric' }));
+        
+        chartDatasets.push({
+            label: isVolume ? 'Volume Totale' : 'Intensità Totale (Aggregata)',
+            data: defaultData.map(d => d.val),
+            borderColor: '#0071E3',
+            backgroundColor: 'rgba(0, 113, 227, 0.1)',
+            borderWidth: 3, 
+            pointRadius: 5, 
+            fill: true, 
+            tension: 0.3
+        });
+    }
 
     activeCharts[canvasId] = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: data.map(d => analysisType === 'muscle' ? d.label : new Date(d.date).toLocaleDateString(undefined, { day: 'numeric', month: 'numeric' })),
-            datasets: [{
-                label: isVolume ? 'Volume Totale' : 'Max Carico (kg)',
-                data: data.map(d => d.val),
-                borderColor: '#0071E3',
-                backgroundColor: 'rgba(0, 113, 227, 0.1)',
-                borderWidth: 3, pointRadius: 5, fill: true, tension: 0.3
-            }]
+            labels: labels,
+            datasets: chartDatasets
         },
         options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            responsive: true, 
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { display: isDetailedMode }, // Mostra legenda solo se ci sono più linee
+                tooltip: {
+                    mode: isDetailedMode ? 'index' : 'nearest',
+                    intersect: false
+                }
+            },
             scales: {
-                y: { beginAtZero: false, ticks: { callback: (v) => isVolume ? (v / 1000).toFixed(1) + 't' : v + 'kg' } },
+                y: { 
+                    beginAtZero: false, 
+                    ticks: { callback: (v) => isVolume ? (v / 1000).toFixed(1) + 't' : v + 'kg' } 
+                },
                 x: { grid: { display: false } }
             }
         }
@@ -1650,8 +1881,134 @@ function renderCalendarView() {
     container.innerHTML = finalHTML;
 }
 
+
 // Aggiorna anche updatePageTitle per il titolo in alto
 // (Incolla questo pezzo dentro la tua funzione updatePageTitle esistente)
 /*
    case 'section-calendar': pageTitle.textContent = "Calendario Scadenze"; break;
 */
+
+
+
+// --- NUOVE FUNZIONI PER IL DETTAGLIO MUSCOLARE ---
+
+window.toggleDetailMode = (wrapper, parentName) => {
+    const checkbox = wrapper.querySelector('input');
+    // Lo stato cambia DOPO il click, quindi leggiamo il valore checked
+    const isDetailed = checkbox.checked;
+    
+    const card = wrapper.closest('.analysis-card');
+    card.dataset.detailMode = isDetailed;
+
+    // Se la card è aperta, ridisegna il grafico immediatamente
+    if (card.classList.contains('open')) {
+        const historyAggregated = JSON.parse(card.dataset.history);
+        const safeName = parentName.replace(/[^a-zA-Z0-9]/g, '');
+        const canvasId = `chart-${safeName}`;
+        
+        drawAnalysisChart(canvasId, historyAggregated, parentName, isDetailed);
+    }
+};
+
+// Questa funzione ricalcola lo storico separando i figli (es. Gran Dorsale vs Trapezi)
+function getDetailedMuscleHistory(parentName) {
+    // 1. Filtra i log pertinenti a questo gruppo muscolare
+    // Usiamo la mappa globale ANALYSIS_MUSCLE_MAP che abbiamo aggiunto prima
+    const childrenMuscles = ANALYSIS_MUSCLE_MAP[parentName];
+    if (!childrenMuscles) return {};
+
+    const sortedLogs = [...currentAnalysisLogs].sort((a, b) => new Date(a.date) - new Date(b.date));
+    let maxDayInLogs = 0;
+    sortedLogs.forEach(l => { if (l.dayIndex > maxDayInLogs) maxDayInLogs = l.dayIndex; });
+    const limitDays = (typeof currentWorkoutDays !== 'undefined' && currentWorkoutDays > 0) ? currentWorkoutDays : (maxDayInLogs || 7);
+
+    // 2. Creazione Cicli (Identica alla logica aggregata)
+    let cycles = [];
+    let currentCycle = { id: 1, dayLogs: {} };
+    let daysSeenInCycle = new Set();
+    let lastDate = null;
+    let lastDay = null;
+
+    sortedLogs.forEach(log => {
+        const dIndex = parseInt(log.dayIndex) || 1;
+        const sDate = new Date(log.date).toDateString();
+        const isUpdate = (lastDate === sDate && lastDay === dIndex);
+
+        if (daysSeenInCycle.has(dIndex) && !isUpdate) {
+            cycles.push(currentCycle);
+            currentCycle = { id: currentCycle.id + 1, dayLogs: {} };
+            daysSeenInCycle = new Set();
+        }
+        if (!isUpdate) daysSeenInCycle.add(dIndex);
+        if (!currentCycle.dayLogs[dIndex]) currentCycle.dayLogs[dIndex] = [];
+        currentCycle.dayLogs[dIndex].push(log);
+        lastDate = sDate;
+        lastDay = dIndex;
+    });
+    cycles.push(currentCycle);
+
+    // 3. Estrazione Dati per Singolo Figlio
+    let detailedStats = {}; // { "Gran Dorsale": [{val, label}, ...], "Trapezio": [...] }
+    let memory = {}; // { "Gran Dorsale": { day1: 50kg } }
+
+    cycles.forEach(cycle => {
+        // Accumulatore temporaneo per questo ciclo
+        let cycleSpecificStats = {}; 
+
+        for (let d = 1; d <= limitDays; d++) {
+            const logsForDay = cycle.dayLogs[d];
+            
+            if (logsForDay && logsForDay.length > 0) {
+                const log = logsForDay[logsForDay.length - 1];
+                if (log.exercises) {
+                    log.exercises.forEach(ex => {
+                        if (ex.muscles && ex.muscles.length > 0) {
+                            // Recupera nome specifico
+                            const rawMuscle = ex.muscles[0];
+                            let specificName = (typeof rawMuscle === 'object' && rawMuscle.name) ? rawMuscle.name : rawMuscle;
+                            
+                            // SE questo specifico muscolo è figlio del Padre richiesto
+                            if (childrenMuscles.includes(specificName) || specificName === parentName) {
+                                
+                                let maxSetKg = 0;
+                                if (ex.sets) ex.sets.forEach(s => {
+                                    const k = parseFloat(s.kg) || 0;
+                                    if (k > maxSetKg) maxSetKg = k;
+                                });
+
+                                if (maxSetKg > 0) {
+                                    if (!cycleSpecificStats[specificName]) cycleSpecificStats[specificName] = 0;
+                                    // Se fai 2 esercizi per lo stesso muscolo specifico nello stesso giorno, prendiamo il max o la somma? 
+                                    // Per coerenza col padre, sommiamo l'intensità (es. Panca Piana + Panca Alta)
+                                    cycleSpecificStats[specificName] += maxSetKg;
+
+                                    if (!memory[specificName]) memory[specificName] = {};
+                                    memory[specificName][d] = maxSetKg;
+                                }
+                            }
+                        }
+                    });
+                }
+            } else {
+                // Logica Memoria per ogni figlio specifico
+                Object.keys(memory).forEach(childName => {
+                    if (memory[childName][d]) {
+                        if (!cycleSpecificStats[childName]) cycleSpecificStats[childName] = 0;
+                        cycleSpecificStats[childName] += memory[childName][d];
+                    }
+                });
+            }
+        }
+
+        // Salva risultati del ciclo
+        Object.keys(cycleSpecificStats).forEach(childName => {
+            if (!detailedStats[childName]) detailedStats[childName] = [];
+            detailedStats[childName].push({
+                val: cycleSpecificStats[childName],
+                label: `Ciclo ${cycle.id}`
+            });
+        });
+    });
+
+    return detailedStats;
+}
