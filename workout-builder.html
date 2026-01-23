@@ -30,23 +30,35 @@
 
     <!-- APP CONTAINER -->
     <div class="builder-container">
-        
+
         <!-- HEADER SUPERIORE -->
         <header class="builder-header">
             <div class="header-left">
                 <button id="btn-back" class="icon-btn"><i class="ph ph-arrow-left"></i></button>
                 <h1 contenteditable="true" id="workout-name">Nuova Scheda Allenamento</h1>
-                
+
             </div>
 
             <div class="header-center">
-                 <select id="client-select">
-                    <option value="" disabled selected>Seleziona Cliente...</option>
-                    <!-- Popolato via JS -->
-                </select>
-                <div class="days-control">
-                    <label>Giorni:</label>
-                    <input type="number" id="num-days" value="3" min="1" max="7">
+                <!-- TOGGLE SWITCH -->
+                <div class="mode-switch-wrapper">
+                    <label class="switch-label selected" id="lbl-bb">Bodybuilding</label>
+                    <label class="switch">
+                        <input type="checkbox" id="mode-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <label class="switch-label" id="lbl-pl">Powerlifting / S&C</label>
+                </div>
+
+                <!-- STANDARD CONTROLS (Nascosti in PL Mode) -->
+                <div id="bb-controls" style="display:flex; gap:10px; align-items:center;">
+                    <select id="client-select">
+                        <option value="" disabled selected>Seleziona Cliente...</option>
+                    </select>
+                    <div class="days-control">
+                        <label>Giorni:</label>
+                        <input type="number" id="num-days" value="3" min="1" max="7" style="width:50px;">
+                    </div>
                 </div>
             </div>
 
@@ -68,6 +80,14 @@
                     <button class="tab-btn active" data-day="1">Giorno 1</button>
                     <button class="tab-btn" data-day="2">Giorno 2</button>
                     <button class="tab-btn" data-day="3">Giorno 3</button>
+                </div>
+                <div id="pl-navigation" class="pl-nav-container hidden">
+                    <div class="pl-weeks-row" id="pl-weeks-container">
+                        <!-- Generato JS: Week 1, Week 2... -->
+                    </div>
+                    <div class="pl-days-row" id="pl-days-container">
+                        <!-- Generato JS: Day 1, Day 2... -->
+                    </div>
                 </div>
 
                 <!-- CONTENUTO DEL GIORNO CORRENTE -->
@@ -164,6 +184,65 @@
             <div class="modal-footer">
                 <button id="btn-confirm-save" class="btn-primary full-width">Conferma e Salva</button>
             </div>
+        </div>
+    </div>
+    <!-- MODALE SETUP MESOCICLO -->
+    <div id="pl-setup-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>Nuovo Mesociclo PL</h3>
+            <p>Definisci la struttura del blocco.</p>
+
+            <label class="tiny-label">Durata (Settimane)</label>
+            <input type="number" id="pl-setup-weeks" value="4" class="modal-input">
+
+            <label class="tiny-label">Frequenza (Giorni a settimana)</label>
+            <input type="number" id="pl-setup-days" value="4" class="modal-input">
+
+            <button id="btn-confirm-pl-setup" class="btn-primary full-width" style="margin-top:20px;">Crea
+                Struttura</button>
+        </div>
+    </div>
+
+    <!-- MODALE CREA VARIANTE -->
+    <div id="pl-variant-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>Crea Nuova Variante</h3>
+
+            <label class="tiny-label">Nome Variante</label>
+            <input type="text" id="new-var-name" placeholder="es. Pin Squat altezza ginocchio" class="modal-input">
+
+            <label class="tiny-label">Categoria / Sezione</label>
+            <input type="text" id="new-var-section" list="var-sections-list" placeholder="es. ROM Ridotto"
+                class="modal-input">
+            <datalist id="var-sections-list">
+                <option value="Fermi (Pause)">
+                <option value="Tempi (Isocinetica)">
+                <option value="ROM Ridotto (Board/Pin)">
+                <option value="ROM Aumentato (Deficit)">
+                <option value="Special Bars">
+                <option value="Elastici / Catene">
+            </datalist>
+
+            <label class="tiny-label">Parametro Extra (Opzionale)</label>
+            <select id="new-var-param" class="modal-select">
+                <option value="none">Nessuno</option>
+                <option value="time">Tempo (Secondi)</option>
+                <option value="height">Altezza (cm/pin)</option>
+                <option value="angle">Angolo (gradi)</option>
+            </select>
+
+            <label class="tiny-label">Per quali alzate?</label>
+            <div style="display:flex; gap:10px; margin-top:5px;">
+                <label><input type="checkbox" class="chk-lift" value="Squat"> Squat</label>
+                <label><input type="checkbox" class="chk-lift" value="Panca"> Panca</label>
+                <label><input type="checkbox" class="chk-lift" value="Stacco"> Stacco</label>
+                <label><input type="checkbox" class="chk-lift" value="Military"> Military</label>
+            </div>
+
+            <button id="btn-save-variant" class="btn-primary full-width" style="margin-top:20px;">Salva
+                Variante</button>
+            <button onclick="document.getElementById('pl-variant-modal').classList.add('hidden')"
+                class="btn-secondary full-width" style="margin-top:5px;">Annulla</button>
         </div>
     </div>
     <!-- JS BUILDER -->

@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-    getFirestore, doc, getDoc, updateDoc, collection, query, where, getDocs, orderBy, deleteDoc, addDoc, serverTimestamp, setDoc, onSnapshot
+    getFirestore, doc, getDoc, updateDoc, collection, query, where, limit, getDocs, orderBy, deleteDoc, addDoc, serverTimestamp, setDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // CONFIGURAZIONE
@@ -116,8 +116,8 @@ function initDashboard(user, dbData) {
     const displayName = dbData.customName || dbData.name || user.displayName;
     const displayPhoto = dbData.customPhoto || dbData.photoURL || user.photoURL;
 
-    if(ptNameElement) ptNameElement.textContent = displayName;
-    if(ptAvatarElement) ptAvatarElement.src = displayPhoto;
+    if (ptNameElement) ptNameElement.textContent = displayName;
+    if (ptAvatarElement) ptAvatarElement.src = displayPhoto;
 
     // Popola Settings
     const settingsName = document.getElementById('settings-name');
@@ -127,7 +127,7 @@ function initDashboard(user, dbData) {
     if (settingsBio) settingsBio.value = dbData.bio || "";
     if (settingsAvatar) settingsAvatar.src = displayPhoto;
 
-    if(currentDateElement) currentDateElement.textContent = new Date().toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    if (currentDateElement) currentDateElement.textContent = new Date().toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     if (dbData.trainerCode && displayTrainerCode) displayTrainerCode.textContent = dbData.trainerCode;
 
     // Popola Volume
@@ -136,10 +136,10 @@ function initDashboard(user, dbData) {
         const v3 = document.getElementById('vol-tertiary');
         const v4 = document.getElementById('vol-quaternary');
         const vO = document.getElementById('vol-other');
-        if(v2) v2.value = dbData.volumeSettings.secondary ?? 0.5;
-        if(v3) v3.value = dbData.volumeSettings.tertiary ?? 0.3;
-        if(v4) v4.value = dbData.volumeSettings.quaternary ?? 0.15;
-        if(vO) vO.value = dbData.volumeSettings.other ?? 0.1;
+        if (v2) v2.value = dbData.volumeSettings.secondary ?? 0.5;
+        if (v3) v3.value = dbData.volumeSettings.tertiary ?? 0.3;
+        if (v4) v4.value = dbData.volumeSettings.quaternary ?? 0.15;
+        if (vO) vO.value = dbData.volumeSettings.other ?? 0.1;
     }
 
     loadWorkouts(user.uid);
@@ -169,7 +169,7 @@ navLinks.forEach(link => {
         navLinks.forEach(l => l.classList.remove('active'));
         link.classList.add('active');
         sections.forEach(section => section.classList.add('hidden'));
-        
+
         const targetId = link.getAttribute('data-target');
         document.getElementById(targetId).classList.remove('hidden');
 
@@ -179,13 +179,13 @@ navLinks.forEach(link => {
         if (targetId === 'section-calendar') {
             renderCalendarView();
         }
-        
+
         // ... codice esistente badge chat ...
         if (targetId === 'section-chat') { /*...*/ }
     });
 });
 
-if(logoutBtn) logoutBtn.addEventListener('click', async () => {
+if (logoutBtn) logoutBtn.addEventListener('click', async () => {
     try { await signOut(auth); window.location.href = "login.html"; }
     catch (error) { console.error("Errore logout:", error); }
 });
@@ -233,7 +233,7 @@ if (btnSaveAll) {
 
             await updateDoc(doc(db, "users", currentUserData.uid), updateData);
 
-            if(ptNameElement) ptNameElement.textContent = newName;
+            if (ptNameElement) ptNameElement.textContent = newName;
             if (newPhotoBase64 && ptAvatarElement) ptAvatarElement.src = newPhotoBase64;
             alert("Salvato!");
         } catch (error) {
@@ -280,10 +280,10 @@ if (tabActive && tabArchive) {
         console.log("Switch to Active"); // Debug
         tabActive.classList.add('active');
         tabArchive.classList.remove('active');
-        
+
         // Gestione view
-        if(viewActive) viewActive.classList.remove('hidden');
-        if(viewArchive) viewArchive.classList.add('hidden');
+        if (viewActive) viewActive.classList.remove('hidden');
+        if (viewArchive) viewArchive.classList.add('hidden');
     });
 
     // Click su TAB ARCHIVIO
@@ -291,15 +291,15 @@ if (tabActive && tabArchive) {
         console.log("Switch to Archive"); // Debug
         tabArchive.classList.add('active');
         tabActive.classList.remove('active');
-        
+
         // Gestione view
-        if(viewArchive) viewArchive.classList.remove('hidden');
-        if(viewActive) viewActive.classList.add('hidden');
+        if (viewArchive) viewArchive.classList.remove('hidden');
+        if (viewActive) viewActive.classList.add('hidden');
     });
 }
 
 async function loadWorkouts(coachId) {
-    if(!listActive) return;
+    if (!listActive) return;
     listActive.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Caricamento...</div>';
     listArchive.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Caricamento...</div>';
 
@@ -363,19 +363,19 @@ async function loadClientsGrid(coachId) {
     clientsGrid.innerHTML = '<p style="padding:20px; color:#888;">Caricamento team...</p>';
 
     const q = query(collection(db, "users"), where("coachId", "==", coachId));
-    
+
     // Listener Real-time per aggiornamenti automatici
     onSnapshot(q, (snap) => {
         allClientsCache = [];
         uniqueTagsCache = new Set();
-        
+
         snap.forEach(doc => {
             const data = doc.data();
             data.id = doc.id; // Salviamo l'ID nel blocco dati
             allClientsCache.push(data);
-            
+
             // Raccogli tag per i filtri e suggerimenti
-            if(data.customLabel) uniqueTagsCache.add(data.customLabel.trim());
+            if (data.customLabel) uniqueTagsCache.add(data.customLabel.trim());
         });
 
         updateTagFilterDropdown(); // Aggiorna il dropdown dei filtri
@@ -388,7 +388,7 @@ window.applyClientFilters = () => {
     const searchText = document.getElementById('search-client').value.toLowerCase();
     const colorFilter = document.getElementById('filter-color').value;
     const tagFilter = document.getElementById('filter-tag').value;
-    
+
     // NUOVO: Lettura select ordinamento (se non esiste nel DOM, fallback su 'name')
     const sortMode = document.getElementById('sort-clients') ? document.getElementById('sort-clients').value : 'name';
 
@@ -416,7 +416,7 @@ window.applyClientFilters = () => {
     if (sortMode === 'renewal') {
         filtered.sort((a, b) => {
             // Chi non ha data va in fondo
-            if (!a.renewalDate) return 1; 
+            if (!a.renewalDate) return 1;
             if (!b.renewalDate) return -1;
             return new Date(a.renewalDate) - new Date(b.renewalDate); // Data più vicina prima
         });
@@ -431,14 +431,14 @@ window.applyClientFilters = () => {
 // 3. GENERAZIONE HTML (Griglia/Lista)
 function renderClients(clients) {
     clientsGrid.innerHTML = '';
-    
+
     if (clients.length === 0) {
         clientsGrid.innerHTML = '<div style="padding:40px; text-align:center; color:#999; grid-column: 1/-1;">Nessun atleta trovato.</div>';
         return;
     }
 
     // HTML per suggerimenti tag (rimane uguale)
-    const suggestionsHTML = Array.from(uniqueTagsCache).map(tag => 
+    const suggestionsHTML = Array.from(uniqueTagsCache).map(tag =>
         `<span class="tag-chip" onclick="fillTagInput(this, '${tag}')">${tag}</span>`
     ).join('');
 
@@ -446,8 +446,8 @@ function renderClients(clients) {
         // --- 1. LOGICA SEMAFORO SCADENZA ---
         let renewalBadgeHTML = '';
         if (c.renewalDate) {
-            const today = new Date(); 
-            today.setHours(0,0,0,0); // Reset orario per confronto puro
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Reset orario per confronto puro
             const rDate = new Date(c.renewalDate);
             const diffTime = rDate - today;
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); // Giorni di differenza
@@ -470,7 +470,7 @@ function renderClients(clients) {
                 badgeIcon = '⏳';
             } else {
                 // Verde (> 7 giorni)
-                badgeText = `Rinnovo: ${new Date(c.renewalDate).toLocaleDateString('it-IT', {day:'2-digit', month:'2-digit'})}`;
+                badgeText = `Rinnovo: ${new Date(c.renewalDate).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })}`;
             }
 
             renewalBadgeHTML = `<div class="renewal-badge ${badgeClass}">${badgeIcon} ${badgeText}</div>`;
@@ -541,7 +541,10 @@ function renderClients(clients) {
             ${menuHtml}
             
             <div class="client-header">
-                <div class="client-avatar">${c.name ? c.name.charAt(0).toUpperCase() : '?'}</div>
+                <div class="client-avatar-wrapper">
+                ${c.photoURL? `<img src="${c.photoURL}" class="client-avatar-img" alt="${c.name}">`: `<div class="client-avatar">${getInitials(c.name)}</div>`
+            }
+            </div>
                 <div>
                     <h4 style="margin-bottom:0;">${c.name || "Senza Nome"}</h4>
                     
@@ -554,30 +557,34 @@ function renderClients(clients) {
             </div>
 
             <!-- Area Grafico (Placeholder) -->
-            <div class="mini-chart-area">
-                <span>Analisi in arrivo...</span>
-            </div>
+            <div class="mini-chart-area" id="mini-chart-${c.id}">
+    <div class="mini-chart-info">
+        <span class="mini-chart-label">Ultimo Allenamento</span>
+        <span class="mini-chart-value" style="color:#aaa; font-size:12px;">Caricamento...</span>
+    </div>
+</div>
             
             <button class="btn-details" onclick="openClientDetail('${c.id}')">Scheda Atleta</button>
         `;
         clientsGrid.appendChild(card);
+        loadClientMiniChart(c.id);
     });
 }
 
 // 4. FUNZIONI TAG & SUGGERIMENTI
 function updateTagFilterDropdown() {
     const select = document.getElementById('filter-tag');
-    if(!select) return;
-    
+    if (!select) return;
+
     // Salva selezione corrente per non resettarla
     const currentVal = select.value;
-    
+
     // Ricostruisci opzioni
     select.innerHTML = '<option value="all">🏷️tag</option>';
     uniqueTagsCache.forEach(tag => {
         select.innerHTML += `<option value="${tag}">${tag}</option>`;
     });
-    
+
     select.value = currentVal;
 }
 
@@ -586,7 +593,7 @@ window.fillTagInput = (chip, value) => {
     // Trova l'input nel genitore più vicino (dropdown corrente)
     const container = chip.closest('.dropdown-section');
     const input = container.querySelector('input');
-    if(input) {
+    if (input) {
         input.value = value;
     }
 };
@@ -632,18 +639,18 @@ window.toggleCardMenu = (e, id) => {
     document.getElementById(`menu-${id}`)?.classList.toggle('active');
 };
 
-document.addEventListener('click', (e) => { 
+document.addEventListener('click', (e) => {
     if (!e.target.closest('.card-dropdown') && !e.target.closest('.card-menu-btn')) {
         document.querySelectorAll('.card-dropdown').forEach(d => d.classList.remove('active'));
     }
 });
 
-window.deleteClient = async (id) => { 
+window.deleteClient = async (id) => {
     if (confirm("Sei sicuro di voler eliminare questo atleta dal team?")) {
         try {
             await updateDoc(doc(db, "users", id), { coachId: null, pendingCoachId: null, status: null });
             alert("Atleta rimosso dal team.");
-        } catch(e) { console.error(e); alert("Errore rimozione."); }
+        } catch (e) { console.error(e); alert("Errore rimozione."); }
     }
 };
 
@@ -658,17 +665,17 @@ window.deleteClient = async (id) => {
 window.openClientDetail = async (clientId) => {
     console.log("Apertura dettaglio per:", clientId);
     currentSelectedClientId = clientId;
-    
+
     // Mostra il pannello (se esiste)
-    if(clientPanel) clientPanel.classList.remove('hidden');
-    
+    if (clientPanel) clientPanel.classList.remove('hidden');
+
     // 1. SCARICA DATI
     const snap = await getDoc(doc(db, "users", clientId));
     if (!snap.exists()) {
         console.error("Cliente non trovato nel DB");
         return;
     }
-    
+
     const data = snap.data();
     console.log("DATI UTENTE:", data); // Vedi i dati in console
 
@@ -697,7 +704,7 @@ window.openClientDetail = async (clientId) => {
     // 4. LOGICA INFORTUNI (Colore Rosso)
     const inj = data.injuries && data.injuries !== "Nessuno" ? data.injuries : null;
     const pos = data.posture && data.posture !== "Normale" ? data.posture : null;
-    
+
     let physText = "✅ Sano / Nessun problema";
     if (inj || pos) {
         physText = "";
@@ -732,22 +739,22 @@ window.openClientDetail = async (clientId) => {
 
     // Carica le altre sezioni (Grafici e Misure)
     // Usiamo try-catch per evitare che un errore qui blocchi tutto il resto
-    try { loadClientCharts(clientId); } catch(e) { console.error("Err Grafici", e); }
-    try { loadMeasurements(clientId); } catch(e) { console.error("Err Misure", e); }
+    try { loadClientCharts(clientId); } catch (e) { console.error("Err Grafici", e); }
+    try { loadMeasurements(clientId); } catch (e) { console.error("Err Misure", e); }
 };
 // Listener Salvataggio Note Coach
 const btnSaveNotes = document.getElementById('btn-save-coach-notes');
-if(btnSaveNotes) {
+if (btnSaveNotes) {
     btnSaveNotes.onclick = async () => {
-        if(!currentSelectedClientId) return;
+        if (!currentSelectedClientId) return;
         const txt = document.getElementById('coach-notes-input').value;
         const status = document.getElementById('coach-notes-status');
-        
+
         btnSaveNotes.textContent = "Salvataggio...";
         await updateDoc(doc(db, "users", currentSelectedClientId), { coachPrivateNotes: txt });
-        
+
         btnSaveNotes.textContent = "Salva Note";
-        if(status) { status.style.opacity = '1'; setTimeout(()=> status.style.opacity='0', 2000); }
+        if (status) { status.style.opacity = '1'; setTimeout(() => status.style.opacity = '0', 2000); }
     };
 }
 
@@ -756,10 +763,10 @@ const btnSaveCoachNotes = document.getElementById('btn-save-coach-notes');
 if (btnSaveCoachNotes) {
     btnSaveCoachNotes.addEventListener('click', async () => {
         if (!currentSelectedClientId) return;
-        
+
         const noteText = document.getElementById('coach-notes-input').value;
         const statusLabel = document.getElementById('coach-notes-status');
-        
+
         btnSaveCoachNotes.textContent = "Salvataggio...";
         btnSaveCoachNotes.disabled = true;
 
@@ -767,11 +774,11 @@ if (btnSaveCoachNotes) {
             await updateDoc(doc(db, "users", currentSelectedClientId), {
                 coachPrivateNotes: noteText
             });
-            
+
             // Feedback Visivo
             btnSaveCoachNotes.textContent = "Salva Note";
             btnSaveCoachNotes.disabled = false;
-            if(statusLabel) {
+            if (statusLabel) {
                 statusLabel.classList.add('visible');
                 setTimeout(() => statusLabel.classList.remove('visible'), 2000);
             }
@@ -918,8 +925,8 @@ function initChatSystem(userUid) {
     );
 
     onSnapshot(q, (snapshot) => {
-        if(chatListContainer) chatListContainer.innerHTML = '';
-        
+        if (chatListContainer) chatListContainer.innerHTML = '';
+
         let globalUnreadCount = 0;
         const readHistory = JSON.parse(localStorage.getItem('chatReadHistory') || '{}');
         const isChatSectionOpen = !document.getElementById('section-chat').classList.contains('hidden');
@@ -931,7 +938,7 @@ function initChatSystem(userUid) {
 
         snapshot.forEach(doc => {
             const chat = doc.data();
-            
+
             // LOGICA NOME
             let otherUserName = "Utente";
             if (chat.participants && chat.participantNames) {
@@ -961,7 +968,7 @@ function initChatSystem(userUid) {
 
             if (isUnread) globalUnreadCount++;
 
-            if(chatListContainer) {
+            if (chatListContainer) {
                 const div = document.createElement('div');
                 div.id = `chat-item-${doc.id}`;
                 div.className = `chat-list-item ${activeChatId === doc.id ? 'active' : ''}`;
@@ -1017,7 +1024,7 @@ window.openChat = (chatId, chatTitle) => {
     activeChatId = chatId;
     document.querySelectorAll('.chat-list-item').forEach(el => el.classList.remove('active'));
     if (chatItem) chatItem.classList.add('active');
-    
+
     chatMessagesArea.innerHTML = '';
     if (unsubscribeMessages) unsubscribeMessages();
 
@@ -1216,7 +1223,7 @@ const ANALYSIS_MUSCLE_MAP = {
 // Funzione che prende un nome specifico (es. "Gran Dorsale") e restituisce il Padre (es. "Schiena")
 function getMuscleParent(specificName) {
     if (!specificName) return "Sconosciuto";
-    
+
     // Controlla se il nome è già una categoria padre
     if (ANALYSIS_MUSCLE_MAP[specificName]) return specificName;
 
@@ -1226,7 +1233,7 @@ function getMuscleParent(specificName) {
             return parent;
         }
     }
-    
+
     // Fallback intelligente: se contine "Dorso" o "Spalle" nel nome ma non è mappato
     const lower = specificName.toLowerCase();
     if (lower.includes('dorso') || lower.includes('schiena')) return "Schiena";
@@ -1289,7 +1296,7 @@ window.openWorkoutAnalysis = (workoutId, workoutName, days) => {
     document.getElementById('analysis-title').textContent = workoutName;
 
     currentAnalysisLogs = allClientLogs.filter(l => l.workoutId === workoutId);
-    currentWorkoutDays = parseInt(days) || 7; 
+    currentWorkoutDays = parseInt(days) || 7;
 
     analysisType = 'exercise';
     updateToggleButtons();
@@ -1356,7 +1363,7 @@ function renderAnalysisList() {
             });
         });
     }
-    
+
     // --- TIPO MUSCOLO (MODIFICATO PER GERARCHIA) ---
     else if (analysisType === 'muscle') {
         let maxDayInLogs = 0;
@@ -1391,26 +1398,26 @@ function renderAnalysisList() {
 
         // 2. Calcolo Statistiche aggregando per PADRE
         let memory = {}; // Serve per ricordare il carico dei giorni precedenti nel ciclo
-        
+
         cycles.forEach(cycle => {
             let cycleMuscleStats = {}; // Qui accumuliamo per PADRE (es. Schiena)
-            
+
             for (let d = 1; d <= limitDays; d++) {
                 const logsForDay = cycle.dayLogs[d];
-                
+
                 if (logsForDay && logsForDay.length > 0) {
                     // Prendi l'ultimo log valido del giorno
                     const log = logsForDay[logsForDay.length - 1];
-                    
+
                     if (log.exercises) {
                         log.exercises.forEach(ex => {
                             // Controlla se ci sono muscoli definiti
                             if (ex.muscles && ex.muscles.length > 0) {
-                                
+
                                 // GESTIONE COMPATIBILITÀ (Stringa vs Oggetto)
                                 const rawMuscle = ex.muscles[0]; // Primario
                                 let specificName = "";
-                                
+
                                 if (typeof rawMuscle === 'object' && rawMuscle.name) {
                                     specificName = rawMuscle.name; // Nuovo formato
                                 } else if (typeof rawMuscle === 'string') {
@@ -1430,11 +1437,11 @@ function renderAnalysisList() {
 
                                     if (maxSetKg > 0) {
                                         if (!cycleMuscleStats[parentName]) cycleMuscleStats[parentName] = 0;
-                                        
+
                                         // QUI SOMMIAMO: Se fai Lat Machine (Schiena) e Pulley (Schiena), 
                                         // somma i massimali per dare un indice di "Intensità Totale Schiena"
                                         cycleMuscleStats[parentName] += maxSetKg;
-                                        
+
                                         if (!memory[parentName]) memory[parentName] = {};
                                         memory[parentName][d] = maxSetKg;
                                     }
@@ -1453,12 +1460,12 @@ function renderAnalysisList() {
                     });
                 }
             }
-            
+
             // Salva nello storico globale usando il nome del PADRE
             if (Object.keys(cycleMuscleStats).length > 0) {
                 Object.keys(cycleMuscleStats).forEach(parentName => {
                     if (!statsMap[parentName]) statsMap[parentName] = { name: parentName, history: [] };
-                    
+
                     statsMap[parentName].history.push({
                         date: new Date().toISOString(), // Data fittizia per ordinamento
                         val: cycleMuscleStats[parentName],
@@ -1468,7 +1475,7 @@ function renderAnalysisList() {
             }
         });
     }
-    
+
     // --- TIPO SEDUTA (Invariato) ---
     else if (analysisType === 'session') {
         sortedLogs.forEach(log => {
@@ -1497,7 +1504,7 @@ function renderAnalysisList() {
 
     // --- RESTO DELLA FUNZIONE (Rendering HTML) ---
     // (Questa parte rimane identica al tuo codice originale)
-    
+
     let items = Object.values(statsMap).map(item => {
         const hist = item.history;
         if (!hist || hist.length < 1) return null;
@@ -1539,8 +1546,8 @@ function renderAnalysisList() {
         const card = document.createElement('div');
         card.className = 'analysis-card';
         // Aggiungiamo un attributo per sapere se è in modalità dettaglio
-        card.dataset.detailMode = "false"; 
-        
+        card.dataset.detailMode = "false";
+
         card.innerHTML = `
             <div class="ac-header" onclick="toggleChart(this, '${item.name.replace(/'/g, "\\'")}')">
                 <div class="ac-info">
@@ -1570,7 +1577,7 @@ window.toggleChart = (header, name) => {
 
     // Chiudi altri (opzionale, mantengo la tua logica)
     document.querySelectorAll('.analysis-card.open').forEach(c => {
-        if(c !== card) {
+        if (c !== card) {
             c.classList.remove('open');
             // Distruggi istanze vecchie per risparmiare memoria
             const oldId = `chart-${c.querySelector('h4').textContent.replace(/[^a-zA-Z0-9]/g, '')}`;
@@ -1581,10 +1588,10 @@ window.toggleChart = (header, name) => {
     if (!wasOpen) {
         card.classList.add('open');
         const history = JSON.parse(card.dataset.history);
-        
+
         // Controlla se la modalità dettaglio era già attiva
         const isDetailed = card.dataset.detailMode === "true";
-        
+
         setTimeout(() => drawAnalysisChart(canvasId, history, name, isDetailed), 150);
     } else {
         card.classList.remove('open');
@@ -1595,7 +1602,7 @@ window.toggleChart = (header, name) => {
 function drawAnalysisChart(canvasId, defaultData, label, isDetailedMode = false) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
-    
+
     // Distruggi grafico esistente
     if (activeCharts[canvasId]) { activeCharts[canvasId].destroy(); delete activeCharts[canvasId]; }
 
@@ -1608,7 +1615,7 @@ function drawAnalysisChart(canvasId, defaultData, label, isDetailedMode = false)
     if (isDetailedMode && analysisType === 'muscle') {
         // --- MODALITÀ DETTAGLIO: MULTI LINEA ---
         const detailedDataMap = getDetailedMuscleHistory(label);
-        
+
         // Generatore colori dinamico
         const colors = ['#FF3B30', '#FF9500', '#FFCC00', '#4CD964', '#5AC8FA', '#0071E3', '#5856D6', '#FF2D55'];
         let colorIdx = 0;
@@ -1640,15 +1647,15 @@ function drawAnalysisChart(canvasId, defaultData, label, isDetailedMode = false)
     } else {
         // --- MODALITÀ STANDARD: LINEA SINGOLA AGGREGATA ---
         labels = defaultData.map(d => analysisType === 'muscle' ? d.label : new Date(d.date).toLocaleDateString(undefined, { day: 'numeric', month: 'numeric' }));
-        
+
         chartDatasets.push({
             label: isVolume ? 'Volume Totale' : 'Intensità Totale (Aggregata)',
             data: defaultData.map(d => d.val),
             borderColor: '#0071E3',
             backgroundColor: 'rgba(0, 113, 227, 0.1)',
-            borderWidth: 3, 
-            pointRadius: 5, 
-            fill: true, 
+            borderWidth: 3,
+            pointRadius: 5,
+            fill: true,
             tension: 0.3
         });
     }
@@ -1660,9 +1667,9 @@ function drawAnalysisChart(canvasId, defaultData, label, isDetailedMode = false)
             datasets: chartDatasets
         },
         options: {
-            responsive: true, 
+            responsive: true,
             maintainAspectRatio: false,
-            plugins: { 
+            plugins: {
                 legend: { display: isDetailedMode }, // Mostra legenda solo se ci sono più linee
                 tooltip: {
                     mode: isDetailedMode ? 'index' : 'nearest',
@@ -1670,9 +1677,9 @@ function drawAnalysisChart(canvasId, defaultData, label, isDetailedMode = false)
                 }
             },
             scales: {
-                y: { 
-                    beginAtZero: false, 
-                    ticks: { callback: (v) => isVolume ? (v / 1000).toFixed(1) + 't' : v + 'kg' } 
+                y: {
+                    beginAtZero: false,
+                    ticks: { callback: (v) => isVolume ? (v / 1000).toFixed(1) + 't' : v + 'kg' }
                 },
                 x: { grid: { display: false } }
             }
@@ -1687,7 +1694,7 @@ window.openLogHistoryPanel = () => {
         console.error("Elementi pannello non trovati nel DOM");
         return;
     }
-    panel.classList.remove('hidden'); 
+    panel.classList.remove('hidden');
     setTimeout(() => { panel.classList.add('open'); }, 10);
     requestAnimationFrame(() => { panel.classList.add('open'); });
 
@@ -1758,7 +1765,7 @@ if (miniProfileBtn && settingsNavLink) {
 window.setClientRenewal = async (id) => {
     const input = document.getElementById(`renewal-input-${id}`);
     const dateVal = input.value; // YYYY-MM-DD
-    
+
     // Chiudi menu per pulizia
     document.querySelectorAll('.card-dropdown').forEach(d => d.classList.remove('active'));
 
@@ -1766,9 +1773,9 @@ window.setClientRenewal = async (id) => {
         // Salviamo su Firebase (campo renewalDate)
         await updateDoc(doc(db, "users", id), { renewalDate: dateVal || null });
         // La griglia si aggiornerà da sola grazie al listener onSnapshot
-    } catch (e) { 
-        console.error("Errore salvataggio data:", e); 
-        alert("Errore salvataggio scadenza"); 
+    } catch (e) {
+        console.error("Errore salvataggio data:", e);
+        alert("Errore salvataggio scadenza");
     }
 };
 // =========================================
@@ -1806,13 +1813,13 @@ function renderCalendarView() {
     };
 
     const today = new Date();
-    today.setHours(0,0,0,0);
+    today.setHours(0, 0, 0, 0);
 
     // Smistamento Clienti nei Gruppi
     clientsWithDates.forEach(c => {
         const rDate = new Date(c.renewalDate);
-        rDate.setHours(0,0,0,0); // Normalizza orario
-        
+        rDate.setHours(0, 0, 0, 0); // Normalizza orario
+
         const diffTime = rDate - today;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -1841,7 +1848,7 @@ function renderCalendarView() {
             else if (key === 'today') { labelText = 'Scade OGGI'; badgeColorClass = 'bg-orange'; }
             else if (key === 'tomorrow') { labelText = 'Scade Domani'; badgeColorClass = 'bg-orange'; }
             else { labelText = `Tra ${c.diff} giorni`; badgeColorClass = 'bg-blue'; }
-            
+
             if (key === 'future') badgeColorClass = 'bg-gray';
 
             // Cliccando apre il dettaglio (funzione esistente)
@@ -1896,7 +1903,7 @@ window.toggleDetailMode = (wrapper, parentName) => {
     const checkbox = wrapper.querySelector('input');
     // Lo stato cambia DOPO il click, quindi leggiamo il valore checked
     const isDetailed = checkbox.checked;
-    
+
     const card = wrapper.closest('.analysis-card');
     card.dataset.detailMode = isDetailed;
 
@@ -1905,7 +1912,7 @@ window.toggleDetailMode = (wrapper, parentName) => {
         const historyAggregated = JSON.parse(card.dataset.history);
         const safeName = parentName.replace(/[^a-zA-Z0-9]/g, '');
         const canvasId = `chart-${safeName}`;
-        
+
         drawAnalysisChart(canvasId, historyAggregated, parentName, isDetailed);
     }
 };
@@ -1953,11 +1960,11 @@ function getDetailedMuscleHistory(parentName) {
 
     cycles.forEach(cycle => {
         // Accumulatore temporaneo per questo ciclo
-        let cycleSpecificStats = {}; 
+        let cycleSpecificStats = {};
 
         for (let d = 1; d <= limitDays; d++) {
             const logsForDay = cycle.dayLogs[d];
-            
+
             if (logsForDay && logsForDay.length > 0) {
                 const log = logsForDay[logsForDay.length - 1];
                 if (log.exercises) {
@@ -1966,10 +1973,10 @@ function getDetailedMuscleHistory(parentName) {
                             // Recupera nome specifico
                             const rawMuscle = ex.muscles[0];
                             let specificName = (typeof rawMuscle === 'object' && rawMuscle.name) ? rawMuscle.name : rawMuscle;
-                            
+
                             // SE questo specifico muscolo è figlio del Padre richiesto
                             if (childrenMuscles.includes(specificName) || specificName === parentName) {
-                                
+
                                 let maxSetKg = 0;
                                 if (ex.sets) ex.sets.forEach(s => {
                                     const k = parseFloat(s.kg) || 0;
@@ -2011,4 +2018,551 @@ function getDetailedMuscleHistory(parentName) {
     });
 
     return detailedStats;
+}
+
+// --- GENERATORE ATLETA FANTOCCIO (Incolla in dashboard-pt.js) ---
+
+
+
+// =========================================
+// 10. GENERATORE ATLETA TEST (GERARCHIA PADRE/FIGLIO)
+// =========================================
+
+const btnGenDummy = document.getElementById('btn-generate-dummy');
+if (btnGenDummy) {
+    btnGenDummy.addEventListener('click', async () => {
+        if (!confirm("Generare 'Mario Test'?\nQuesto creerà dati specifici per testare la gerarchia Muscolare (Padre/Figli).")) return;
+        
+        btnGenDummy.textContent = "Generazione in corso...";
+        btnGenDummy.disabled = true;
+
+        try {
+            await generateHierarchyDummyData();
+            alert("✅ Mario Test creato!\nVai nella lista clienti, apri la scheda, clicca su 'Carichi & Grafici' -> 'Scheda Test Gerarchia' e prova i filtri Muscoli.");
+            window.location.reload();
+        } catch (e) {
+            console.error(e);
+            alert("Errore: " + e.message);
+            btnGenDummy.textContent = "Riprova";
+            btnGenDummy.disabled = false;
+        }
+    });
+}
+
+async function generateHierarchyDummyData() {
+    console.log("🚀 Inizio generazione Dati Gerarchici...");
+    const coachId = auth.currentUser.uid;
+    const dummyId = "dummy_hierarchy_" + Date.now();
+    const today = new Date();
+
+    // 1. CREAZIONE CLIENTE
+    await setDoc(doc(db, "users", dummyId), {
+        name: "Mario Test (Grafici)",
+        email: "test.hierarchy@demo.it",
+        role: "client",
+        coachId: coachId,
+        status: "active",
+        photoURL: "https://randomuser.me/api/portraits/lego/1.jpg",
+        createdAt: serverTimestamp(),
+        customLabel: "TESTER",
+        labelColor: "#FF3B30", // Rosso
+        renewalDate: new Date(today.getTime() + (86400000 * 10)).toISOString().split('T')[0], // Scade tra 10gg
+        activeWorkoutId: "dummy_workout_hierarchy",
+        goals: "Verifica Grafici Padre/Figlio"
+    });
+
+    // 2. CONFIGURAZIONE ESERCIZI PER TESTARE LA MAPPA
+    // Usiamo esattamente i nomi definiti nella tua ANALYSIS_MUSCLE_MAP
+    const exercisesDef = [
+        // --- GIORNO A: PETTO (Padre vs Figlio) ---
+        {
+            name: "Panca Piana (Gen)",
+            baseKg: 80,
+            // Questo esercizio targetta il PADRE generico
+            muscles: [{ name: "Pettorali" }] 
+        },
+        {
+            name: "Croci ai Cavi Alti",
+            baseKg: 20,
+            // Questo esercizio targetta un FIGLIO specifico
+            muscles: [{ name: "Pettorale Alto (Clavicolare)" }] 
+        },
+        
+        // --- GIORNO B: GAMBE (Padre vs Figlio) ---
+        {
+            name: "Squat (Gen)",
+            baseKg: 100,
+            // Padre generico
+            muscles: [{ name: "Quadricipiti" }]
+        },
+        {
+            name: "Leg Extension (Vasto)",
+            baseKg: 40,
+            // Figlio specifico
+            muscles: [{ name: "Vasto Laterale" }]
+        },
+
+        // --- GIORNO B: SCHIENA (Ampiezza vs Spessore - Sono due padri diversi) ---
+        {
+            name: "Lat Machine",
+            baseKg: 50,
+            muscles: [{ name: "Schiena (Ampiezza/Lats)" }]
+        },
+        {
+            name: "Pulley Basso",
+            baseKg: 60,
+            muscles: [{ name: "Schiena (Alta/Spessore)" }]
+        }
+    ];
+
+    // 3. GENERAZIONE LOGS (3 Mesi)
+    const logsCollection = collection(db, "users", dummyId, "logs");
+    const startDate = new Date();
+    startDate.setDate(today.getDate() - 90); 
+
+    let sessionCount = 0;
+    
+    // Simuliamo un allenamento ogni 2 giorni
+    for (let i = 0; i < 90; i += 2) {
+        const currentDate = new Date(startDate);
+        currentDate.setDate(startDate.getDate() + i);
+
+        // Progressione Lineare (+10% in 3 mesi)
+        const progression = 1 + (i * 0.0015); 
+
+        // Dividiamo in Giorno A (Petto) e Giorno B (Gambe/Schiena)
+        const isDayA = (sessionCount % 2 === 0);
+        
+        // Filtriamo gli esercizi in base al giorno
+        let dailyExercises = [];
+        if (isDayA) {
+            // Prende i primi 2 esercizi (Petto)
+            dailyExercises = exercisesDef.slice(0, 2); 
+        } else {
+            // Prende gli altri (Gambe e Schiena)
+            dailyExercises = exercisesDef.slice(2);
+        }
+
+        // Costruiamo l'oggetto esercizi con i carichi calcolati
+        const sessionExercisesMapped = dailyExercises.map(ex => {
+            // Aggiungiamo un po' di rumore casuale (+/- 2kg) per rendere il grafico realistico
+            const noise = (Math.random() * 4) - 2; 
+            const currentKg = Math.round((ex.baseKg * progression) + noise);
+
+            return {
+                name: ex.name,
+                muscles: ex.muscles, // Qui passa la struttura corretta {name: "..."}
+                sets: [
+                    { kg: currentKg, reps: 8, done: true },
+                    { kg: currentKg, reps: 8, done: true },
+                    { kg: currentKg, reps: 8, done: true }
+                ]
+            };
+        });
+
+        await addDoc(logsCollection, {
+            date: currentDate.toISOString(),
+            dayIndex: isDayA ? 1 : 2,
+            workoutId: "dummy_workout_hierarchy",
+            workoutName: "Scheda Test Gerarchia",
+            exercises: sessionExercisesMapped
+        });
+
+        sessionCount++;
+    }
+
+    // 4. CREAZIONE SCHEDA NEL DB (Necessaria per entrare nell'analisi)
+    await setDoc(doc(db, "workouts", "dummy_workout_hierarchy"), {
+        name: "Scheda Test Gerarchia",
+        coachId: coachId,
+        assignedTo: dummyId,
+        createdAt: serverTimestamp(),
+        days: 2,
+        isTemplate: false
+    });
+    
+    // 5. MISURE CORPOREE (Per non lasciare vuota quella tab)
+    const measuresCollection = collection(db, "users", dummyId, "measurements");
+    await addDoc(measuresCollection, {
+        date: new Date().toISOString().split('T')[0],
+        weight: 80.5,
+        createdAt: serverTimestamp()
+    });
+
+    console.log("✅ Dati Test Gerarchici Generati!");
+}
+
+
+
+
+
+
+// =========================================
+// 11. GENERATORE "LUIGI ADVANCED" (TEST ESTREMO FIGLI)
+// =========================================
+
+const btnGenAdv = document.getElementById('btn-generate-advanced');
+if (btnGenAdv) {
+    btnGenAdv.addEventListener('click', async () => {
+        if (!confirm("Creare 'Luigi Advanced'?\nQuesto genererà molti dati dettagliati per testare le linee multiple nei grafici.")) return;
+        
+        btnGenAdv.textContent = "Generazione complessa in corso...";
+        btnGenAdv.disabled = true;
+
+        try {
+            await generateAdvancedHierarchyData();
+            alert("✅ Luigi Advanced è pronto!\nVai ai grafici, seleziona 'Split Bodybuilding' e divertiti con la checkbox 'Dettaglio'.");
+            window.location.reload();
+        } catch (e) {
+            console.error(e);
+            alert("Errore: " + e.message);
+            btnGenAdv.textContent = "Riprova";
+            btnGenAdv.disabled = false;
+        }
+    });
+}
+
+async function generateAdvancedHierarchyData() {
+    console.log("🚀 Inizio generazione Luigi Advanced...");
+    const coachId = auth.currentUser.uid;
+    const dummyId = "dummy_adv_" + Date.now();
+    const today = new Date();
+
+    // 1. CREAZIONE CLIENTE
+    await setDoc(doc(db, "users", dummyId), {
+        name: "Luigi Advanced (Dettagli)",
+        email: "luigi.adv@demo.it",
+        role: "client",
+        coachId: coachId,
+        status: "active",
+        photoURL: "https://randomuser.me/api/portraits/men/32.jpg",
+        createdAt: serverTimestamp(),
+        customLabel: "PRO IFBB",
+        labelColor: "#AF52DE", // Viola
+        renewalDate: new Date(today.getTime() + (86400000 * 30)).toISOString().split('T')[0],
+        activeWorkoutId: "dummy_workout_adv",
+        goals: "Testare separazione fasci muscolari nei grafici"
+    });
+
+    // 2. DEFINIZIONE ESERCIZI (SPLIT 3 GIORNI: PUSH / PULL / LEGS)
+    // Qui usiamo i nomi specifici dei FIGLI definiti nella tua mappa
+    
+    const exercisesLibrary = {
+        // --- GIORNO A: PUSH (Petto, Spalle Avanti, Tricipiti) ---
+        dayA: [
+            { 
+                name: "Panca Piana Power", 
+                baseKg: 100, 
+                muscles: [{name: "Gran Pettorale (Generale)"}] // Padre: Pettorali
+            },
+            { 
+                name: "Panca Inclinata Manubri", 
+                baseKg: 32, // (x2 manubri)
+                muscles: [{name: "Pettorale Alto (Clavicolare)"}] // Figlio 1
+            },
+            { 
+                name: "Cross-over Cavi Bassi", 
+                baseKg: 20, 
+                muscles: [{name: "Pettorale Basso (Sternocostale)"}] // Figlio 2
+            },
+            { 
+                name: "French Press", 
+                baseKg: 40, 
+                muscles: [{name: "Tricipite (Capo Lungo)"}] // Figlio A Tricipiti
+            },
+            { 
+                name: "Pushdown Corda", 
+                baseKg: 25, 
+                muscles: [{name: "Tricipite (Capo Laterale)"}] // Figlio B Tricipiti
+            }
+        ],
+
+        // --- GIORNO B: PULL (Schiena, Spalle Dietro, Bicipiti) ---
+        dayB: [
+            { 
+                name: "Trazioni Zavorrate", 
+                baseKg: 85, // Peso corpo + zavorra
+                muscles: [{name: "Gran Dorsale (Lats)"}] // Padre: Schiena Ampiezza
+            },
+            { 
+                name: "Rematore Bilanciere", 
+                baseKg: 90, 
+                muscles: [{name: "Schiena (Alta/Spessore)"}] // Padre: Schiena Spessore
+            },
+            { 
+                name: "Scrollate Manubri", 
+                baseKg: 40, 
+                muscles: [{name: "Trapezio (Superiore)"}] // Figlio di Schiena Spessore
+            },
+            { 
+                name: "Alzate 90°", 
+                baseKg: 12, 
+                muscles: [{name: "Deltoide Posteriore"}] // Figlio di Deltoidi Posteriori
+            }
+        ],
+
+        // --- GIORNO C: LEGS (Quad, Femorali, Polpacci) ---
+        dayC: [
+            { 
+                name: "Squat", 
+                baseKg: 140, 
+                muscles: [{name: "Quadricipiti (Generale)"}] // Padre
+            },
+            { 
+                name: "Leg Extension Unilaterale", 
+                baseKg: 35, 
+                muscles: [{name: "Vasto Laterale"}] // Figlio 1 Quad
+            },
+            { 
+                name: "Stacco Rumeno", 
+                baseKg: 110, 
+                muscles: [{name: "Bicipite Femorale (Capo Lungo)"}] // Figlio 1 Femorali
+            },
+            { 
+                name: "Nordic Curl", 
+                baseKg: 0, // Peso corpo (ma mettiamo un valore fittizio per il grafico)
+                muscles: [{name: "Semitendinoso"}] // Figlio 2 Femorali
+            }
+        ]
+    };
+
+    // 3. GENERAZIONE LOGS (3 Mesi - 90 Giorni)
+    const logsCollection = collection(db, "users", dummyId, "logs");
+    const startDate = new Date();
+    startDate.setDate(today.getDate() - 90); 
+
+    let sessionCount = 0;
+    
+    // Allenamento 4 volte a settimana (Lun, Mar, Gio, Ven) simulato
+    // Semplicemente iteriamo ogni 2 giorni per semplicità
+    for (let i = 0; i < 90; i += 2) {
+        const currentDate = new Date(startDate);
+        currentDate.setDate(startDate.getDate() + i);
+
+        // Progressione ondulata (sale e scende) per rendere i grafici sexy
+        // Math.sin crea un'onda, + (i*...) crea la tendenza a salire
+        const wave = Math.sin(i * 0.2) * 0.05; // Oscillazione del 5%
+        const growth = i * 0.002; // Crescita costante
+        const factor = 1 + wave + growth;
+
+        // Rotazione A -> B -> C
+        const rotation = sessionCount % 3;
+        let selectedRoutine = [];
+        let routineName = "";
+
+        if (rotation === 0) { 
+            selectedRoutine = exercisesLibrary.dayA; 
+            routineName = "Push (Petto Focus)";
+        } else if (rotation === 1) { 
+            selectedRoutine = exercisesLibrary.dayB; 
+            routineName = "Pull (Back Focus)";
+        } else { 
+            selectedRoutine = exercisesLibrary.dayC; 
+            routineName = "Legs Hypertrophy";
+        }
+
+        const sessionExercisesMapped = selectedRoutine.map(ex => {
+            // Calcolo carico con un po' di variazione random
+            const kg = Math.round(ex.baseKg * factor);
+            return {
+                name: ex.name,
+                muscles: ex.muscles,
+                sets: [
+                    { kg: kg, reps: 8, done: true },
+                    { kg: kg, reps: 8, done: true },
+                    { kg: kg, reps: 8, done: true }
+                ]
+            };
+        });
+
+        await addDoc(logsCollection, {
+            date: currentDate.toISOString(),
+            dayIndex: rotation + 1, // Giorno 1, 2 o 3
+            workoutId: "dummy_workout_adv",
+            workoutName: "Split Bodybuilding Pro",
+            exercises: sessionExercisesMapped
+        });
+
+        sessionCount++;
+    }
+
+    // 4. CREAZIONE SCHEDA
+    await setDoc(doc(db, "workouts", "dummy_workout_adv"), {
+        name: "Split Bodybuilding Pro",
+        coachId: coachId,
+        assignedTo: dummyId,
+        createdAt: serverTimestamp(),
+        days: 3,
+        isTemplate: false
+    });
+    
+    // 5. MISURE (Massa pura)
+    const measuresCollection = collection(db, "users", dummyId, "measurements");
+    for(let k=0; k<12; k++) {
+         const mD = new Date(startDate);
+         mD.setDate(startDate.getDate() + (k*7));
+         await addDoc(measuresCollection, {
+            date: mD.toISOString().split('T')[0],
+            weight: 90 + (k * 0.2), // Massa: sale di peso
+            bia: { muscle: 45 + (k * 0.15), fat: 12 },
+            createdAt: serverTimestamp()
+        });
+    }
+
+    console.log("✅ Dati Luigi Advanced Generati!");
+}
+// =========================================
+// FUNZIONI MINI-CHART (SPARKLINE)
+// =========================================
+
+
+
+async function loadClientMiniChart(clientId) {
+    const container = document.getElementById(`mini-chart-${clientId}`);
+    if (!container) return;
+
+    try {
+        // 1. Scarichiamo PIÙ logs (40) per ricostruire i cicli completi
+        const q = query(
+            collection(db, "users", clientId, "logs"),
+            orderBy("date", "desc"),
+            limit(40) // Aumentato per coprire più settimane
+        );
+        const snap = await getDocs(q);
+
+        if (snap.empty) {
+            container.innerHTML = `
+                <div class="mini-chart-info">
+                    <span class="mini-chart-label">Stato</span>
+                    <span class="mini-chart-value" style="font-size:13px; color:#888;">Nessun dato</span>
+                </div>`;
+            return;
+        }
+
+        // 2. Ordiniamo dal più vecchio al più nuovo per sommare correttamente
+        const logs = snap.docs.map(d => d.data()).reverse();
+
+        // 3. LOGICA DI RAGGRUPPAMENTO PER MICROCICLO
+        let cycles = []; // Qui salveremo i totali dei cicli
+        let currentCycleVol = 0;
+        let daysSeenInCycle = new Set(); // Per capire quando il giro ricomincia
+
+        logs.forEach(log => {
+            // Calcolo volume singola seduta
+            let sessionVol = 0;
+            if (log.exercises) {
+                log.exercises.forEach(ex => {
+                    if (ex.sets) ex.sets.forEach(s => sessionVol += (s.kg || 0) * (s.reps || 0));
+                });
+            }
+
+            const dayIndex = log.dayIndex || "unico";
+
+            // SE incontriamo un giorno che abbiamo già visto in questo accumulo...
+            // ...significa che il microciclo è finito e ne è iniziato uno nuovo.
+            if (daysSeenInCycle.has(dayIndex)) {
+                // Salviamo il ciclo concluso
+                cycles.push(currentCycleVol);
+                
+                // Resettiamo per il nuovo ciclo
+                currentCycleVol = 0;
+                daysSeenInCycle.clear();
+            }
+
+            // Aggiungiamo la seduta all'accumulo corrente
+            daysSeenInCycle.add(dayIndex);
+            currentCycleVol += sessionVol;
+        });
+
+        // Aggiungiamo l'ultimo ciclo (quello corrente/in corso)
+        if (currentCycleVol > 0) cycles.push(currentCycleVol);
+
+        // 4. PREPARIAMO I DATI PER IL GRAFICO
+        // Prendiamo solo gli ultimi 5 cicli completi (o parziali)
+        const dataPoints = cycles.slice(-5);
+
+        // Se abbiamo meno di 2 cicli, non possiamo fare un trend
+        if (dataPoints.length < 2) {
+            container.innerHTML = `
+                <div class="mini-chart-info">
+                    <span class="mini-chart-label">Analisi Ciclo</span>
+                    <span class="mini-chart-value" style="font-size:12px; color:#888;">Dati insufficienti</span>
+                </div>`;
+            return;
+        }
+
+        // 5. Calcoli estetici
+        const lastVal = dataPoints[dataPoints.length - 1];
+        const prevVal = dataPoints[dataPoints.length - 2];
+        const isUp = lastVal >= prevVal;
+        
+        // Logica colore: Se il ciclo corrente è molto basso (es. appena iniziato), 
+        // mostriamo grigio invece di rosso panico, altrimenti verde/rosso.
+        // Se è > 80% del precedente lo consideriamo stabile/buono (dato che magari non è finito)
+        let color = "#86868B"; 
+        if (lastVal >= prevVal) color = "#34C759"; // Verde (Superato il precedente)
+        else if (lastVal < prevVal * 0.5) color = "#FF9F0A"; // Arancione (Forse ciclo in corso?)
+        else color = "#FF3B30"; // Rosso (Calo effettivo)
+
+        // SVG
+        const svgHTML = generateSparklineSVG(dataPoints, color);
+        const displayVal = (lastVal / 1000).toFixed(1) + 't'; 
+        const arrow = isUp ? '▲' : ''; // Mostriamo freccia solo se sale, se scende potrebbe essere incompleto
+
+        container.innerHTML = `
+            <div class="mini-chart-info">
+                <span class="mini-chart-label">Vol. Microciclo</span>
+                <span class="mini-chart-value">
+                    ${displayVal} <span style="font-size:11px; color:${color};">${arrow}</span>
+                </span>
+            </div>
+            ${svgHTML}
+        `;
+
+    } catch (e) {
+        console.error("Err mini-chart", e);
+        container.innerHTML = '<span style="font-size:10px; color:#ccc;">Err Calcolo</span>';
+    }
+}
+
+// Funzione matematica pura per creare il path SVG
+function generateSparklineSVG(data, color) {
+    if (!data || data.length < 2) return ''; // Serve almeno una linea (2 punti)
+
+    const width = 100; 
+    const height = 40;
+    const max = Math.max(...data);
+    const min = Math.min(...data);
+    
+    // Evita divisione per zero se tutti i valori sono uguali
+    const range = (max - min) === 0 ? 1 : (max - min);
+
+    // Mappa i valori X,Y
+    const points = data.map((val, i) => {
+        const x = (i / (data.length - 1)) * width;
+        // Invertiamo Y perché SVG ha 0 in alto
+        // Aggiungiamo un padding del 10% sopra e sotto per non tagliare la linea
+        const normalizedVal = (val - min) / range;
+        const y = height - (normalizedVal * (height * 0.8) + (height * 0.1)); 
+        return `${x},${y}`;
+    });
+
+    // Costruisci il path della linea
+    const linePath = `M ${points.join(' L ')}`;
+
+    // Costruisci il path di riempimento (chiuso in basso)
+    const fillPath = `${linePath} L ${width},${height + 10} L 0,${height + 10} Z`;
+
+    return `
+        <svg class="sparkline-svg" viewBox="0 0 100 40" preserveAspectRatio="none">
+            <defs>
+                <linearGradient id="grad-${color.replace('#','')}" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:${color}; stop-opacity:0.4" />
+                    <stop offset="100%" style="stop-color:${color}; stop-opacity:0" />
+                </linearGradient>
+            </defs>
+            <path d="${fillPath}" fill="url(#grad-${color.replace('#','')})" />
+            <path d="${linePath}" class="spark-path" stroke="${color}" />
+        </svg>
+    `;
 }

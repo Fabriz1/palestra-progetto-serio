@@ -1172,3 +1172,74 @@ h2 { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #1D1D1F; }
     height: 20px;
     accent-color: #0071E3; /* Colore blu quando selezionata */
 }
+
+
+
+
+
+/*FOTO AVATAR*/
+
+.client-avatar-img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover; /* Fondamentale: non storce la foto */
+    border: 2px solid #E5E5EA;
+}
+
+
+/*grafico mini */
+/* Aggiungi in style.css */
+
+.mini-chart-area {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px; /* Un po' più alto */
+    background: #F5F5F7;
+    border-radius: 8px;
+    padding: 0 12px;
+    margin-top: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.mini-chart-info {
+    font-size: 11px;
+    color: #86868B;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 2; /* Sopra il grafico */
+}
+
+.mini-chart-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1D1D1F;
+}
+
+.trend-positive { color: #34C759; }
+.trend-negative { color: #FF3B30; }
+
+/* Contenitore SVG del grafico */
+.sparkline-svg {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 60%; /* Occupa la parte destra */
+    height: 100%;
+    opacity: 0.5; /* Leggermente sfumato */
+    z-index: 1;
+}
+
+.spark-path {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.spark-fill {
+    stroke: none;
+    opacity: 0.2;
+}

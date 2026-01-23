@@ -584,3 +584,151 @@ body {
 
 @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+
+
+/*codice per scheda powerliftingé*/
+/* ========================================= */
+/* === 8. STILE POWERLIFTING / PRO MODE === */
+/* ========================================= */
+
+/* --- TOGGLE SWITCH NELL'HEADER --- */
+.mode-switch-wrapper {
+    display: flex; align-items: center; gap: 8px;
+    background: #F5F5F7; padding: 4px 12px; border-radius: 20px;
+    margin-right: 16px; border: 1px solid #E5E5EA;
+}
+.switch-label { font-size: 11px; font-weight: 600; color: #86868B; transition: color 0.3s; }
+.switch-label.selected { color: #1D1D1F; }
+
+/* The switch - the box around the slider */
+.switch { position: relative; display: inline-block; width: 34px; height: 20px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #ccc; transition: .4s; border-radius: 34px;
+}
+.slider:before {
+    position: absolute; content: ""; height: 14px; width: 14px;
+    left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;
+}
+input:checked + .slider { background-color: #1D1D1F; } /* Nero Pro per PL */
+input:checked + .slider:before { transform: translateX(14px); }
+
+
+/* --- RIGA ESERCIZIO POWERLIFTING (PL-ROW) --- */
+.pl-row {
+    background: #FFFFFF;
+    border-left: 4px solid #1D1D1F; /* Bordo nero per distinguere */
+    padding: 16px; border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.04);
+    display: flex; flex-direction: column; gap: 12px;
+    margin-bottom: 12px; position: relative;
+    border: 1px solid #E5E5EA;
+}
+
+.pl-header { display: flex; align-items: center; gap: 12px; padding-right: 40px; }
+.tier-badge {
+    font-size: 9px; font-weight: 800; text-transform: uppercase;
+    padding: 4px 6px; border-radius: 4px; color: white; background: #1D1D1F;
+}
+
+/* Griglia Logica PL */
+.pl-logic-grid {
+    display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px;
+    background: #FAFAFC; padding: 12px; border-radius: 8px; border: 1px solid #F0F0F5;
+}
+
+.pl-section { display: flex; flex-direction: column; gap: 6px; }
+.pl-section-title { font-size: 10px; font-weight: 700; color: #86868B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #E5E5EA; padding-bottom: 4px; margin-bottom: 4px; }
+
+.pl-inputs-row { display: flex; align-items: center; gap: 8px; }
+.pl-input-mini { width: 50px !important; text-align: center; font-weight: 600; padding: 6px !important; }
+.pl-text-fixed { font-size: 12px; color: #666; }
+
+/* Menu Logica Backoff */
+.pl-select-logic {
+    border: 1px solid #D2D2D7; font-size: 12px; padding: 6px; border-radius: 6px;
+    background: white; width: 100%; font-weight: 500; cursor: pointer;
+}
+.pl-select-logic:focus { border-color: #0071E3; }
+
+/* Colore Input in base al contesto */
+.inp-rpe { border-color: #FF9500 !important; color: #FF9500; }
+.inp-perc { border-color: #0071E3 !important; color: #0071E3; }
+.inp-kg { border-color: #34C759 !important; color: #34C759; }
+
+
+/* --- POWERLIFTING NAV --- */
+.pl-nav-container { background: white; border-bottom: 1px solid #E5E5EA; display: flex; flex-direction: column; }
+.pl-weeks-row { display: flex; overflow-x: auto; padding: 10px 15px; gap: 8px; border-bottom: 1px solid #F5F5F7; }
+.pl-days-row { display: flex; padding: 8px 15px; gap: 8px; background: #FAFAFC; }
+
+.btn-week, .btn-day {
+    border: 1px solid #E5E5EA; background: white; padding: 6px 12px; border-radius: 6px;
+    font-size: 12px; font-weight: 600; cursor: pointer; color: #86868B; transition: all 0.2s;
+}
+.btn-week:hover, .btn-day:hover { border-color: #0071E3; }
+.btn-week.active { background: #1D1D1F; color: white; border-color: #1D1D1F; }
+.btn-day.active { background: #0071E3; color: white; border-color: #0071E3; }
+
+/* --- CARD FONDAMENTALE (PL) --- */
+.pl-fund-row {
+    border-left: 5px solid #FF9500; /* Arancione Forza */
+    background: #FFFCF5;
+}
+
+.variant-selector {
+    width: 100%; padding: 10px; border: 1px solid #E5E5EA; background: white; border-radius: 8px;
+    cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center;
+}
+.variant-selector:hover { border-color: #FF9500; }
+
+.pl-tracking-row {
+    display: flex; gap: 15px; align-items: center; margin-top: 10px;
+    background: white; padding: 8px; border-radius: 8px; border: 1px solid #eee;
+}
+
+/* Checkbox volume custom */
+.vol-exclude-wrapper {
+    display: flex; align-items: center; gap: 6px; font-size: 11px; color: #666;
+    margin-left: auto; cursor: pointer;
+}
+
+/* Copia Complementari Button */
+.btn-copy-series {
+    font-size: 11px; color: #0071E3; background: transparent; border: none; cursor: pointer;
+    display: flex; align-items: center; gap: 4px; padding: 4px; margin-top: 5px;
+}
+.btn-copy-series:hover { text-decoration: underline; }
+
+/* --- MENU VARIANTI LARGO --- */
+.variant-dropdown-menu {
+    width: 600px !important; /* Molto più largo */
+    max-width: 90vw;
+    padding: 15px;
+}
+
+/* Griglia interna per le categorie */
+.variant-grid-layout {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* 2 Colonne */
+    gap: 15px;
+}
+
+.variant-group {
+    background: #FAFAFC;
+    border-radius: 8px;
+    padding: 8px;
+    border: 1px solid #F0F0F5;
+}
+
+.variant-group h4 {
+    font-size: 11px; text-transform: uppercase; color: #86868B;
+    margin-bottom: 6px; border-bottom: 1px solid #E5E5EA; padding-bottom: 4px;
+}
+/* Input speciale per Varianti a Tempo/Isocinetiche */
+.pl-param-extra {
+    border: 1px solid #AF52DE; color: #AF52DE; font-weight: bold;
+    background: #Fbf5ff; width: 80px; text-align: center;
+}

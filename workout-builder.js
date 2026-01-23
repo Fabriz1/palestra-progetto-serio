@@ -21,6 +21,33 @@ const db = getFirestore(app);
 
 // --- COSTANTI ---
 // --- COSTANTI ---
+//pl
+let isPlMode = false;
+let plWeeks = 4;
+let plDaysPerWeek = 4;
+let currentPlWeek = 1;
+let currentPlDay = 1;
+// Database Varianti (Hardcoded + Estensibile)
+let VARIANTS_DB = {
+    "Gara (Comp)": [
+        { name: "Squat (Comp)", lifts: ["Squat"] }, { name: "Panca Piana (Comp)", lifts: ["Panca"] }, { name: "Stacco Sumo (Comp)", lifts: ["Stacco"] }, { name: "Stacco Classico (Comp)", lifts: ["Stacco"] }
+    ],
+    "Fermi (Pause)": [
+        { name: "Fermo in buca (2s)", lifts: ["Squat"] }, { name: "Fermo al petto (1s)", lifts: ["Panca"] }, { name: "Fermo al ginocchio", lifts: ["Stacco"] }
+    ],
+    "Tempi (Isocinetica)": [
+        { name: "Discesa Lenta (3s)", lifts: ["Squat", "Panca"] }, { name: "Salita Lenta (3s)", lifts: ["Squat", "Panca"] }
+    ],
+    "ROM Aumentato": [
+        { name: "Deficit Deadlift", lifts: ["Stacco"] }, { name: "Larsen Press", lifts: ["Panca"] }
+    ],
+    "ROM Ridotto": [
+        { name: "Pin Squat", lifts: ["Squat"] }, { name: "Board Press", lifts: ["Panca"] }, { name: "Block Pull", lifts: ["Stacco"] }
+    ]
+};
+
+//fine pl
+
 
 
 // --- COSTANTI AGGIORNATE ---
@@ -131,6 +158,7 @@ let volumeChartInstance = null;
 let workoutData = { 1: [], 2: [], 3: [] };
 
 // EDIT MODE STATE
+let isPowerliftingMode = false;
 let isEditMode = false;
 let editingWorkoutId = null;
 let originalAssignedTo = null; // Per gestire cambi assegnazione
@@ -159,7 +187,7 @@ const dayContentArea = document.getElementById('day-content-area');
 const inputNumDays = document.getElementById('num-days');
 const volumeChartCanvas = document.getElementById('volumeChart');
 const workoutNameEl = document.getElementById('workout-name');
-
+const modeToggle = document.getElementById('mode-toggle');
 // --- INIT ---
 // --- INIT ---
 onAuthStateChanged(auth, async (user) => {
@@ -181,11 +209,91 @@ onAuthStateChanged(auth, async (user) => {
             // Unisce la bibbia standard con le personalizzazioni del coach
             globalExerciseLibrary = { ...defaultExercises, ...userData.exerciseLibrary };
             console.log("Libreria esercizi caricata e aggiornata.");
+
+        }
+        // C. CARICA VARIANTI PERSONALIZZATE
+        if (userData.savedVariants) {
+            // Uniamo le custom a quelle di base
+            VARIANTS_DB = { ...VARIANTS_DB, ...userData.savedVariants };
+            console.log("Varianti caricate dal DB.");
         }
     }
     rebuildSearchIndex();
     initChart();
     setupDatalist();
+
+
+
+
+    //sezione pl2
+    // Aggiungi questo nel blocco onAuthStateChanged o init
+
+
+    if (modeToggle) {
+        modeToggle.addEventListener('change', (e) => {
+            // CONTROLLO SICUREZZA DATI
+            // Se c'è qualcosa in workoutData, chiedi conferma
+            let hasData = false;
+            Object.values(workoutData).forEach(arr => { if (arr.length > 0) hasData = true; });
+
+            if (hasData) {
+                const confirmSwitch = confirm("ATTENZIONE: Cambiando modalità cancellerai TUTTA la scheda corrente.\nSei sicuro di voler procedere?");
+                if (!confirmSwitch) {
+                    e.target.checked = !e.target.checked; // Annulla click
+                    return; // Esci
+                }
+                workoutData = {}; // Resetta i dati
+            }
+
+            isPlMode = e.target.checked;
+
+            // Aggiorna UI
+            document.getElementById('bb-controls').classList.toggle('hidden', isPlMode);
+            document.getElementById('days-tabs-container').classList.toggle('hidden', isPlMode);
+            document.getElementById('pl-navigation').classList.toggle('hidden', !isPlMode);
+            document.getElementById('lbl-bb').classList.toggle('selected', !isPlMode);
+            document.getElementById('lbl-pl').classList.toggle('selected', isPlMode);
+
+            if (isPlMode) {
+                // Setup Iniziale PL
+                workoutData = {};
+                for (let w = 1; w <= plWeeks; w++) {
+                    for (let d = 1; d <= plDaysPerWeek; d++) {
+                        workoutData[`w${w}_d${d}`] = [];
+                    }
+                }
+                // Se è la prima volta assoluta o vuoto, apri setup
+                document.getElementById('pl-setup-modal').classList.remove('hidden');
+            } else {
+                // Setup Iniziale BB
+                workoutData = { 1: [], 2: [], 3: [] }; // Reset default BB
+                renderTabs();
+                renderDay(currentDay);
+            }
+        });
+    }
+
+    // SETUP MODAL LOGIC
+    document.getElementById('btn-confirm-pl-setup').addEventListener('click', () => {
+        plWeeks = parseInt(document.getElementById('pl-setup-weeks').value);
+        plDaysPerWeek = parseInt(document.getElementById('pl-setup-days').value);
+
+        // Inizializza struttura dati vuota per PL
+        workoutData = {}; // Reset per pulizia (o gestisci merge se preferisci)
+        for (let w = 1; w <= plWeeks; w++) {
+            for (let d = 1; d <= plDaysPerWeek; d++) {
+                workoutData[`w${w}_d${d}`] = [];
+            }
+        }
+
+        document.getElementById('pl-setup-modal').classList.add('hidden');
+        renderPlNav();
+        renderPlDay();
+    });
+    //fine sezione pl2
+
+
+
 
     // 2. CONTROLLA SE SIAMO IN EDIT MODE
     const editId = localStorage.getItem('editWorkoutId');
@@ -277,6 +385,7 @@ function setupDatalist() {
 }
 
 
+// Cerca la funzione renderDay esistente e modificala così:
 function renderDay(day) {
     dayContentArea.innerHTML = '';
     const listContainer = document.createElement('div');
@@ -285,21 +394,36 @@ function renderDay(day) {
 
     const exercises = workoutData[day] || [];
     exercises.forEach((exData, index) => {
-        createExerciseRowHTML(listContainer, exData, index);
+        // --- BIVIO LOGICO ---
+        if (isPowerliftingMode) {
+            createPowerliftingRowHTML(listContainer, exData, index);
+        } else {
+            createExerciseRowHTML(listContainer, exData, index);
+        }
     });
 
     const addBtn = document.createElement('button');
     addBtn.className = 'btn-add-exercise';
-    addBtn.innerHTML = '<i class="ph ph-plus-circle"></i> Aggiungi Esercizio';
+    addBtn.innerHTML = isPowerliftingMode ? '<i class="ph ph-barbell"></i> Aggiungi Lift (PL)' : '<i class="ph ph-plus-circle"></i> Aggiungi Esercizio';
     addBtn.onclick = () => {
+        // Dati di default
         const newEx = {
-            id: Date.now(), name: "", technique: "Standard", metricType: "RPE",
-            val1: "", val2: "", intensityVal: "",
-            topReps: "", topInt: "", backSets: "", backReps: "", backInt: "",
-            notes: "", rest: "", muscles: []
+            id: Date.now(), name: "",
+            // Dati standard
+            technique: "Standard", metricType: "RPE", val1: "", val2: "", intensityVal: "", notes: "", rest: "", muscles: [],
+            // Dati PL Nuovi
+            plType: "T1", // Tier 1
+            plTargetSets: "1", plTargetReps: "1", plTargetRPE: "8",
+            plBackoffSets: "3", plBackoffReps: "5",
+            plBackoffLogic: "percent_top", // percent_top, percent_1rm, fixed_drop
+            plBackoffVal: "-10%"
         };
         workoutData[day].push(newEx);
-        createExerciseRowHTML(listContainer, newEx, workoutData[day].length - 1);
+
+        // Renderizza la riga giusta
+        if (isPowerliftingMode) createPowerliftingRowHTML(listContainer, newEx, workoutData[day].length - 1);
+        else createExerciseRowHTML(listContainer, newEx, workoutData[day].length - 1);
+
         updateLiveStats();
     };
     dayContentArea.appendChild(addBtn);
@@ -517,13 +641,13 @@ function createExerciseRowHTML(container, data, index) {
     container.appendChild(row);
 
     // --- LOGICA JAVASCRIPT (Aggiornata ai nuovi selettori) ---
-    
+
     // 1. Gestione Sets/Reps Dinamici
     const dynamicArea = row.querySelector('.dynamic-inputs-area');
-    
+
     const renderCentralInputs = () => {
         dynamicArea.innerHTML = '';
-        
+
         if (data.technique === "Top set + back-off") {
             // Layout Speciale Top Set
             dynamicArea.className = 'dynamic-inputs-area special-mode';
@@ -545,14 +669,14 @@ function createExerciseRowHTML(container, data, index) {
                         <input type="text" class="special-input input-back-reps" value="${data.backReps || ''}" placeholder="Reps">
                     </div>
                 </div>`;
-                // Nascondi input intensità standard se siamo in top set (opzionale)
-                row.querySelector('.input-intensity-val').parentElement.style.display = 'none';
+            // Nascondi input intensità standard se siamo in top set (opzionale)
+            row.querySelector('.input-intensity-val').parentElement.style.display = 'none';
 
         } else {
             // Layout Standard
             dynamicArea.className = 'dynamic-inputs-area standard-mode';
             const layout = TECHNIQUE_LAYOUTS[data.technique] || TECHNIQUE_LAYOUTS["Standard"];
-            
+
             dynamicArea.innerHTML = `
                 <div class="input-wrapper">
                     <span class="tiny-label">${layout.label1}</span>
@@ -565,9 +689,9 @@ function createExerciseRowHTML(container, data, index) {
             `;
             // Mostra input intensità standard
             const intValContainer = row.querySelector('.input-intensity-val').parentElement;
-            if(intValContainer) intValContainer.style.display = 'block';
+            if (intValContainer) intValContainer.style.display = 'block';
         }
-        
+
         // Riattacca listeners agli input dinamici
         dynamicArea.querySelectorAll('input').forEach(i => i.addEventListener('input', updateData));
     };
@@ -579,10 +703,10 @@ function createExerciseRowHTML(container, data, index) {
         data.metricType = row.querySelector('.select-metric').value;
         data.notes = row.querySelector('.input-notes').value;
         data.rest = row.querySelector('.input-rest').value;
-        
+
         // Input intensità standard (potrebbe essere nascosto in Top Set)
         const intInput = row.querySelector('.input-intensity-val');
-        if(intInput) data.intensityVal = intInput.value;
+        if (intInput) data.intensityVal = intInput.value;
 
         if (data.technique === "Top set + back-off") {
             data.topReps = row.querySelector('.input-top-reps')?.value;
@@ -590,7 +714,7 @@ function createExerciseRowHTML(container, data, index) {
             data.backSets = row.querySelector('.input-back-sets')?.value;
             data.backReps = row.querySelector('.input-back-reps')?.value;
             data.backInt = row.querySelector('.input-back-int')?.value; // (se c'è)
-            data.val1 = ""; 
+            data.val1 = "";
         } else {
             data.val1 = row.querySelector('.input-sets')?.value;
             data.val2 = row.querySelector('.input-reps')?.value;
@@ -606,22 +730,22 @@ function createExerciseRowHTML(container, data, index) {
     row.querySelector('.input-rest').addEventListener('input', updateData);
     row.querySelector('.input-intensity-val').addEventListener('input', updateData);
 
-    row.querySelector('.select-technique').addEventListener('change', (e) => { 
-        data.technique = e.target.value; 
-        renderCentralInputs(); 
-        updateData(); 
+    row.querySelector('.select-technique').addEventListener('change', (e) => {
+        data.technique = e.target.value;
+        renderCentralInputs();
+        updateData();
     });
-    
-    row.querySelector('.select-metric').addEventListener('change', (e) => { 
+
+    row.querySelector('.select-metric').addEventListener('change', (e) => {
         data.metricType = e.target.value;
         // Aggiorna placeholder input speciali se esistono
         const topInt = row.querySelector('.input-top-int');
-        if(topInt) topInt.placeholder = data.metricType;
+        if (topInt) topInt.placeholder = data.metricType;
     });
 
-    row.querySelector('.btn-remove-row').addEventListener('click', () => { 
-        workoutData[currentDay].splice(index, 1); 
-        renderDay(currentDay); 
+    row.querySelector('.btn-remove-row').addEventListener('click', () => {
+        workoutData[currentDay].splice(index, 1);
+        renderDay(currentDay);
     });
 
     // 4. Inizializzazione Custom Dropdown (Muscolo Primario)
@@ -629,8 +753,8 @@ function createExerciseRowHTML(container, data, index) {
     const onMuscleChange = (newValue) => {
         data.muscles = data.muscles.filter(m => m.type !== 'primary');
         if (newValue) data.muscles.unshift({ name: newValue, type: 'primary' });
-        updateData(); 
-        updateLiveStats(); 
+        updateData();
+        updateLiveStats();
     };
     const dropdownEl = createMuscleDropdown(primaryMuscle, onMuscleChange);
     muscleContainer.appendChild(dropdownEl);
@@ -644,29 +768,29 @@ function createExerciseRowHTML(container, data, index) {
         syns.forEach((m) => {
             const div = document.createElement('div');
             div.className = 'synergist-row';
-            
+
             // Select Tipo
-            const typeSelect = document.createElement('select'); 
+            const typeSelect = document.createElement('select');
             typeSelect.innerHTML = `
-                <option value="secondary" ${m.type === 'secondary'?'selected':''}>Secondario</option>
-                <option value="tertiary" ${m.type === 'tertiary'?'selected':''}>Terziario</option>
+                <option value="secondary" ${m.type === 'secondary' ? 'selected' : ''}>Secondario</option>
+                <option value="tertiary" ${m.type === 'tertiary' ? 'selected' : ''}>Terziario</option>
             `;
             typeSelect.addEventListener('change', (e) => { m.type = e.target.value; updateLiveStats(); });
 
             // Dropdown Muscolo Sinergico
             const onSynChange = (newVal) => { m.name = newVal; updateLiveStats(); };
             const dd = createMuscleDropdown(m.name, onSynChange);
-            
+
             // Delete Btn
-            const delBtn = document.createElement('i'); 
-            delBtn.className = 'ph ph-x btn-del-syn'; 
-            delBtn.onclick = () => { 
-                const realIndex = data.muscles.indexOf(m); 
-                if (realIndex > -1) data.muscles.splice(realIndex, 1); 
-                renderSynergists(); 
-                updateLiveStats(); 
+            const delBtn = document.createElement('i');
+            delBtn.className = 'ph ph-x btn-del-syn';
+            delBtn.onclick = () => {
+                const realIndex = data.muscles.indexOf(m);
+                if (realIndex > -1) data.muscles.splice(realIndex, 1);
+                renderSynergists();
+                updateLiveStats();
             };
-            
+
             div.appendChild(typeSelect);
             div.appendChild(dd);
             div.appendChild(delBtn);
@@ -674,16 +798,16 @@ function createExerciseRowHTML(container, data, index) {
         });
     };
     renderSynergists();
-    row.querySelector('.btn-add-synergist').addEventListener('click', () => { 
-        data.muscles.push({ name: "", type: "secondary" }); 
-        renderSynergists(); 
+    row.querySelector('.btn-add-synergist').addEventListener('click', () => {
+        data.muscles.push({ name: "", type: "secondary" });
+        renderSynergists();
     });
 
     // 6. Auto-Fill (Logica Ricerca)
     const nameInput = row.querySelector('.input-ex-name');
     nameInput.addEventListener('input', (e) => {
-        const val = e.target.value; 
-        updateData(); 
+        const val = e.target.value;
+        updateData();
         if (val.endsWith(' ')) return;
 
         const searchKey = val.trim().toLowerCase();
@@ -703,7 +827,7 @@ function createExerciseRowHTML(container, data, index) {
                     if (typeof item === 'string') data.muscles.push({ name: item, type: 'secondary' });
                     else data.muscles.push({ name: item.name, type: item.type });
                 });
-                renderSynergists(); 
+                renderSynergists();
             }
             updateLiveStats();
         }
@@ -713,7 +837,7 @@ function createExerciseRowHTML(container, data, index) {
 function updateLiveStats() {
     // 1. Struttura dati annidata: { "Schiena": { total: 0, children: { "Gran Dorsale": 0 } } }
     let hierarchyMap = {};
-    
+
     // Inizializza categorie vuote
     Object.keys(MUSCLE_STRUCTURE).forEach(cat => {
         hierarchyMap[cat] = { total: 0, children: {} };
@@ -721,25 +845,27 @@ function updateLiveStats() {
 
     // 2. Calcolo Volumi
     Object.keys(workoutData).forEach(dayKey => {
+
         workoutData[dayKey].forEach(ex => {
+            if (ex.isFundamental && ex.excludeVolume) return;
             let sets = 0;
-            if (ex.technique === "Top set + back-off") { 
-                const backSets = parseFloat(ex.backSets) || 0; 
-                sets = 1 + backSets; 
-            } else { 
-                sets = parseFloat(ex.val1) || 0; 
+            if (ex.technique === "Top set + back-off") {
+                const backSets = parseFloat(ex.backSets) || 0;
+                sets = 1 + backSets;
+            } else {
+                sets = parseFloat(ex.val1) || 0;
             }
             if (sets === 0) return;
 
             ex.muscles.forEach(m => {
                 if (!m.name) return;
-                
+
                 // Moltiplicatori
                 let mult = 0;
-                if (m.type === 'primary') mult = 1.0; 
-                else if (m.type === 'secondary') mult = userVolumeSettings.secondary; 
-                else if (m.type === 'tertiary') mult = userVolumeSettings.tertiary; 
-                else if (m.type === 'quaternary') mult = userVolumeSettings.quaternary; 
+                if (m.type === 'primary') mult = 1.0;
+                else if (m.type === 'secondary') mult = userVolumeSettings.secondary;
+                else if (m.type === 'tertiary') mult = userVolumeSettings.tertiary;
+                else if (m.type === 'quaternary') mult = userVolumeSettings.quaternary;
                 else mult = userVolumeSettings.other;
 
                 const volume = sets * mult;
@@ -765,144 +891,7 @@ function updateLiveStats() {
         });
     });
 
-    // 3. RENDER LISTA (Sempre Completa con Accordion)
-    const statsList = document.getElementById('stats-breakdown'); 
-    statsList.innerHTML = '';
-    
-    // Ordina padri per volume totale decrescente
-    const sortedParents = Object.entries(hierarchyMap)
-        .filter(([_, data]) => data.total > 0)
-        .sort((a,b) => b[1].total - a[1].total);
-
-    sortedParents.forEach(([parentName, data]) => {
-        const groupDiv = document.createElement('div');
-        groupDiv.className = 'stat-group';
-
-        // Riga Padre
-        const parentDiv = document.createElement('div');
-        parentDiv.className = 'stat-parent';
-        parentDiv.innerHTML = `
-            <span>${parentName}</span>
-            <div style="display:flex; align-items:center;">
-                <span class="volume-value">${data.total.toFixed(1)}</span>
-                <i class="ph ph-caret-right stat-arrow"></i>
-            </div>
-        `;
-        
-        // Container Figli
-        const childrenDiv = document.createElement('div');
-        childrenDiv.className = 'stat-children';
-
-        // Ordina figli
-        const sortedChildren = Object.entries(data.children).sort((a,b) => b[1] - a[1]);
-        sortedChildren.forEach(([childName, vol]) => {
-            const row = document.createElement('div');
-            row.className = 'child-stat';
-            row.innerHTML = `<span>${childName}</span><span>${vol.toFixed(1)}</span>`;
-            childrenDiv.appendChild(row);
-        });
-
-        // Click Event per aprire/chiudere
-        parentDiv.onclick = () => {
-            parentDiv.classList.toggle('active');
-            childrenDiv.classList.toggle('visible');
-        };
-
-        groupDiv.appendChild(parentDiv);
-        groupDiv.appendChild(childrenDiv);
-        statsList.appendChild(groupDiv);
-    });
-
-    // 4. RENDER GRAFICO (Dipende dallo Zoom)
-    if (volumeChartInstance) {
-        let labels = [];
-        let dataValues = [];
-        let colors = [];
-
-        const btnBack = document.getElementById('btn-chart-back');
-
-        // MAPPA COLORI PADRI (Tonalità HSL)
-        // Definiamo un colore distintivo per ogni categoria
-        // MAPPA COLORI PADRI (Gradi HSL: 0-360)
-        // MAPPA COLORI PADRI (Gradi HSL: 0-360)
-        // Logica: Muscoli sinergici hanno colori opposti nella ruota cromatica
-        const CATEGORY_HUES = {
-            // --- GRUPPO SPINTA (Push) ---
-            "Pettorali": 355,           // Rosso Vivo
-            "Deltoidi Anteriori": 180,  // Ciano/Turchese (Opposto al rosso)
-            "Tricipiti": 140,           // Verde Prato (Ben distinto da entrambi)
-
-            // --- GRUPPO SPALLE (Isolamento) ---
-            "Deltoidi Laterali": 270,   // Viola
-            "Deltoidi Posteriori": 50,  // Giallo Oro (Per staccare dalla schiena blu)
-            "Cuffia dei Rotatori": 300, // Fuchsia
-
-            // --- GRUPPO TIRATA (Pull) ---
-            "Schiena (Ampiezza/Lats)": 215, // Blu Reale
-            "Schiena (Alta/Spessore)": 30,  // Arancione (Opposto al blu)
-            "Schiena (Bassa/Lombari)": 320, // Rosa Shocking (Ben visibile)
-            "Bicipiti": 60,             // Giallo Limone (Stacca forte sul blu)
-            "Avambracci": 0,            // Grigio Scuro (Neutro)
-
-            // --- GRUPPO GAMBE (Legs) ---
-            "Quadricipiti": 240,        // Blu Indaco/Notte
-            "Femorali (Ischiocrurali)": 15, // Rosso Ruggine (Opposto all'indaco)
-            "Glutei": 160,              // Verde Acqua/Menta
-            "Adduttori (Interno Coscia)": 290, // Lilla
-            "Abduttori (Esterno Coscia)": 200, // Azzurro Cielo
-
-            // --- PICCOLI GRUPPI ---
-            "Polpacci": 90,             // Verde Lime
-            "Tibiali": 110,             // Verde Smeraldo
-            
-            "Addominali": 25,           // Arancione Scuro
-            "Accessori & Cardio": 200   // Grigio/Azzurrino (Bassa saturazione nel codice)
-        };
-
-        if (currentChartFocus && hierarchyMap[currentChartFocus]) {
-            // --- VISTA DETTAGLIO (Figli) ---
-            // Qui usiamo sfumature dello stesso colore del padre
-            btnBack.style.display = 'block'; 
-            
-            const focusData = hierarchyMap[currentChartFocus].children;
-            const sortedFocus = Object.entries(focusData).sort((a,b) => b[1] - a[1]);
-            
-            labels = sortedFocus.map(x => x[0]);
-            dataValues = sortedFocus.map(x => x[1]);
-            
-            // Recupera il colore base del padre
-            const baseHue = CATEGORY_HUES[currentChartFocus] !== undefined ? CATEGORY_HUES[currentChartFocus] : 0;
-            const isGray = baseHue === 0 && currentChartFocus === "Altro";
-
-            // Genera gradazioni (dal più scuro al più chiaro o viceversa)
-            colors = dataValues.map((_, i) => {
-                // Calcola luminosità progressiva: parte da 50% e sale
-                const lightness = 45 + (i * 10); 
-                const saturation = isGray ? 0 : 75;
-                return `hsl(${baseHue}, ${saturation}%, ${lightness}%)`;
-            });
-
-        } else {
-            // --- VISTA TOTALE (Padri) ---
-            // Qui usiamo i colori distinti definiti nella mappa
-            btnBack.style.display = 'none'; 
-            currentChartFocus = null; 
-
-            labels = sortedParents.map(x => x[0]);
-            dataValues = sortedParents.map(x => x[1].total);
-            
-            colors = labels.map(label => {
-                const hue = CATEGORY_HUES[label] !== undefined ? CATEGORY_HUES[label] : 0; // Default a 0 se non trovato
-                const saturation = (hue === 0 && label === "Altro") ? 0 : 70; // Grigio per "Altro", colore vivo per il resto
-                return `hsl(${hue}, ${saturation}%, 55%)`; // Luminosità media fissa
-            });
-        }
-
-        volumeChartInstance.data.labels = labels;
-        volumeChartInstance.data.datasets[0].data = dataValues;
-        volumeChartInstance.data.datasets[0].backgroundColor = colors;
-        volumeChartInstance.update();
-    }
+    renderStatsUI(hierarchyMap)
 }
 
 // Helper per generare colori costanti per le stringhe
@@ -921,27 +910,27 @@ function getStringHash(str) {
 
 
 let currentChartFocus = null;
-function initChart() { 
-    const ctx = volumeChartCanvas.getContext('2d'); 
-    
-    volumeChartInstance = new Chart(ctx, { 
-        type: 'doughnut', 
-        data: { 
-            labels: [], 
-            datasets: [{ 
-                data: [], 
+function initChart() {
+    const ctx = volumeChartCanvas.getContext('2d');
+
+    volumeChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: [],
+            datasets: [{
+                data: [],
                 borderWidth: 2,
                 hoverOffset: 10
-            }] 
-        }, 
-        options: { 
-            responsive: true, 
-            maintainAspectRatio: false, 
-            plugins: { 
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
                 legend: { display: false },
                 tooltip: {
                     callbacks: {
-                        label: function(context) {
+                        label: function (context) {
                             return ` ${context.label}: ${context.raw.toFixed(1)} Sets`;
                         }
                     }
@@ -952,7 +941,7 @@ function initChart() {
                 if (elements.length > 0) {
                     const index = elements[0].index;
                     const labelClicked = volumeChartInstance.data.labels[index];
-                    
+
                     // Se clicco su una categoria Padre (e non sono già dentro)
                     if (!currentChartFocus) {
                         currentChartFocus = labelClicked;
@@ -960,7 +949,7 @@ function initChart() {
                     }
                 }
             }
-        } 
+        }
     });
 
     // Gestione Bottone Indietro
@@ -1167,4 +1156,760 @@ async function loadClientsForModal() {
         option.textContent = client.name || client.email;
         modalClientSelect.appendChild(option);
     });
+}
+
+
+//sezione powerlifting
+// =========================================
+// 8. GENERATORE RIGA POWERLIFTING (Nuova Funzione)
+// =========================================
+function createPowerliftingRowHTML(container, data, index) {
+    const row = document.createElement('div');
+    row.className = 'exercise-row pl-row'; // Classe specifica
+
+    // Valori default se mancanti
+    if (!data.plBackoffLogic) data.plBackoffLogic = "percent_top";
+
+    row.innerHTML = `
+        <div class="drag-handle"><i class="ph ph-dots-six-vertical"></i></div>
+        <button class="btn-remove-row"><i class="ph ph-trash"></i></button>
+
+        <!-- HEADER RIGA: Nome e Tier -->
+        <div class="pl-header">
+            <span class="tier-badge">${data.plType || 'T1'}</span>
+            <input type="text" class="input-ex-name" value="${data.name}" placeholder="Nome Main Lift (es. Squat)" list="exercise-suggestions" style="font-weight:700; font-size:16px; border:none; padding:0;">
+        </div>
+
+        <!-- GRIGLIA LOGICA PL -->
+        <div class="pl-logic-grid">
+            
+            <!-- 1. TOP SET / TARGET -->
+            <div class="pl-section">
+                <div class="pl-section-title">🎯 Top Set / Target</div>
+                <div class="pl-inputs-row">
+                    <input type="text" class="pl-input-mini input-top-sets" value="${data.plTargetSets || 1}" placeholder="Sets">
+                    <span class="pl-text-fixed">x</span>
+                    <input type="text" class="pl-input-mini input-top-reps" value="${data.plTargetReps || ''}" placeholder="Reps">
+                    <span class="pl-text-fixed">@</span>
+                    <input type="text" class="pl-input-mini input-top-rpe inp-rpe" value="${data.plTargetRPE || ''}" placeholder="RPE">
+                </div>
+            </div>
+
+            <!-- 2. BACK-OFF LOGIC -->
+            <div class="pl-section">
+                <div class="pl-section-title">📉 Back-off Work</div>
+                
+                <!-- Riga 1: Volume -->
+                <div class="pl-inputs-row" style="margin-bottom:6px;">
+                    <input type="text" class="pl-input-mini input-back-sets" value="${data.plBackoffSets || ''}" placeholder="Sets">
+                    <span class="pl-text-fixed">x</span>
+                    <input type="text" class="pl-input-mini input-back-reps" value="${data.plBackoffReps || ''}" placeholder="Reps">
+                </div>
+
+                <!-- Riga 2: Intensità (Il cuore della richiesta) -->
+                <div class="pl-inputs-row">
+                    <input type="text" class="pl-input-mini input-back-val inp-perc" value="${data.plBackoffVal || ''}" placeholder="%/kg">
+                    <select class="pl-select-logic input-back-logic">
+                        <option value="percent_top" ${data.plBackoffLogic === 'percent_top' ? 'selected' : ''}>su Top Set (Load drop)</option>
+                        <option value="percent_1rm" ${data.plBackoffLogic === 'percent_1rm' ? 'selected' : ''}>su 1RM (Percentuale)</option>
+                        <option value="rpe_static" ${data.plBackoffLogic === 'rpe_static' ? 'selected' : ''}>RPE Fisso</option>
+                        <option value="kg_static" ${data.plBackoffLogic === 'kg_static' ? 'selected' : ''}>Carico Fisso (Kg)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- MUSCOLI (Semplificato per PL) -->
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="muscle-dropdown-placeholder" style="width:200px;"></div>
+            <input type="text" class="input-rest" value="${data.rest || ''}" placeholder="Rec. (es. 3-5')" style="width:100px;">
+        </div>
+    `;
+
+    container.appendChild(row);
+
+    // --- LOGICA LISTENER ---
+    const updateData = () => {
+        data.name = row.querySelector('.input-ex-name').value;
+        data.plTargetSets = row.querySelector('.input-top-sets').value;
+        data.plTargetReps = row.querySelector('.input-top-reps').value;
+        data.plTargetRPE = row.querySelector('.input-top-rpe').value;
+
+        data.plBackoffSets = row.querySelector('.input-back-sets').value;
+        data.plBackoffReps = row.querySelector('.input-back-reps').value;
+        data.plBackoffVal = row.querySelector('.input-back-val').value;
+        data.plBackoffLogic = row.querySelector('.input-back-logic').value;
+
+        data.rest = row.querySelector('.input-rest').value;
+
+        // Mappatura sui vecchi campi per compatibilità Grafico Volume
+        // Consideriamo il volume totale PL come (Set Top + Set Backoff)
+        const tS = parseFloat(data.plTargetSets) || 0;
+        const bS = parseFloat(data.plBackoffSets) || 0;
+        data.val1 = tS + bS; // Sets Totali
+
+        updateLiveStats();
+    };
+
+    // Attach Listeners
+    row.querySelectorAll('input, select').forEach(el => el.addEventListener('input', updateData));
+
+    // Delete
+    row.querySelector('.btn-remove-row').addEventListener('click', () => {
+        workoutData[currentDay].splice(index, 1);
+        renderDay(currentDay);
+    });
+
+    // Auto-fill e Muscoli (Riutilizziamo la logica esistente)
+    const primaryMuscle = data.muscles.find(m => m.type === 'primary')?.name || "";
+    const onMuscleChange = (newValue) => {
+        data.muscles = data.muscles.filter(m => m.type !== 'primary');
+        if (newValue) data.muscles.unshift({ name: newValue, type: 'primary' });
+        updateData();
+    };
+    const dropdownEl = createMuscleDropdown(primaryMuscle, onMuscleChange);
+    row.querySelector('.muscle-dropdown-placeholder').appendChild(dropdownEl);
+    row.dropdownComponent = dropdownEl;
+
+    // Search logic (Copiata e adattata)
+    const nameInput = row.querySelector('.input-ex-name');
+    nameInput.addEventListener('input', (e) => {
+        const val = e.target.value; updateData();
+        if (val.endsWith(' ')) return;
+        const searchKey = val.trim().toLowerCase();
+        const foundExercise = exerciseSearchIndex[searchKey];
+        if (foundExercise && row.dropdownComponent) {
+            row.dropdownComponent.setValue(foundExercise.p);
+            data.muscles = [{ name: foundExercise.p, type: 'primary' }];
+            updateLiveStats();
+        }
+    });
+}
+
+
+//sezione pl2
+
+
+// =========================================
+// === FUNZIONI POWERLIFTING / S&C MODE ===
+// =========================================
+
+// --- RENDER NAVIGAZIONE (Week 1, Day 1...) ---
+function renderPlNav() {
+    const wCont = document.getElementById('pl-weeks-container');
+    const dCont = document.getElementById('pl-days-container');
+
+    // Sicurezza: se gli elementi non esistono (es. siamo in BB mode caricata male), esci
+    if (!wCont || !dCont) return;
+
+    wCont.innerHTML = '';
+    dCont.innerHTML = '';
+
+    // Render Weeks Buttons
+    for (let w = 1; w <= plWeeks; w++) {
+        const btn = document.createElement('button');
+        btn.className = `btn-week ${w === currentPlWeek ? 'active' : ''}`;
+        btn.textContent = `Week ${w}`;
+        btn.onclick = () => { currentPlWeek = w; renderPlNav(); renderPlDay(); };
+        wCont.appendChild(btn);
+    }
+
+    // Render Days Buttons
+    for (let d = 1; d <= plDaysPerWeek; d++) {
+        const btn = document.createElement('button');
+        btn.className = `btn-day ${d === currentPlDay ? 'active' : ''}`;
+        btn.textContent = `Day ${d}`;
+        btn.onclick = () => { currentPlDay = d; renderPlNav(); renderPlDay(); };
+        dCont.appendChild(btn);
+    }
+}
+
+// --- RENDER GIORNO CORRENTE (PL) ---
+function renderPlDay() {
+    const key = `w${currentPlWeek}_d${currentPlDay}`;
+    dayContentArea.innerHTML = '';
+    const listContainer = document.createElement('div');
+    listContainer.className = 'exercises-list';
+    dayContentArea.appendChild(listContainer);
+
+    if (!workoutData[key]) workoutData[key] = [];
+    const exercises = workoutData[key];
+
+    exercises.forEach((exData, index) => {
+        if(exData.isFundamental) {
+            createFundamentalRowHTML(listContainer, exData, index, key);
+        } else {
+            // Crea card standard
+            createExerciseRowHTML(listContainer, exData, index);
+            
+            // --- FIX DELETE PER COMPLEMENTARI PL ---
+            // Sovrascriviamo l'onclick del cestino appena creato
+            const row = listContainer.lastChild;
+            const delBtn = row.querySelector('.btn-remove-row');
+            // Clona il bottone per rimuovere i vecchi listener BB
+            const newDelBtn = delBtn.cloneNode(true);
+            delBtn.parentNode.replaceChild(newDelBtn, delBtn);
+            
+            newDelBtn.onclick = () => {
+                if(confirm("Eliminare complementare?")) {
+                    workoutData[key].splice(index, 1);
+                    renderPlDay();
+                }
+            };
+            
+            // Aggiungi tasto copia week
+            addCopyToWeeksBtn(row, exData, index, key);
+        }
+    });
+
+    // ... (Il resto dei bottoni aggiungi rimane uguale) ...
+    // ... Copia qui sotto i bottoni "Aggiungi Fondamentale/Complementare" e "Copia Tutto" dal codice precedente ...
+    // (Se non vuoi ricopiarli dimmelo, ma è meglio avere la funzione pulita)
+    
+    // CODICE BOTTONI (Riassunto per brevità, assicurati di averlo):
+    const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex; gap:10px; margin-top:20px;';
+    const addFundBtn = document.createElement('button'); addFundBtn.className = 'btn-primary'; addFundBtn.style.cssText = 'flex:1; background:#FF9500;'; addFundBtn.innerHTML = '<i class="ph ph-barbell"></i> + Fondamentale';
+    addFundBtn.onclick = () => {
+        workoutData[key].push({ id: Date.now(), isFundamental: true, excludeVolume: true, variant: "Seleziona...", trackingMetric: "Kg", sets: [] });
+        renderPlDay();
+    };
+    const addAccBtn = document.createElement('button'); addAccBtn.className = 'btn-secondary'; addAccBtn.style.flex = '1'; addAccBtn.innerHTML = '<i class="ph ph-plus"></i> + Complementare';
+    addAccBtn.onclick = () => {
+        workoutData[key].push({ id: Date.now(), name: "", technique: "Standard", muscles: [], isFundamental: false });
+        renderPlDay();
+    };
+    btnRow.append(addFundBtn, addAccBtn); dayContentArea.appendChild(btnRow);
+
+    const copyAllBtn = document.createElement('button'); copyAllBtn.className = 'btn-secondary'; copyAllBtn.style.cssText = 'width:100%; margin-top:15px; border-style:dashed; color:#0071E3;';
+    copyAllBtn.innerHTML = `<i class="ph ph-copy-simple"></i> Copia tutti i complementari su Week 2-${plWeeks}`;
+    copyAllBtn.onclick = () => {
+        if(!confirm("Copiare TUTTI i complementari?")) return;
+        const accs = workoutData[key].filter(e => !e.isFundamental);
+        const dayNum = currentPlDay;
+        for(let w=1; w<=plWeeks; w++) {
+            if(w === currentPlWeek) continue;
+            const targetKey = `w${w}_d${dayNum}`;
+            if(!workoutData[targetKey]) workoutData[targetKey] = [];
+            accs.forEach(acc => { const clone = JSON.parse(JSON.stringify(acc)); clone.id = Date.now() + Math.random(); workoutData[targetKey].push(clone); });
+        }
+        alert("Copiato!");
+    };
+    dayContentArea.appendChild(copyAllBtn);
+    
+    updateLiveStatsPL();
+}
+
+// --- CREAZIONE CARD FONDAMENTALE (Arancione) ---
+function createFundamentalRowHTML(container, data, index, dayKey) {
+    const row = document.createElement('div');
+    row.className = 'exercise-row pl-fund-row';
+
+    if (!data.sets || data.sets.length === 0) data.sets = [{ reps: 5, perc: '', target: '' }];
+
+    row.innerHTML = `
+        <div class="drag-handle"><i class="ph ph-dots-six-vertical"></i></div>
+        <button class="btn-remove-row"><i class="ph ph-trash"></i></button>
+
+        <div style="margin-bottom: 12px; display:flex; gap:10px; align-items:flex-end;">
+            <div style="flex:1;">
+                <span class="tiny-label">Esercizio Base</span>
+                <input type="text" class="input-ex-name" value="${data.name}" placeholder="es. Squat" list="exercise-suggestions" style="font-weight:700; font-size:15px;">
+            </div>
+            <div style="flex:1;">
+                <span class="tiny-label">Variante</span>
+                <div class="variant-selector">
+                    <span>${data.variant || 'Nessuna'}</span>
+                    <i class="ph ph-caret-down"></i>
+                </div>
+            </div>
+            
+            <!-- CAMPO EXTRA DINAMICO (Tempo/Altezza) -->
+            <div class="extra-param-wrapper" style="display:${data.variantParam && data.variantParam !== 'none' ? 'block' : 'none'};">
+                <span class="tiny-label" id="lbl-extra-param">${data.variantParam === 'time' ? 'Secondi' : 'Param'}</span>
+                <input type="text" class="pl-param-extra" value="${data.variantValue || ''}" placeholder="...">
+            </div>
+        </div>
+
+        <!-- TRACKING SETTINGS -->
+        <div class="pl-tracking-row">
+            <div style="display:flex; flex-direction:column;">
+                <span class="tiny-label" style="margin-bottom:2px;">Progressione:</span>
+                <select class="input-tracking" style="padding:4px; font-size:12px;">
+                    <option value="Kg" ${data.trackingMetric === 'Kg' ? 'selected' : ''}>Kg (Carico)</option>
+                    <option value="RPE" ${data.trackingMetric === 'RPE' ? 'selected' : ''}>RPE (Sforzo)</option>
+                    <option value="Reps" ${data.trackingMetric === 'Reps' ? 'selected' : ''}>Reps (Volume)</option>
+                    <option value="Tech" ${data.trackingMetric === 'Tech' ? 'selected' : ''}>Tecnica (Voto)</option>
+                </select>
+            </div>
+            
+            <label class="vol-exclude-wrapper">
+                <input type="checkbox" class="chk-vol" ${!data.excludeVolume ? 'checked' : ''}>
+                Conta Vol.
+            </label>
+        </div>
+
+        <!-- SETS -->
+        <div class="sets-header" style="display:flex; gap:8px; margin-top:10px; padding-left:20px; font-size:10px; color:#888;">
+            <span style="width:50px;">REPS</span>
+            <span style="width:50px;">% 1RM</span>
+            <span style="flex:1;">TARGET</span>
+        </div>
+        <div class="sets-container" style="display:flex; flex-direction:column; gap:6px;"></div>
+        <button class="btn-add-set-pl" style="font-size:11px; width:100%; margin-top:8px; padding:6px; background:#fff; border:1px dashed #ccc; cursor:pointer;">+ Set</button>
+
+        <!-- NOTE -->
+        <textarea class="input-notes" placeholder="Note Tecniche..." style="margin-top:10px; height:50px; width:100%;">${data.notes || ''}</textarea>
+    `;
+
+    container.appendChild(row);
+
+    // LOGICA INTERNA
+
+    // 1. Nome Esercizio
+    row.querySelector('.input-ex-name').oninput = (e) => data.name = e.target.value;
+
+    // 2. Logica Variante
+    const varSelector = row.querySelector('.variant-selector');
+    varSelector.onclick = (e) => {
+        e.stopPropagation();
+        openVariantDropdown(varSelector, (name, section, param) => {
+            data.variant = name;
+            data.variantSection = section;
+            data.variantParam = param; // Salva il tipo di parametro (es. 'time')
+            
+            varSelector.querySelector('span').textContent = name;
+            
+            // Gestione Visibilità Input Extra
+            const extraWrap = row.querySelector('.extra-param-wrapper');
+            const extraInput = row.querySelector('.pl-param-extra');
+            const extraLbl = row.querySelector('#lbl-extra-param');
+            
+            if (param && param !== 'none') {
+                extraWrap.style.display = 'block';
+                if (param === 'time') { extraLbl.textContent = 'Tempo (sec)'; extraInput.placeholder = 'es. 3-0-3'; }
+                else if (param === 'height') { extraLbl.textContent = 'Altezza (cm)'; extraInput.placeholder = 'es. 10cm'; }
+            } else {
+                extraWrap.style.display = 'none';
+                data.variantValue = ""; // Reset valore
+            }
+        });
+    };
+
+    // Listener Input Extra
+    const extraInput = row.querySelector('.pl-param-extra');
+    if(extraInput) extraInput.oninput = (e) => data.variantValue = e.target.value;
+
+    // 3. Render Sets
+    const setsCont = row.querySelector('.sets-container');
+    const renderSets = () => {
+        setsCont.innerHTML = '';
+        data.sets.forEach((set, sIdx) => {
+            const div = document.createElement('div');
+            div.style.display = 'flex'; div.style.gap = '8px'; div.style.alignItems = 'center';
+            div.innerHTML = `
+                <span style="font-size:11px; font-weight:bold; width:15px; text-align:right;">${sIdx + 1}</span>
+                <input type="text" placeholder="Reps" value="${set.reps || ''}" class="pl-inp-reps" style="width:50px; text-align:center;">
+                <input type="text" placeholder="%" value="${set.perc || ''}" class="pl-inp-perc" style="width:50px; text-align:center;">
+                <input type="text" placeholder="Target" value="${set.target || ''}" class="pl-inp-target" style="flex:1;">
+                <i class="ph ph-x btn-del-set" style="cursor:pointer; color:#FF3B30;"></i>
+            `;
+            // Bindings
+            div.querySelector('.pl-inp-reps').oninput = (e) => set.reps = e.target.value;
+            div.querySelector('.pl-inp-perc').oninput = (e) => set.perc = e.target.value;
+            div.querySelector('.pl-inp-target').oninput = (e) => set.target = e.target.value;
+            div.querySelector('.btn-del-set').onclick = () => {
+                data.sets.splice(sIdx, 1);
+                renderSets();
+                updateLiveStatsPL();
+            };
+            setsCont.appendChild(div);
+        });
+    };
+    renderSets();
+    row.querySelector('.btn-add-set-pl').onclick = () => {
+        const last = data.sets[data.sets.length - 1];
+        data.sets.push(last ? { ...last } : { reps: 5, perc: '', target: '' });
+        renderSets();
+        updateLiveStatsPL();
+    };
+
+    // 4. Listeners
+    row.querySelector('.input-tracking').onchange = (e) => { data.trackingMetric = e.target.value; };
+    row.querySelector('.chk-vol').onchange = (e) => { data.excludeVolume = !e.target.checked; updateLiveStatsPL(); };
+    row.querySelector('.input-notes').oninput = (e) => { data.notes = e.target.value; };
+
+    // 5. FIX ERRORE DELETE (Il punto cruciale)
+    row.querySelector('.btn-remove-row').onclick = () => {
+        if (confirm("Eliminare?")) {
+            // USIAMO dayKey, NON currentDay
+            workoutData[dayKey].splice(index, 1);
+            renderPlDay(); // Ricarica la vista corretta
+        }
+    };
+}
+
+// --- LOGICA COPIA AUTOMATICA COMPLEMENTARI ---
+function addCopyToWeeksBtn(rowElement, data, index, currentKey) {
+    const btn = document.createElement('button');
+    btn.className = 'btn-copy-series'; // Classe CSS definita prima
+    btn.style.marginTop = '10px';
+    btn.style.width = '100%';
+    btn.style.justifyContent = 'center';
+    btn.innerHTML = '<i class="ph ph-copy"></i> Copia su tutte le settimane';
+
+    btn.onclick = () => {
+        if (!confirm(`Copiare "${data.name}" su tutte le settimane del Giorno ${currentKey.split('_')[1].replace('d', '')}?`)) return;
+
+        // currentKey è tipo "w1_d2". Estraiamo "d2".
+        const dayPart = currentKey.split('_')[1];
+
+        for (let w = 1; w <= plWeeks; w++) {
+            const targetKey = `w${w}_${dayPart}`;
+            if (targetKey === currentKey) continue; // Salta se stesso
+
+            // Assicurati che l'array target esista
+            if (!workoutData[targetKey]) workoutData[targetKey] = [];
+
+            // Clona oggetto (deep copy brutale ma efficace)
+            const clone = JSON.parse(JSON.stringify(data));
+            clone.id = Date.now() + Math.random(); // Nuovo ID univoco
+
+            workoutData[targetKey].push(clone);
+        }
+        alert("Copiato con successo!");
+    };
+
+    // Inserisci il bottone alla fine della card
+    rowElement.appendChild(btn);
+}
+
+// --- MENU DROPDOWN VARIANTI (Dinamico) ---
+function openVariantDropdown(targetElement, onSelect) {
+    document.querySelectorAll('.variant-dropdown-menu').forEach(e => e.remove());
+
+    const menu = document.createElement('div');
+    menu.className = 'dropdown-menu variant-dropdown-menu open';
+    // Posizionamento
+    const rect = targetElement.getBoundingClientRect();
+    menu.style.position = 'absolute';
+    menu.style.top = '100%';
+    menu.style.left = '0';
+    menu.style.zIndex = '9999';
+
+    // Container Griglia
+    const gridLayout = document.createElement('div');
+    gridLayout.className = 'variant-grid-layout'; // Definito nel CSS
+
+    Object.keys(VARIANTS_DB).forEach(cat => {
+        const group = document.createElement('div');
+        group.className = 'variant-group'; // Definito nel CSS
+
+        const title = document.createElement('h4');
+        title.textContent = cat;
+        group.appendChild(title);
+
+        VARIANTS_DB[cat].forEach(variant => {
+            const item = document.createElement('div');
+            item.className = 'child-item';
+            item.textContent = variant.name;
+            item.onclick = () => {
+                onSelect(variant.name, cat);
+                menu.remove();
+            };
+            group.appendChild(item);
+        });
+        gridLayout.appendChild(group);
+    });
+
+    // Scorrimento se troppo alto
+    const scrollContainer = document.createElement('div');
+    scrollContainer.style.maxHeight = '400px';
+    scrollContainer.style.overflowY = 'auto';
+    scrollContainer.appendChild(gridLayout);
+    menu.appendChild(scrollContainer);
+
+    // Tasto Nuova Variante (Footer)
+    const createBtn = document.createElement('div');
+    createBtn.style.padding = '10px';
+    createBtn.style.borderTop = '1px solid #eee';
+    createBtn.style.color = '#0071E3';
+    createBtn.style.cursor = 'pointer';
+    createBtn.style.textAlign = 'center';
+    createBtn.style.fontWeight = 'bold';
+    createBtn.innerHTML = '<i class="ph ph-plus-circle"></i> Crea Nuova Variante Custom...';
+    createBtn.onclick = () => {
+        menu.remove();
+        document.getElementById('pl-variant-modal').classList.remove('hidden');
+        // (Logica salvataggio identica a prima...)
+        document.getElementById('btn-save-variant').onclick = async () => {
+            const name = document.getElementById('new-var-name').value;
+            const section = document.getElementById('new-var-section').value || "Custom";
+            const paramType = document.getElementById('new-var-param').value; // 'time', 'height', 'none'
+
+            if(name) {
+                if(!VARIANTS_DB[section]) VARIANTS_DB[section] = [];
+                
+                // Aggiungiamo la variante con il parametro (es. time)
+                VARIANTS_DB[section].push({ name: name, param: paramType, lifts: [] });
+                
+                // --- SALVATAGGIO SU FIREBASE ---
+                try {
+                    const user = auth.currentUser;
+                    await updateDoc(doc(db, "users", user.uid), {
+                        savedVariants: VARIANTS_DB
+                    });
+                    console.log("Variante salvata su Cloud");
+                } catch(e) { console.error("Err salvataggio variante", e); }
+                // -------------------------------
+
+                onSelect(name, section, paramType);
+                document.getElementById('pl-variant-modal').classList.add('hidden');
+            }
+        };
+    };
+    menu.appendChild(createBtn);
+
+    targetElement.parentElement.style.position = 'relative';
+    targetElement.parentElement.appendChild(menu);
+
+    // Close handler
+    const closeHandler = (e) => {
+        if (!menu.contains(e.target) && !targetElement.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeHandler);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeHandler), 100);
+}
+//fine sezione pl2
+
+
+
+
+// =========================================
+// 9. CALCOLO VOLUME POWERLIFTING (Safety Version)
+// =========================================
+
+function updateLiveStatsPL() {
+    console.log(`Calcolo Volume PL per Week ${currentPlWeek}...`);
+    
+    let hierarchyMap = {};
+    Object.keys(MUSCLE_STRUCTURE).forEach(cat => {
+        hierarchyMap[cat] = { total: 0, children: {} };
+    });
+
+    // 1. FILTRO: Prendi solo i giorni della SETTIMANA CORRENTE
+    // Le chiavi sono tipo "w1_d1", "w2_d1". Noi vogliamo solo quelle che iniziano con "w{currentPlWeek}_"
+    const weekPrefix = `w${currentPlWeek}_`;
+    const weeklyKeys = Object.keys(workoutData).filter(k => k.startsWith(weekPrefix));
+
+    weeklyKeys.forEach(dayKey => {
+        if (!workoutData[dayKey]) return;
+
+        workoutData[dayKey].forEach(ex => {
+            // A. CHECK ESCLUSIONE
+            if (ex.isFundamental && ex.excludeVolume === true) return;
+
+            // B. CALCOLO SETS
+            let sets = 0;
+            if (ex.isFundamental) {
+                // Conta quanti oggetti ci sono nell'array 'sets'
+                sets = (ex.sets && Array.isArray(ex.sets)) ? ex.sets.length : 0;
+            } else {
+                // Complementari
+                if (ex.technique === "Top set + back-off") {
+                    sets = 1 + (parseFloat(ex.backSets) || 0);
+                } else {
+                    sets = parseFloat(ex.val1) || 0;
+                }
+            }
+
+            if (sets === 0) return;
+
+            // C. DISTRIBUZIONE MUSCOLI
+            if (ex.muscles && Array.isArray(ex.muscles)) {
+                ex.muscles.forEach(m => {
+                    if (!m.name) return;
+                    
+                    let mult = 0;
+                    if (m.type === 'primary') mult = 1.0; 
+                    else if (m.type === 'secondary') mult = userVolumeSettings.secondary; 
+                    else if (m.type === 'tertiary') mult = userVolumeSettings.tertiary; 
+                    else mult = userVolumeSettings.other;
+
+                    const volume = sets * mult;
+
+                    let parent = "Altro";
+                    for (const [cat, list] of Object.entries(MUSCLE_STRUCTURE)) {
+                        if (list.includes(m.name) || cat === m.name) {
+                            parent = cat;
+                            break;
+                        }
+                    }
+                    
+                    if (!hierarchyMap[parent]) hierarchyMap[parent] = { total: 0, children: {} };
+                    hierarchyMap[parent].total += volume;
+
+                    const childName = m.name;
+                    if (!hierarchyMap[parent].children[childName]) hierarchyMap[parent].children[childName] = 0;
+                    hierarchyMap[parent].children[childName] += volume;
+                });
+            }
+        });
+    });
+
+    // Usa la funzione comune per disegnare
+    if (typeof renderStatsUI === "function") {
+        renderStatsUI(hierarchyMap);
+    } else {
+        console.warn("Manca renderStatsUI, impossibile aggiornare grafico.");
+    }
+}
+//ancora pl fino a quiì
+
+
+
+
+//qui gestico i grafici bb e pl insieme
+
+
+function renderStatsUI(hierarchyMap) {
+// 3. RENDER LISTA (Sempre Completa con Accordion)
+    const statsList = document.getElementById('stats-breakdown');
+    statsList.innerHTML = '';
+
+    // Ordina padri per volume totale decrescente
+    const sortedParents = Object.entries(hierarchyMap)
+        .filter(([_, data]) => data.total > 0)
+        .sort((a, b) => b[1].total - a[1].total);
+
+    sortedParents.forEach(([parentName, data]) => {
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'stat-group';
+
+        // Riga Padre
+        const parentDiv = document.createElement('div');
+        parentDiv.className = 'stat-parent';
+        parentDiv.innerHTML = `
+            <span>${parentName}</span>
+            <div style="display:flex; align-items:center;">
+                <span class="volume-value">${data.total.toFixed(1)}</span>
+                <i class="ph ph-caret-right stat-arrow"></i>
+            </div>
+        `;
+
+        // Container Figli
+        const childrenDiv = document.createElement('div');
+        childrenDiv.className = 'stat-children';
+
+        // Ordina figli
+        const sortedChildren = Object.entries(data.children).sort((a, b) => b[1] - a[1]);
+        sortedChildren.forEach(([childName, vol]) => {
+            const row = document.createElement('div');
+            row.className = 'child-stat';
+            row.innerHTML = `<span>${childName}</span><span>${vol.toFixed(1)}</span>`;
+            childrenDiv.appendChild(row);
+        });
+
+        // Click Event per aprire/chiudere
+        parentDiv.onclick = () => {
+            parentDiv.classList.toggle('active');
+            childrenDiv.classList.toggle('visible');
+        };
+
+        groupDiv.appendChild(parentDiv);
+        groupDiv.appendChild(childrenDiv);
+        statsList.appendChild(groupDiv);
+    });
+
+    // 4. RENDER GRAFICO (Dipende dallo Zoom)
+    if (volumeChartInstance) {
+        let labels = [];
+        let dataValues = [];
+        let colors = [];
+
+        const btnBack = document.getElementById('btn-chart-back');
+
+        // MAPPA COLORI PADRI (Tonalità HSL)
+        // Definiamo un colore distintivo per ogni categoria
+        // MAPPA COLORI PADRI (Gradi HSL: 0-360)
+        // MAPPA COLORI PADRI (Gradi HSL: 0-360)
+        // Logica: Muscoli sinergici hanno colori opposti nella ruota cromatica
+        const CATEGORY_HUES = {
+            // --- GRUPPO SPINTA (Push) ---
+            "Pettorali": 355,           // Rosso Vivo
+            "Deltoidi Anteriori": 180,  // Ciano/Turchese (Opposto al rosso)
+            "Tricipiti": 140,           // Verde Prato (Ben distinto da entrambi)
+
+            // --- GRUPPO SPALLE (Isolamento) ---
+            "Deltoidi Laterali": 270,   // Viola
+            "Deltoidi Posteriori": 50,  // Giallo Oro (Per staccare dalla schiena blu)
+            "Cuffia dei Rotatori": 300, // Fuchsia
+
+            // --- GRUPPO TIRATA (Pull) ---
+            "Schiena (Ampiezza/Lats)": 215, // Blu Reale
+            "Schiena (Alta/Spessore)": 30,  // Arancione (Opposto al blu)
+            "Schiena (Bassa/Lombari)": 320, // Rosa Shocking (Ben visibile)
+            "Bicipiti": 60,             // Giallo Limone (Stacca forte sul blu)
+            "Avambracci": 0,            // Grigio Scuro (Neutro)
+
+            // --- GRUPPO GAMBE (Legs) ---
+            "Quadricipiti": 240,        // Blu Indaco/Notte
+            "Femorali (Ischiocrurali)": 15, // Rosso Ruggine (Opposto all'indaco)
+            "Glutei": 160,              // Verde Acqua/Menta
+            "Adduttori (Interno Coscia)": 290, // Lilla
+            "Abduttori (Esterno Coscia)": 200, // Azzurro Cielo
+
+            // --- PICCOLI GRUPPI ---
+            "Polpacci": 90,             // Verde Lime
+            "Tibiali": 110,             // Verde Smeraldo
+
+            "Addominali": 25,           // Arancione Scuro
+            "Accessori & Cardio": 200   // Grigio/Azzurrino (Bassa saturazione nel codice)
+        };
+
+        if (currentChartFocus && hierarchyMap[currentChartFocus]) {
+            // --- VISTA DETTAGLIO (Figli) ---
+            // Qui usiamo sfumature dello stesso colore del padre
+            btnBack.style.display = 'block';
+
+            const focusData = hierarchyMap[currentChartFocus].children;
+            const sortedFocus = Object.entries(focusData).sort((a, b) => b[1] - a[1]);
+
+            labels = sortedFocus.map(x => x[0]);
+            dataValues = sortedFocus.map(x => x[1]);
+
+            // Recupera il colore base del padre
+            const baseHue = CATEGORY_HUES[currentChartFocus] !== undefined ? CATEGORY_HUES[currentChartFocus] : 0;
+            const isGray = baseHue === 0 && currentChartFocus === "Altro";
+
+            // Genera gradazioni (dal più scuro al più chiaro o viceversa)
+            colors = dataValues.map((_, i) => {
+                // Calcola luminosità progressiva: parte da 50% e sale
+                const lightness = 45 + (i * 10);
+                const saturation = isGray ? 0 : 75;
+                return `hsl(${baseHue}, ${saturation}%, ${lightness}%)`;
+            });
+
+        } else {
+            // --- VISTA TOTALE (Padri) ---
+            // Qui usiamo i colori distinti definiti nella mappa
+            btnBack.style.display = 'none';
+            currentChartFocus = null;
+
+            labels = sortedParents.map(x => x[0]);
+            dataValues = sortedParents.map(x => x[1].total);
+
+            colors = labels.map(label => {
+                const hue = CATEGORY_HUES[label] !== undefined ? CATEGORY_HUES[label] : 0; // Default a 0 se non trovato
+                const saturation = (hue === 0 && label === "Altro") ? 0 : 70; // Grigio per "Altro", colore vivo per il resto
+                return `hsl(${hue}, ${saturation}%, 55%)`; // Luminosità media fissa
+            });
+        }
+
+        volumeChartInstance.data.labels = labels;
+        volumeChartInstance.data.datasets[0].data = dataValues;
+        volumeChartInstance.data.datasets[0].backgroundColor = colors;
+        volumeChartInstance.update();
+    }
 }
