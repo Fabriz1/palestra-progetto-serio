@@ -569,25 +569,195 @@ function createMuscleDropdown(initialValue, onSelectCallback) {
 
 
 
+// --- NUOVA FUNZIONE 1: Organizza esercizi per categoria ---
+function organizeExercisesByMuscle() {
+    const categorized = {};
+    // Crea chiavi per ogni macro-categoria muscolare
+    Object.keys(MUSCLE_STRUCTURE).forEach(parentCat => {
+        categorized[parentCat] = [];
+    });
+    categorized["Altro"] = [];
+
+    // Smista gli esercizi
+    Object.entries(globalExerciseLibrary).forEach(([exName, details]) => {
+        const primaryMuscle = details.p || "Altro";
+        let foundCategory = "Altro";
+
+        // Cerca se il muscolo primario è una categoria padre o un figlio
+        for (const [parent, children] of Object.entries(MUSCLE_STRUCTURE)) {
+            if (primaryMuscle === parent || children.includes(primaryMuscle)) {
+                foundCategory = parent;
+                break;
+            }
+        }
+        categorized[foundCategory].push({
+            name: exName,
+            detail: primaryMuscle !== foundCategory ? primaryMuscle : "" 
+        });
+    });
+
+    // Ordina alfabeticamente
+    Object.keys(categorized).forEach(cat => {
+        categorized[cat].sort((a, b) => a.name.localeCompare(b.name));
+    });
+    return categorized;
+}
+
+// --- NUOVA FUNZIONE 2: Crea Componente Tendina (UI) ---
+function createExerciseSmartDropdown(initialValue, onSelect) {
+    const container = document.createElement('div');
+    container.className = 'exercise-select-wrapper custom-dropdown-wrapper'; 
+
+    // Trigger
+    const trigger = document.createElement('div');
+    trigger.className = 'exercise-trigger';
+    const displayVal = initialValue || "Seleziona Esercizio...";
+    trigger.innerHTML = `<span>${displayVal}</span> <i class="ph ph-caret-down"></i>`;
+
+    // Menu Nascosto
+    const menu = document.createElement('div');
+    menu.className = 'dropdown-menu';
+    menu.style.width = '100%'; 
+
+    // Search Box
+    const searchDiv = document.createElement('div');
+    searchDiv.className = 'dropdown-search-box';
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Cerca o scrivi nuovo...';
+    searchInput.onclick = (e) => e.stopPropagation(); 
+    searchDiv.appendChild(searchInput);
+
+    // Lista Scrollabile
+    const listContainer = document.createElement('div');
+    listContainer.className = 'dropdown-items-container';
+
+    // Dati
+    const exercisesData = organizeExercisesByMuscle();
+
+    // Render Function
+    const renderList = (filter = "") => {
+        listContainer.innerHTML = '';
+        const lowerFilter = filter.toLowerCase();
+        let hasResults = false;
+
+        Object.entries(exercisesData).forEach(([category, exercises]) => {
+            if (exercises.length === 0) return;
+
+            const matchingExercises = exercises.filter(ex => 
+                ex.name.toLowerCase().includes(lowerFilter) || 
+                category.toLowerCase().includes(lowerFilter)
+            );
+
+            if (matchingExercises.length === 0) return;
+            hasResults = true;
+
+            // Header Categoria
+            const catHeader = document.createElement('div');
+            catHeader.className = 'ex-category-header';
+            catHeader.innerHTML = `<span>${category}</span> <i class="ph ph-caret-right cat-arrow"></i>`;
+
+            // Body Categoria
+            const catBody = document.createElement('div');
+            catBody.className = 'ex-category-body';
+
+            if (filter.length > 0) {
+                catHeader.classList.add('expanded');
+                catBody.classList.add('visible');
+            }
+
+            catHeader.onclick = (e) => {
+                e.stopPropagation();
+                catHeader.classList.toggle('expanded');
+                catBody.classList.toggle('visible');
+            };
+
+            matchingExercises.forEach(ex => {
+                const item = document.createElement('div');
+                item.className = 'ex-option-item';
+                const tagHtml = ex.detail ? `<span class="muscle-tag">${ex.detail}</span>` : '';
+                item.innerHTML = `<span>${ex.name}</span> ${tagHtml}`;
+                
+                if (ex.name === initialValue) {
+                    item.style.fontWeight = "bold"; 
+                    item.style.color = "#0071E3";
+                }
+
+                item.onclick = (e) => {
+                    e.stopPropagation();
+                    trigger.querySelector('span').textContent = ex.name;
+                    menu.classList.remove('open');
+                    onSelect(ex.name);
+                };
+                catBody.appendChild(item);
+            });
+
+            listContainer.appendChild(catHeader);
+            listContainer.appendChild(catBody);
+        });
+
+        if (!hasResults && filter) {
+             const newItem = document.createElement('div');
+             newItem.className = 'ex-option-item';
+             newItem.innerHTML = `Usa "<b>${filter}</b>" come nuovo`;
+             newItem.onclick = () => {
+                 trigger.querySelector('span').textContent = filter;
+                 menu.classList.remove('open');
+                 onSelect(filter);
+             };
+             listContainer.appendChild(newItem);
+        }
+    };
+
+    renderList(); 
+
+    // Eventi
+    searchInput.addEventListener('input', (e) => renderList(e.target.value));
+    
+    trigger.onclick = (e) => {
+        document.querySelectorAll('.dropdown-menu.open').forEach(el => {
+           if(el !== menu) el.classList.remove('open');
+        });
+        menu.classList.toggle('open');
+        if (menu.classList.contains('open')) {
+            setTimeout(() => searchInput.focus(), 50);
+            searchInput.value = '';
+            renderList(); 
+        }
+    };
+
+    document.addEventListener('click', (e) => {
+        if (!container.contains(e.target)) menu.classList.remove('open');
+    });
+
+    menu.appendChild(searchDiv);
+    menu.appendChild(listContainer);
+    container.appendChild(trigger);
+    container.appendChild(menu);
+
+    return container;
+}
+
+
 function createExerciseRowHTML(container, data, index) {
     const row = document.createElement('div');
     row.className = 'exercise-row';
     const primaryMuscle = data.muscles.find(m => m.type === 'primary')?.name || "";
 
-    // --- NUOVA STRUTTURA A 3 LIVELLI ---
+    // --- HTML STRUTTURA ---
     row.innerHTML = `
-        <!-- ELEMENTI FISSI (Drag & Drop + Cestino) -->
+        <!-- ELEMENTI FISSI -->
         <div class="drag-handle"><i class="ph ph-dots-six-vertical"></i></div>
         <button class="btn-remove-row"><i class="ph ph-trash"></i></button>
 
-        <!-- PIANO 1: ESERCIZIO E VOLUMI -->
+        <!-- PIANO 1: ESERCIZIO (Nuova Tendina) E TECNICA -->
         <div class="er-top-deck">
-            <div class="input-wrapper ex-name-wrapper">
+            <div class="input-wrapper ex-name-wrapper" style="flex-grow: 1;">
                 <span class="tiny-label">Esercizio</span>
-                <input type="text" class="input-ex-name" value="${data.name}" placeholder="Nome Esercizio" list="exercise-suggestions" autocomplete="off">
+                <!-- Qui verrà inserita la tendina via JS -->
+                <div class="exercise-smart-select-placeholder"></div>
             </div>
             
-            <!-- Area Dinamica (Sets/Reps) -->
             <div class="dynamic-inputs-area"></div>
 
             <div class="input-wrapper tech-wrapper">
@@ -598,7 +768,7 @@ function createExerciseRowHTML(container, data, index) {
             </div>
         </div>
 
-        <!-- PIANO 2: RECUPERO E INTENSITÀ -->
+        <!-- PIANO 2: RECUPERO E INTENSITÀ (Invariato) -->
         <div class="er-mid-deck">
             <div class="input-wrapper rest-wrapper">
                 <span class="tiny-label">Recupero</span>
@@ -612,7 +782,6 @@ function createExerciseRowHTML(container, data, index) {
                         ${INTENSITY_METRICS.map(m => `<option value="${m}" ${m === data.metricType ? 'selected' : ''}>${m}</option>`).join('')}
                     </select>
                 </div>
-                <!-- Il valore (es. @8) verrà iniettato qui dalla logica dinamica o sotto -->
                 <div class="input-wrapper">
                      <span class="tiny-label">Target</span>
                      <input type="text" class="input-intensity-val" value="${data.intensityVal || ''}" style="width: 50px; text-align: center; border-color: #FF2D55; font-weight:700;">
@@ -620,91 +789,99 @@ function createExerciseRowHTML(container, data, index) {
             </div>
         </div>
 
-        <!-- PIANO 3: MUSCOLI E NOTE -->
+        <!-- PIANO 3: MUSCOLI E NOTE (Invariato) -->
         <div class="er-bot-deck">
-            <!-- Colonna Sinistra: Muscoli -->
             <div class="er-col-muscles">
                 <span class="tiny-label">Focus Muscolare</span>
-                <div class="muscle-dropdown-placeholder"></div> <!-- Qui va il Custom Dropdown -->
-                
+                <div class="muscle-dropdown-placeholder"></div>
                 <div class="synergists-list"></div>
                 <button class="btn-add-synergist"><i class="ph ph-plus"></i> Sinergico</button>
             </div>
-
-            <!-- Colonna Destra: Note -->
             <div class="er-col-notes">
-                <span class="tiny-label">Note Tecniche per il Cliente</span>
-                <textarea class="input-notes" placeholder="Scrivi indicazioni sull'esecuzione...">${data.notes || ''}</textarea>
+                <span class="tiny-label">Note Tecniche</span>
+                <textarea class="input-notes" placeholder="Indicazioni...">${data.notes || ''}</textarea>
             </div>
         </div>
     `;
     container.appendChild(row);
 
-    // --- LOGICA JAVASCRIPT (Aggiornata ai nuovi selettori) ---
+    // --- LOGICA JAVASCRIPT ---
 
-    // 1. Gestione Sets/Reps Dinamici
+    // 1. GESTIONE NUOVA TENDINA ESERCIZI
+    const exSelectContainer = row.querySelector('.exercise-smart-select-placeholder');
+    
+    const onExerciseSelected = (selectedName) => {
+        data.name = selectedName;
+        
+        // Logica Auto-Fill Muscoli
+        const searchKey = selectedName.toLowerCase();
+        const foundExercise = exerciseSearchIndex[searchKey] || globalExerciseLibrary[selectedName];
+
+        if (foundExercise) {
+            // A. Imposta Muscolo Primario
+            if (foundExercise.p && row.dropdownComponent) {
+                row.dropdownComponent.setValue(foundExercise.p);
+                data.muscles = data.muscles.filter(m => m.type !== 'primary');
+                data.muscles.unshift({ name: foundExercise.p, type: 'primary' });
+            }
+
+            // B. Imposta Sinergici (Reset e Aggiunta)
+            data.muscles = data.muscles.filter(m => m.type === 'primary'); // Tieni solo il primario
+            if (foundExercise.s && foundExercise.s.length > 0) {
+                foundExercise.s.forEach(item => {
+                    if (typeof item === 'string') data.muscles.push({ name: item, type: 'secondary' });
+                    else data.muscles.push({ name: item.name, type: item.type });
+                });
+            }
+            // Ridisegna lista sinergici
+            if (typeof renderSynergists === 'function') renderSynergists(); // Safe check
+            else {
+                // Se la funzione è definita nello scope sotto, la richiamiamo dopo
+                // (In questo blocco renderSynergists è definita sotto, quindi l'evento la vedrà)
+            }
+            
+            // Ridisegna manualmente i sinergici se siamo dentro l'evento
+            const synList = row.querySelector('.synergists-list');
+            if(synList) {
+                synList.innerHTML = ''; 
+                // La logica di render è duplicata sotto per sicurezza, ma qui triggeriamo l'aggiornamento
+                const evt = new Event('render-syn-trigger');
+                row.dispatchEvent(evt);
+            }
+        }
+        updateLiveStats();
+    };
+
+    const smartDropdown = createExerciseSmartDropdown(data.name, onExerciseSelected);
+    exSelectContainer.appendChild(smartDropdown);
+
+
+    // 2. GESTIONE SETS/REPS (Identica a prima)
     const dynamicArea = row.querySelector('.dynamic-inputs-area');
-
     const renderCentralInputs = () => {
         dynamicArea.innerHTML = '';
-
         if (data.technique === "Top set + back-off") {
-            // Layout Speciale Top Set
             dynamicArea.className = 'dynamic-inputs-area special-mode';
             dynamicArea.innerHTML = `
-                <div class="special-group">
-                    <span class="tiny-label">TOP</span>
-                    <div style="display:flex; gap:2px; align-items:center;">
-                        <span style="font-size:11px; color:#888;">1 x</span>
-                        <input type="text" class="special-input input-top-reps" value="${data.topReps || ''}" placeholder="Reps">
-                        <span style="font-size:11px; color:#888;">@</span>
-                        <input type="text" class="special-input input-top-int" value="${data.topInt || ''}" placeholder="${data.metricType}">
-                    </div>
-                </div>
-                <div class="special-group">
-                    <span class="tiny-label">BACK</span>
-                    <div style="display:flex; gap:2px; align-items:center;">
-                        <input type="text" class="special-input input-back-sets" value="${data.backSets || ''}" placeholder="Sets">
-                        <span style="font-size:11px; color:#888;">x</span>
-                        <input type="text" class="special-input input-back-reps" value="${data.backReps || ''}" placeholder="Reps">
-                    </div>
-                </div>`;
-            // Nascondi input intensità standard se siamo in top set (opzionale)
-            row.querySelector('.input-intensity-val').parentElement.style.display = 'none';
-
+                <div class="special-group"><span class="tiny-label">TOP</span><div style="display:flex; gap:2px; align-items:center;"><span style="font-size:11px; color:#888;">1 x</span><input type="text" class="special-input input-top-reps" value="${data.topReps || ''}" placeholder="Reps"><span style="font-size:11px; color:#888;">@</span><input type="text" class="special-input input-top-int" value="${data.topInt || ''}" placeholder="${data.metricType}"></div></div>
+                <div class="special-group"><span class="tiny-label">BACK</span><div style="display:flex; gap:2px; align-items:center;"><input type="text" class="special-input input-back-sets" value="${data.backSets || ''}" placeholder="Sets"><span style="font-size:11px; color:#888;">x</span><input type="text" class="special-input input-back-reps" value="${data.backReps || ''}" placeholder="Reps"></div></div>`;
+            const el = row.querySelector('.input-intensity-val'); if(el) el.parentElement.style.display = 'none';
         } else {
-            // Layout Standard
             dynamicArea.className = 'dynamic-inputs-area standard-mode';
             const layout = TECHNIQUE_LAYOUTS[data.technique] || TECHNIQUE_LAYOUTS["Standard"];
-
-            dynamicArea.innerHTML = `
-                <div class="input-wrapper">
-                    <span class="tiny-label">${layout.label1}</span>
-                    <input type="text" class="input-sets" value="${data.val1 || ''}">
-                </div>
-                <div class="input-wrapper">
-                    <span class="tiny-label">${layout.label2}</span>
-                    <input type="text" class="input-reps" value="${data.val2 || ''}">
-                </div>
-            `;
-            // Mostra input intensità standard
-            const intValContainer = row.querySelector('.input-intensity-val').parentElement;
-            if (intValContainer) intValContainer.style.display = 'block';
+            dynamicArea.innerHTML = `<div class="input-wrapper"><span class="tiny-label">${layout.label1}</span><input type="text" class="input-sets" value="${data.val1 || ''}"></div><div class="input-wrapper"><span class="tiny-label">${layout.label2}</span><input type="text" class="input-reps" value="${data.val2 || ''}"></div>`;
+            const el = row.querySelector('.input-intensity-val'); if(el) el.parentElement.style.display = 'block';
         }
-
-        // Riattacca listeners agli input dinamici
         dynamicArea.querySelectorAll('input').forEach(i => i.addEventListener('input', updateData));
     };
 
-    // 2. Funzione Update Data
+    // 3. UPDATE DATA
     const updateData = () => {
-        data.name = row.querySelector('.input-ex-name').value;
+        // data.name è gestito dalla smartDropdown ora
         data.technique = row.querySelector('.select-technique').value;
         data.metricType = row.querySelector('.select-metric').value;
         data.notes = row.querySelector('.input-notes').value;
         data.rest = row.querySelector('.input-rest').value;
-
-        // Input intensità standard (potrebbe essere nascosto in Top Set)
         const intInput = row.querySelector('.input-intensity-val');
         if (intInput) data.intensityVal = intInput.value;
 
@@ -713,8 +890,6 @@ function createExerciseRowHTML(container, data, index) {
             data.topInt = row.querySelector('.input-top-int')?.value;
             data.backSets = row.querySelector('.input-back-sets')?.value;
             data.backReps = row.querySelector('.input-back-reps')?.value;
-            data.backInt = row.querySelector('.input-back-int')?.value; // (se c'è)
-            data.val1 = "";
         } else {
             data.val1 = row.querySelector('.input-sets')?.value;
             data.val2 = row.querySelector('.input-reps')?.value;
@@ -724,113 +899,62 @@ function createExerciseRowHTML(container, data, index) {
 
     renderCentralInputs();
 
-    // 3. Event Listeners Generali
-    row.querySelector('.input-ex-name').addEventListener('input', updateData);
+    // 4. LISTENERS GENERICI
     row.querySelector('.input-notes').addEventListener('input', updateData);
     row.querySelector('.input-rest').addEventListener('input', updateData);
     row.querySelector('.input-intensity-val').addEventListener('input', updateData);
-
     row.querySelector('.select-technique').addEventListener('change', (e) => {
-        data.technique = e.target.value;
-        renderCentralInputs();
-        updateData();
+        data.technique = e.target.value; renderCentralInputs(); updateData();
     });
-
     row.querySelector('.select-metric').addEventListener('change', (e) => {
         data.metricType = e.target.value;
-        // Aggiorna placeholder input speciali se esistono
-        const topInt = row.querySelector('.input-top-int');
-        if (topInt) topInt.placeholder = data.metricType;
     });
-
     row.querySelector('.btn-remove-row').addEventListener('click', () => {
         workoutData[currentDay].splice(index, 1);
         renderDay(currentDay);
     });
 
-    // 4. Inizializzazione Custom Dropdown (Muscolo Primario)
+    // 5. MUSCOLO PRIMARIO (Dropdown)
     const muscleContainer = row.querySelector('.muscle-dropdown-placeholder');
     const onMuscleChange = (newValue) => {
         data.muscles = data.muscles.filter(m => m.type !== 'primary');
         if (newValue) data.muscles.unshift({ name: newValue, type: 'primary' });
-        updateData();
-        updateLiveStats();
+        updateData(); updateLiveStats();
     };
     const dropdownEl = createMuscleDropdown(primaryMuscle, onMuscleChange);
     muscleContainer.appendChild(dropdownEl);
     row.dropdownComponent = dropdownEl;
 
-    // 5. Gestione Sinergici
+    // 6. SINERGICI
     const synList = row.querySelector('.synergists-list');
     const renderSynergists = () => {
         synList.innerHTML = '';
         const syns = data.muscles.filter(m => m.type !== 'primary');
         syns.forEach((m) => {
-            const div = document.createElement('div');
-            div.className = 'synergist-row';
-
-            // Select Tipo
+            const div = document.createElement('div'); div.className = 'synergist-row';
             const typeSelect = document.createElement('select');
-            typeSelect.innerHTML = `
-                <option value="secondary" ${m.type === 'secondary' ? 'selected' : ''}>Secondario</option>
-                <option value="tertiary" ${m.type === 'tertiary' ? 'selected' : ''}>Terziario</option>
-            `;
+            typeSelect.innerHTML = `<option value="secondary" ${m.type==='secondary'?'selected':''}>Secondario</option><option value="tertiary" ${m.type==='tertiary'?'selected':''}>Terziario</option>`;
             typeSelect.addEventListener('change', (e) => { m.type = e.target.value; updateLiveStats(); });
-
-            // Dropdown Muscolo Sinergico
             const onSynChange = (newVal) => { m.name = newVal; updateLiveStats(); };
             const dd = createMuscleDropdown(m.name, onSynChange);
-
-            // Delete Btn
-            const delBtn = document.createElement('i');
-            delBtn.className = 'ph ph-x btn-del-syn';
+            const delBtn = document.createElement('i'); delBtn.className = 'ph ph-x btn-del-syn';
             delBtn.onclick = () => {
                 const realIndex = data.muscles.indexOf(m);
                 if (realIndex > -1) data.muscles.splice(realIndex, 1);
-                renderSynergists();
-                updateLiveStats();
+                renderSynergists(); updateLiveStats();
             };
-
-            div.appendChild(typeSelect);
-            div.appendChild(dd);
-            div.appendChild(delBtn);
+            div.appendChild(typeSelect); div.appendChild(dd); div.appendChild(delBtn);
             synList.appendChild(div);
         });
     };
     renderSynergists();
+    
+    // Listener custom per aggiornare sinergici quando cambia l'esercizio (triggerato sopra)
+    row.addEventListener('render-syn-trigger', renderSynergists);
+
     row.querySelector('.btn-add-synergist').addEventListener('click', () => {
         data.muscles.push({ name: "", type: "secondary" });
         renderSynergists();
-    });
-
-    // 6. Auto-Fill (Logica Ricerca)
-    const nameInput = row.querySelector('.input-ex-name');
-    nameInput.addEventListener('input', (e) => {
-        const val = e.target.value;
-        updateData();
-        if (val.endsWith(' ')) return;
-
-        const searchKey = val.trim().toLowerCase();
-        const foundExercise = exerciseSearchIndex[searchKey];
-
-        if (foundExercise) {
-            if (foundExercise.p && row.dropdownComponent) {
-                row.dropdownComponent.setValue(foundExercise.p);
-                data.muscles = data.muscles.filter(m => m.type !== 'primary');
-                data.muscles.unshift({ name: foundExercise.p, type: 'primary' });
-            }
-
-            const currentSyns = data.muscles.filter(m => m.type !== 'primary');
-            if (currentSyns.length === 0 && foundExercise.s && foundExercise.s.length > 0) {
-                data.muscles = data.muscles.filter(m => m.type === 'primary');
-                foundExercise.s.forEach(item => {
-                    if (typeof item === 'string') data.muscles.push({ name: item, type: 'secondary' });
-                    else data.muscles.push({ name: item.name, type: item.type });
-                });
-                renderSynergists();
-            }
-            updateLiveStats();
-        }
     });
 }
 
@@ -1370,7 +1494,7 @@ function renderPlDay() {
     const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex; gap:10px; margin-top:20px;';
     const addFundBtn = document.createElement('button'); addFundBtn.className = 'btn-primary'; addFundBtn.style.cssText = 'flex:1; background:#FF9500;'; addFundBtn.innerHTML = '<i class="ph ph-barbell"></i> + Fondamentale';
     addFundBtn.onclick = () => {
-        workoutData[key].push({ id: Date.now(), isFundamental: true, excludeVolume: true, variant: "Seleziona...", trackingMetric: "Kg", sets: [] });
+        workoutData[key].push({ id: Date.now(), isFundamental: true, excludeVolume: true, variant: "", name: "", trackingMetric: "Kg", sets: [] });
         renderPlDay();
     };
     const addAccBtn = document.createElement('button'); addAccBtn.className = 'btn-secondary'; addAccBtn.style.flex = '1'; addAccBtn.innerHTML = '<i class="ph ph-plus"></i> + Complementare';
@@ -1416,12 +1540,22 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
                 <input type="text" class="input-ex-name" value="${data.name}" placeholder="es. Squat" list="exercise-suggestions" style="font-weight:700; font-size:15px;">
             </div>
             <div style="flex:1;">
-                <span class="tiny-label">Variante</span>
-                <div class="variant-selector">
-                    <span>${data.variant || 'Nessuna'}</span>
+            <span class="tiny-label">Variante</span>
+            
+            <!-- SELECTOR MODIFICATO CON LA X -->
+            <div class="variant-selector" style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="var-text">${data.variant || 'Nessuna'}</span>
+                
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <!-- TASTO X (appare solo se data.variant esiste) -->
+                    <i class="ph ph-x-circle btn-clear-var" 
+                       style="color:#FF3B30; font-size:16px; z-index:10; cursor:pointer; ${data.variant ? '' : 'display:none;'}"
+                       title="Rimuovi variante">
+                    </i>
                     <i class="ph ph-caret-down"></i>
                 </div>
             </div>
+        </div>
             
             <!-- CAMPO EXTRA DINAMICO (Tempo/Altezza) -->
             <div class="extra-param-wrapper" style="display:${data.variantParam && data.variantParam !== 'none' ? 'block' : 'none'};">
@@ -1469,34 +1603,70 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
     row.querySelector('.input-ex-name').oninput = (e) => data.name = e.target.value;
 
     // 2. Logica Variante
+   
+    
+    
     const varSelector = row.querySelector('.variant-selector');
+    const varText = row.querySelector('.var-text');     // Span del testo
+    const clearBtn = row.querySelector('.btn-clear-var'); // Icona X
+    const extraWrap = row.querySelector('.extra-param-wrapper');
+    const extraInput = row.querySelector('.pl-param-extra');
+    const extraLbl = row.querySelector('#lbl-extra-param');
+
+    // 1. APERTURA MENU
     varSelector.onclick = (e) => {
+        // Se l'utente ha cliccato sulla X, non aprire il menu (gestito sotto)
+        if(e.target.classList.contains('btn-clear-var')) return;
+
         e.stopPropagation();
         openVariantDropdown(varSelector, (name, section, param) => {
+            // Salva i dati
             data.variant = name;
             data.variantSection = section;
-            data.variantParam = param; // Salva il tipo di parametro (es. 'time')
+            data.variantParam = param;
             
-            varSelector.querySelector('span').textContent = name;
-            
-            // Gestione Visibilità Input Extra
-            const extraWrap = row.querySelector('.extra-param-wrapper');
-            const extraInput = row.querySelector('.pl-param-extra');
-            const extraLbl = row.querySelector('#lbl-extra-param');
-            
+            // Aggiorna UI
+            varText.textContent = name;
+            clearBtn.style.display = 'block'; // MOSTRA LA X ORA
+
+            // Gestione Input Extra (Tempo/Altezza)
             if (param && param !== 'none') {
                 extraWrap.style.display = 'block';
-                if (param === 'time') { extraLbl.textContent = 'Tempo (sec)'; extraInput.placeholder = 'es. 3-0-3'; }
-                else if (param === 'height') { extraLbl.textContent = 'Altezza (cm)'; extraInput.placeholder = 'es. 10cm'; }
+                if (param === 'time') { 
+                    extraLbl.textContent = 'Tempo (sec)'; 
+                    extraInput.placeholder = 'es. 3-0-3'; 
+                } else if (param === 'height') { 
+                    extraLbl.textContent = 'Altezza (cm)'; 
+                    extraInput.placeholder = 'es. 10cm'; 
+                } else if (param === 'angle') {
+                    extraLbl.textContent = 'Angolo (°)'; 
+                    extraInput.placeholder = 'es. 45°'; 
+                }
             } else {
                 extraWrap.style.display = 'none';
-                data.variantValue = ""; // Reset valore
+                data.variantValue = ""; // Resetta valore se la variante non ha parametri
             }
         });
     };
 
+    // 2. CLICK SULLA "X" (RIMUOVI VARIANTE)
+    clearBtn.onclick = (e) => {
+        e.stopPropagation(); // Impedisce che il click apra il menu a tendina
+        
+        // Resetta Dati
+        data.variant = "";
+        data.variantSection = "";
+        data.variantParam = "";
+        data.variantValue = "";
+
+        // Resetta UI
+        varText.textContent = "Nessuna";
+        clearBtn.style.display = 'none'; // Nascondi la X
+        extraWrap.style.display = 'none'; // Nascondi input extra
+    };
+
     // Listener Input Extra
-    const extraInput = row.querySelector('.pl-param-extra');
+
     if(extraInput) extraInput.oninput = (e) => data.variantValue = e.target.value;
 
     // 3. Render Sets
