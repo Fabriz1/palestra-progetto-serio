@@ -1,24 +1,38 @@
 <!DOCTYPE html>
 <html lang="it">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Accedi - PT Platform</title>
-    
+
 
     <!-- Importiamo il font 'Inter' per quello stile pulito/Apple che cerchiamo -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+    <meta name="theme-color" content="#d32f2f"> <!-- Aggiungi questo per la coerenza su mobile -->
+    <link rel="apple-touch-icon" href="icon/icon-192.png"> <!-- Per dispositivi Apple -->
+
+    <link rel="manifest" href="manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registrato!', reg))
+                    .catch(err => console.log('Service Worker errore:', err));
+            });
+        }
+    </script>
     <!-- Link al CSS (che creeremo nel prossimo step) -->
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
     <div class="main-container">
         <div class="login-card">
-            
+
             <!-- Header della Card -->
             <div class="card-header">
                 <div class="logo-placeholder">PT</div> <!-- Qui poi metteremo un logo vero -->
@@ -38,7 +52,7 @@
             <div id="role-selection-section" class="hidden">
                 <h2>Come vuoi registrarti?</h2>
                 <div class="role-options">
-                    
+
                     <!-- Opzione Personal Trainer -->
                     <div class="role-card" id="btn-role-pt">
                         <div class="role-icon">🏋️‍♂️</div>
@@ -68,4 +82,5 @@
     <script type="module" src="login.js"></script>
 
 </body>
+
 </html>

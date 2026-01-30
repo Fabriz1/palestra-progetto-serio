@@ -19,7 +19,18 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// --- COSTANTI ---
+let plChartView = 'lifts';
+// Funzione per trovare il massimale corrispondente al nome esercizio
+// Esempio: Se l'esercizio è "Squat High Bar", trova la chiave "Squat" e restituisce i Kg.
+function getReferenceMax(exerciseName) {
+    if (!exerciseName) return 0;
+    const cleanName = exerciseName.toLowerCase();
+
+    // Cerca se una delle chiavi dei massimali è contenuta nel nome dell'esercizio
+    const matchKey = Object.keys(currentMaxes).find(key => cleanName.includes(key.toLowerCase()));
+    return matchKey ? currentMaxes[matchKey] : 0;
+}
+
 // --- COSTANTI ---
 //pl
 let isPlMode = false;
@@ -27,6 +38,7 @@ let plWeeks = 4;
 let plDaysPerWeek = 4;
 let currentPlWeek = 1;
 let currentPlDay = 1;
+let currentMaxes = {};
 // Database Varianti (Hardcoded + Estensibile)
 let VARIANTS_DB = {
     "Gara (Comp)": [
@@ -217,7 +229,140 @@ onAuthStateChanged(auth, async (user) => {
             VARIANTS_DB = { ...VARIANTS_DB, ...userData.savedVariants };
             console.log("Varianti caricate dal DB.");
         }
+        // D. CARICA MASSIMALI SALVATI
+        if (userData.savedMaxes) {
+            currentMaxes = { ...currentMaxes, ...userData.savedMaxes };
+            console.log("Massimali caricati:", currentMaxes);
+        }
     }
+    // --- PL EXTENSIONS STATE (CORRETTO) ---
+
+    // 1. Funzione Render Lista Massimali
+    function renderMaxesModal() {
+        const container = document.getElementById('maxes-list-container');
+        if (!container) return; // Sicurezza
+        container.innerHTML = '';
+
+        const keys = Object.keys(currentMaxes).sort();
+
+        if (keys.length === 0) {
+            container.innerHTML = `<div style="text-align:center; padding:10px; color:#999; font-size:12px;">Nessun esercizio monitorato. Cerca sopra per aggiungere.</div>`;
+        }
+
+        keys.forEach(name => {
+            const val = currentMaxes[name];
+            const row = document.createElement('div');
+            row.style.cssText = "display:flex; gap:10px; align-items:center; background:#FAFAFC; padding:8px; border-radius:8px; border:1px solid #E5E5EA;";
+
+            row.innerHTML = `
+                <div class="max-name-txt" style="flex:2; font-weight:600; font-size:13px; color:#1D1D1F;">${name}</div>
+                <input type="number" class="max-val-inp" value="${val}" placeholder="Kg" style="width:80px; padding:6px; border:1px solid #D2D2D7; border-radius:6px; text-align:center; font-weight:700;">
+                <button class="btn-del-max" style="color:#FF3B30; background:white; border:1px solid #E5E5EA; border-radius:6px; width:30px; height:30px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="ph ph-trash"></i></button>
+            `;
+
+            // Aggiorna valore nell'oggetto mentre scrivi
+            row.querySelector('.max-val-inp').oninput = (e) => {
+                currentMaxes[name] = parseFloat(e.target.value) || 0;
+            };
+
+            // Rimuovi dalla lista
+            row.querySelector('.btn-del-max').onclick = () => {
+                delete currentMaxes[name];
+                renderMaxesModal();
+            };
+
+            container.appendChild(row);
+        });
+    }
+
+    // 2. Listener Apertura Modale (Btn Set Maxes)
+    const btnSetMaxes = document.getElementById('btn-set-maxes');
+    if (btnSetMaxes) {
+        btnSetMaxes.addEventListener('click', () => {
+            renderMaxesModal();
+            const modal = document.getElementById('maxes-modal');
+            modal.classList.remove('hidden');
+
+            // Inserisci la Smart Dropdown nell'area dedicata
+            const addArea = document.getElementById('max-add-area');
+            if (addArea) {
+                addArea.innerHTML = '';
+
+                const onSelectNewMax = (selectedName) => {
+                    if (!currentMaxes[selectedName]) {
+                        currentMaxes[selectedName] = 0; // Aggiungi nuovo con 0 kg
+                        renderMaxesModal(); // Ridisegna lista
+                    } else {
+                        alert("Esercizio già presente!");
+                    }
+                };
+
+                // False = Mostra TUTTI gli esercizi per permettere di aggiungerli
+                const dropdown = createExerciseSmartDropdown("Cerca esercizio da aggiungere...", onSelectNewMax, false);
+
+                // Styling fix per il modale
+                const trig = dropdown.querySelector('.exercise-trigger');
+                if (trig) trig.style.background = "#F5F5F7";
+
+                addArea.appendChild(dropdown);
+            }
+        });
+    }
+
+    // 3. Listener Salvataggio (Btn Save Maxes)
+    const btnSaveMaxes = document.getElementById('btn-save-maxes');
+    if (btnSaveMaxes) {
+        btnSaveMaxes.addEventListener('click', async () => {
+            const user = auth.currentUser;
+            if (user) {
+                try {
+                    const userRef = doc(db, "users", user.uid);
+                    await updateDoc(userRef, { savedMaxes: currentMaxes });
+                    console.log("Massimali salvati su Cloud");
+                } catch (e) { console.error("Err salvataggio maxes:", e); }
+            }
+
+            document.getElementById('maxes-modal').classList.add('hidden');
+            if (isPlMode) renderPlDay(); // Ricalcola la vista PL
+        });
+    }
+
+    // Toggle RPE Widget
+    document.getElementById('btn-toggle-rpe').addEventListener('click', () => {
+        document.getElementById('rpe-widget').classList.toggle('visible');
+    });
+    document.getElementById('close-rpe').addEventListener('click', () => {
+        document.getElementById('rpe-widget').classList.remove('visible');
+    });
+
+    // Toggle Progressione
+
+    // STATO VISUALIZZAZIONE GRAFICO PL
+    let plChartView = 'lifts'; // 'lifts' oppure 'muscles'
+
+    // Listener per i bottoni grafico PL
+    const btnChartLifts = document.getElementById('btn-chart-lifts');
+    const btnChartMuscles = document.getElementById('btn-chart-muscles');
+
+    if (btnChartLifts && btnChartMuscles) {
+        btnChartLifts.addEventListener('click', () => {
+            plChartView = 'lifts';
+            btnChartLifts.style.background = '#1D1D1F'; btnChartLifts.style.color = 'white';
+            btnChartMuscles.style.background = 'white'; btnChartMuscles.style.color = '#1D1D1F';
+            updateLiveStatsPL();
+        });
+
+        btnChartMuscles.addEventListener('click', () => {
+            plChartView = 'muscles';
+            btnChartMuscles.style.background = '#1D1D1F'; btnChartMuscles.style.color = 'white';
+            btnChartLifts.style.background = 'white'; btnChartLifts.style.color = '#1D1D1F';
+            updateLiveStatsPL();
+        });
+    }
+
+
+
+
     rebuildSearchIndex();
     initChart();
     setupDatalist();
@@ -264,8 +409,13 @@ onAuthStateChanged(auth, async (user) => {
                 }
                 // Se è la prima volta assoluta o vuoto, apri setup
                 document.getElementById('pl-setup-modal').classList.remove('hidden');
+                document.getElementById('pl-tools').classList.remove('hidden'); // Mostra toolbar
+                document.getElementById('pl-chart-controls').classList.remove('hidden');
+                document.getElementById('pl-chart-controls').style.display = 'flex';
             } else {
                 // Setup Iniziale BB
+                document.getElementById('pl-tools').classList.add('hidden');
+                document.getElementById('pl-chart-controls').classList.add('hidden');
                 workoutData = { 1: [], 2: [], 3: [] }; // Reset default BB
                 renderTabs();
                 renderDay(currentDay);
@@ -427,6 +577,7 @@ function renderDay(day) {
         updateLiveStats();
     };
     dayContentArea.appendChild(addBtn);
+    setupDragAndDrop(listContainer, workoutData[day]);
     updateLiveStats();
 }
 
@@ -570,70 +721,97 @@ function createMuscleDropdown(initialValue, onSelectCallback) {
 
 
 // --- NUOVA FUNZIONE 1: Organizza esercizi per categoria ---
-function organizeExercisesByMuscle() {
+
+function organizeExercisesByMuscle(onlySavedMaxes = false) {
     const categorized = {};
-    // Crea chiavi per ogni macro-categoria muscolare
+
+    // Crea categorie
     Object.keys(MUSCLE_STRUCTURE).forEach(parentCat => {
         categorized[parentCat] = [];
     });
-    categorized["Altro"] = [];
+    categorized["Altro / Custom"] = [];
 
-    // Smista gli esercizi
-    Object.entries(globalExerciseLibrary).forEach(([exName, details]) => {
-        const primaryMuscle = details.p || "Altro";
-        let foundCategory = "Altro";
+    // Decidiamo la fonte dati
+    let sourceKeys = [];
 
-        // Cerca se il muscolo primario è una categoria padre o un figlio
+    if (onlySavedMaxes) {
+        // PRENDIAMO SOLO QUELLI CHE HANNO UN MASSIMALE SALVATO
+        sourceKeys = Object.keys(currentMaxes);
+    } else {
+        // PRENDIAMO TUTTO IL DATABASE GLOBALE
+        sourceKeys = Object.keys(globalExerciseLibrary);
+    }
+
+    sourceKeys.forEach(exName => {
+        // Se stiamo filtrando per massimali, dobbiamo recuperare i dettagli dalla libreria globale
+        // Se è un nome custom che non esiste nella libreria, lo gestiamo
+        const libData = globalExerciseLibrary[exName] || { p: "Altro / Custom" };
+        const primaryMuscle = libData.p || "Altro / Custom";
+
+        let foundCategory = "Altro / Custom";
+
+        // Cerca categoria
         for (const [parent, children] of Object.entries(MUSCLE_STRUCTURE)) {
             if (primaryMuscle === parent || children.includes(primaryMuscle)) {
                 foundCategory = parent;
                 break;
             }
         }
+
+        // Se stiamo visualizzando solo i massimali, mettiamo un dettaglio extra
+        const detailTxt = (onlySavedMaxes) ? `1RM: ${currentMaxes[exName]}kg` : (primaryMuscle !== foundCategory ? primaryMuscle : "");
+
         categorized[foundCategory].push({
             name: exName,
-            detail: primaryMuscle !== foundCategory ? primaryMuscle : "" 
+            detail: detailTxt
         });
     });
 
-    // Ordina alfabeticamente
+    // Pulizia categorie vuote e ordinamento
     Object.keys(categorized).forEach(cat => {
-        categorized[cat].sort((a, b) => a.name.localeCompare(b.name));
+        if (categorized[cat].length === 0) delete categorized[cat];
+        else categorized[cat].sort((a, b) => a.name.localeCompare(b.name));
     });
+
     return categorized;
 }
 
 // --- NUOVA FUNZIONE 2: Crea Componente Tendina (UI) ---
-function createExerciseSmartDropdown(initialValue, onSelect) {
+// --- NUOVA FUNZIONE 2: Crea Componente Tendina (UI) ---
+// Aggiunto parametro: showOnlyMaxes (default false)
+function createExerciseSmartDropdown(initialValue, onSelect, showOnlyMaxes = false) {
     const container = document.createElement('div');
-    container.className = 'exercise-select-wrapper custom-dropdown-wrapper'; 
+    container.className = 'exercise-select-wrapper custom-dropdown-wrapper';
 
     // Trigger
     const trigger = document.createElement('div');
     trigger.className = 'exercise-trigger';
-    const displayVal = initialValue || "Seleziona Esercizio...";
+    // Se stiamo filtrando, cambiamo leggermente lo stile o il placeholder
+    const placeholder = showOnlyMaxes ? "Scegli un Fondamentale..." : "Seleziona Esercizio...";
+    const displayVal = initialValue || placeholder;
+
     trigger.innerHTML = `<span>${displayVal}</span> <i class="ph ph-caret-down"></i>`;
 
-    // Menu Nascosto
+    // Menu
     const menu = document.createElement('div');
     menu.className = 'dropdown-menu';
-    menu.style.width = '100%'; 
+    menu.style.width = '100%';
 
     // Search Box
     const searchDiv = document.createElement('div');
     searchDiv.className = 'dropdown-search-box';
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
-    searchInput.placeholder = 'Cerca o scrivi nuovo...';
-    searchInput.onclick = (e) => e.stopPropagation(); 
+    searchInput.placeholder = 'Cerca...';
+    searchInput.onclick = (e) => e.stopPropagation();
     searchDiv.appendChild(searchInput);
 
-    // Lista Scrollabile
+    // Lista
     const listContainer = document.createElement('div');
     listContainer.className = 'dropdown-items-container';
 
-    // Dati
-    const exercisesData = organizeExercisesByMuscle();
+    // DATI FILTRATI IN BASE AL PARAMETRO
+    const exercisesData = organizeExercisesByMuscle(showOnlyMaxes);
 
     // Render Function
     const renderList = (filter = "") => {
@@ -641,45 +819,49 @@ function createExerciseSmartDropdown(initialValue, onSelect) {
         const lowerFilter = filter.toLowerCase();
         let hasResults = false;
 
-        Object.entries(exercisesData).forEach(([category, exercises]) => {
-            if (exercises.length === 0) return;
+        // Se non ci sono massimali salvati e siamo in modalità filter
+        if (showOnlyMaxes && Object.keys(exercisesData).length === 0) {
+            listContainer.innerHTML = `
+                <div style="padding:15px; text-align:center; color:#888; font-size:12px;">
+                    <i class="ph ph-warning-circle" style="font-size:24px; margin-bottom:5px;"></i><br>
+                    Nessun massimale impostato.<br>
+                    Vai su <b>1RM</b> in alto per aggiungerne uno.
+                </div>
+            `;
+            return;
+        }
 
-            const matchingExercises = exercises.filter(ex => 
-                ex.name.toLowerCase().includes(lowerFilter) || 
+        Object.entries(exercisesData).forEach(([category, exercises]) => {
+            const matchingExercises = exercises.filter(ex =>
+                ex.name.toLowerCase().includes(lowerFilter) ||
                 category.toLowerCase().includes(lowerFilter)
             );
 
             if (matchingExercises.length === 0) return;
             hasResults = true;
 
-            // Header Categoria
             const catHeader = document.createElement('div');
-            catHeader.className = 'ex-category-header';
-            catHeader.innerHTML = `<span>${category}</span> <i class="ph ph-caret-right cat-arrow"></i>`;
+            catHeader.className = 'ex-category-header expanded'; // Default aperto per i fondamentali
+            catHeader.innerHTML = `<span>${category}</span>`; // Rimosso freccia per pulizia in liste corte
 
-            // Body Categoria
             const catBody = document.createElement('div');
-            catBody.className = 'ex-category-body';
-
-            if (filter.length > 0) {
-                catHeader.classList.add('expanded');
-                catBody.classList.add('visible');
-            }
-
-            catHeader.onclick = (e) => {
-                e.stopPropagation();
-                catHeader.classList.toggle('expanded');
-                catBody.classList.toggle('visible');
-            };
+            catBody.className = 'ex-category-body visible'; // Default visibile
 
             matchingExercises.forEach(ex => {
                 const item = document.createElement('div');
                 item.className = 'ex-option-item';
-                const tagHtml = ex.detail ? `<span class="muscle-tag">${ex.detail}</span>` : '';
+
+                // Stile speciale se è un massimale
+                if (showOnlyMaxes) {
+                    item.style.borderLeft = "3px solid #FF9500";
+                    item.style.background = "#FFFCF5";
+                }
+
+                const tagHtml = ex.detail ? `<span class="muscle-tag" style="${showOnlyMaxes ? 'color:#FF9500; border-color:#FF9500;' : ''}">${ex.detail}</span>` : '';
                 item.innerHTML = `<span>${ex.name}</span> ${tagHtml}`;
-                
+
                 if (ex.name === initialValue) {
-                    item.style.fontWeight = "bold"; 
+                    item.style.fontWeight = "bold";
                     item.style.color = "#0071E3";
                 }
 
@@ -696,33 +878,34 @@ function createExerciseSmartDropdown(initialValue, onSelect) {
             listContainer.appendChild(catBody);
         });
 
-        if (!hasResults && filter) {
-             const newItem = document.createElement('div');
-             newItem.className = 'ex-option-item';
-             newItem.innerHTML = `Usa "<b>${filter}</b>" come nuovo`;
-             newItem.onclick = () => {
-                 trigger.querySelector('span').textContent = filter;
-                 menu.classList.remove('open');
-                 onSelect(filter);
-             };
-             listContainer.appendChild(newItem);
+        // "Usa come nuovo" solo se NON siamo in modalità massimali stretta
+        if (!hasResults && filter && !showOnlyMaxes) {
+            const newItem = document.createElement('div');
+            newItem.className = 'ex-option-item';
+            newItem.innerHTML = `Usa "<b>${filter}</b>" come nuovo`;
+            newItem.onclick = () => {
+                trigger.querySelector('span').textContent = filter;
+                menu.classList.remove('open');
+                onSelect(filter);
+            };
+            listContainer.appendChild(newItem);
         }
     };
 
-    renderList(); 
+    renderList();
 
     // Eventi
     searchInput.addEventListener('input', (e) => renderList(e.target.value));
-    
+
     trigger.onclick = (e) => {
         document.querySelectorAll('.dropdown-menu.open').forEach(el => {
-           if(el !== menu) el.classList.remove('open');
+            if (el !== menu) el.classList.remove('open');
         });
         menu.classList.toggle('open');
         if (menu.classList.contains('open')) {
             setTimeout(() => searchInput.focus(), 50);
             searchInput.value = '';
-            renderList(); 
+            renderList();
         }
     };
 
@@ -739,18 +922,28 @@ function createExerciseSmartDropdown(initialValue, onSelect) {
 }
 
 
+// ============================================================
+// === FUNZIONE RIGA STANDARD (BODYBUILDING / COMPLEMENTARI) ===
+// ============================================================
+
 function createExerciseRowHTML(container, data, index) {
     const row = document.createElement('div');
     row.className = 'exercise-row';
+
+    // Default sicuri per evitare crash
+    if (!data.muscles) data.muscles = [];
+    if (!data.technique) data.technique = "Standard";
+    if (!data.metricType) data.metricType = "RPE";
+
     const primaryMuscle = data.muscles.find(m => m.type === 'primary')?.name || "";
 
-    // --- HTML STRUTTURA ---
+    // --- HTML STRUTTURA (CARD UNICA, NIENTE COLONNE LEFT/RIGHT) ---
     row.innerHTML = `
         <!-- ELEMENTI FISSI -->
         <div class="drag-handle"><i class="ph ph-dots-six-vertical"></i></div>
         <button class="btn-remove-row"><i class="ph ph-trash"></i></button>
 
-        <!-- PIANO 1: ESERCIZIO (Nuova Tendina) E TECNICA -->
+        <!-- PIANO 1: ESERCIZIO E TECNICA -->
         <div class="er-top-deck">
             <div class="input-wrapper ex-name-wrapper" style="flex-grow: 1;">
                 <span class="tiny-label">Esercizio</span>
@@ -768,7 +961,7 @@ function createExerciseRowHTML(container, data, index) {
             </div>
         </div>
 
-        <!-- PIANO 2: RECUPERO E INTENSITÀ (Invariato) -->
+        <!-- PIANO 2: RECUPERO E INTENSITÀ -->
         <div class="er-mid-deck">
             <div class="input-wrapper rest-wrapper">
                 <span class="tiny-label">Recupero</span>
@@ -789,7 +982,7 @@ function createExerciseRowHTML(container, data, index) {
             </div>
         </div>
 
-        <!-- PIANO 3: MUSCOLI E NOTE (Invariato) -->
+        <!-- PIANO 3: MUSCOLI E NOTE -->
         <div class="er-bot-deck">
             <div class="er-col-muscles">
                 <span class="tiny-label">Focus Muscolare</span>
@@ -807,81 +1000,79 @@ function createExerciseRowHTML(container, data, index) {
 
     // --- LOGICA JAVASCRIPT ---
 
-    // 1. GESTIONE NUOVA TENDINA ESERCIZI
+    // 1. TENDINA ESERCIZIO (Smart Dropdown)
     const exSelectContainer = row.querySelector('.exercise-smart-select-placeholder');
-    
+
     const onExerciseSelected = (selectedName) => {
         data.name = selectedName;
-        
-        // Logica Auto-Fill Muscoli
+
+        // Auto-Fill Muscoli
         const searchKey = selectedName.toLowerCase();
-        const foundExercise = exerciseSearchIndex[searchKey] || globalExerciseLibrary[selectedName];
+        // Sicurezza: controlla che exerciseSearchIndex esista
+        const foundExercise = (typeof exerciseSearchIndex !== 'undefined' && exerciseSearchIndex[searchKey])
+            ? exerciseSearchIndex[searchKey]
+            : (typeof globalExerciseLibrary !== 'undefined' ? globalExerciseLibrary[selectedName] : null);
 
         if (foundExercise) {
-            // A. Imposta Muscolo Primario
             if (foundExercise.p && row.dropdownComponent) {
                 row.dropdownComponent.setValue(foundExercise.p);
                 data.muscles = data.muscles.filter(m => m.type !== 'primary');
                 data.muscles.unshift({ name: foundExercise.p, type: 'primary' });
             }
-
-            // B. Imposta Sinergici (Reset e Aggiunta)
-            data.muscles = data.muscles.filter(m => m.type === 'primary'); // Tieni solo il primario
+            // Reset Sinergici
+            data.muscles = data.muscles.filter(m => m.type === 'primary');
             if (foundExercise.s && foundExercise.s.length > 0) {
                 foundExercise.s.forEach(item => {
                     if (typeof item === 'string') data.muscles.push({ name: item, type: 'secondary' });
                     else data.muscles.push({ name: item.name, type: item.type });
                 });
             }
-            // Ridisegna lista sinergici
-            if (typeof renderSynergists === 'function') renderSynergists(); // Safe check
-            else {
-                // Se la funzione è definita nello scope sotto, la richiamiamo dopo
-                // (In questo blocco renderSynergists è definita sotto, quindi l'evento la vedrà)
-            }
-            
-            // Ridisegna manualmente i sinergici se siamo dentro l'evento
-            const synList = row.querySelector('.synergists-list');
-            if(synList) {
-                synList.innerHTML = ''; 
-                // La logica di render è duplicata sotto per sicurezza, ma qui triggeriamo l'aggiornamento
-                const evt = new Event('render-syn-trigger');
-                row.dispatchEvent(evt);
-            }
+            if (typeof renderSynergists === 'function') renderSynergists();
         }
-        updateLiveStats();
+        if (typeof updateLiveStats === 'function') updateLiveStats();
     };
 
-    const smartDropdown = createExerciseSmartDropdown(data.name, onExerciseSelected);
-    exSelectContainer.appendChild(smartDropdown);
+    // Creazione Tendina (FALSE = Mostra tutti, non solo massimali)
+    if (typeof createExerciseSmartDropdown === 'function') {
+        const smartDropdown = createExerciseSmartDropdown(data.name, onExerciseSelected, false);
+        exSelectContainer.appendChild(smartDropdown);
+    } else {
+        // Fallback di emergenza
+        exSelectContainer.innerHTML = `<input type="text" value="${data.name}" class="input-ex-name">`;
+        exSelectContainer.querySelector('input').oninput = (e) => data.name = e.target.value;
+    }
 
 
-    // 2. GESTIONE SETS/REPS (Identica a prima)
+    // 2. GESTIONE SETS/REPS (Dinamica)
     const dynamicArea = row.querySelector('.dynamic-inputs-area');
+
     const renderCentralInputs = () => {
         dynamicArea.innerHTML = '';
+
         if (data.technique === "Top set + back-off") {
             dynamicArea.className = 'dynamic-inputs-area special-mode';
             dynamicArea.innerHTML = `
                 <div class="special-group"><span class="tiny-label">TOP</span><div style="display:flex; gap:2px; align-items:center;"><span style="font-size:11px; color:#888;">1 x</span><input type="text" class="special-input input-top-reps" value="${data.topReps || ''}" placeholder="Reps"><span style="font-size:11px; color:#888;">@</span><input type="text" class="special-input input-top-int" value="${data.topInt || ''}" placeholder="${data.metricType}"></div></div>
                 <div class="special-group"><span class="tiny-label">BACK</span><div style="display:flex; gap:2px; align-items:center;"><input type="text" class="special-input input-back-sets" value="${data.backSets || ''}" placeholder="Sets"><span style="font-size:11px; color:#888;">x</span><input type="text" class="special-input input-back-reps" value="${data.backReps || ''}" placeholder="Reps"></div></div>`;
-            const el = row.querySelector('.input-intensity-val'); if(el) el.parentElement.style.display = 'none';
+            const el = row.querySelector('.input-intensity-val'); if (el) el.parentElement.style.display = 'none';
         } else {
             dynamicArea.className = 'dynamic-inputs-area standard-mode';
             const layout = TECHNIQUE_LAYOUTS[data.technique] || TECHNIQUE_LAYOUTS["Standard"];
             dynamicArea.innerHTML = `<div class="input-wrapper"><span class="tiny-label">${layout.label1}</span><input type="text" class="input-sets" value="${data.val1 || ''}"></div><div class="input-wrapper"><span class="tiny-label">${layout.label2}</span><input type="text" class="input-reps" value="${data.val2 || ''}"></div>`;
-            const el = row.querySelector('.input-intensity-val'); if(el) el.parentElement.style.display = 'block';
+            const el = row.querySelector('.input-intensity-val'); if (el) el.parentElement.style.display = 'block';
         }
+
+        // Ri-attacca i listener agli input appena creati
         dynamicArea.querySelectorAll('input').forEach(i => i.addEventListener('input', updateData));
     };
 
     // 3. UPDATE DATA
     const updateData = () => {
-        // data.name è gestito dalla smartDropdown ora
         data.technique = row.querySelector('.select-technique').value;
         data.metricType = row.querySelector('.select-metric').value;
         data.notes = row.querySelector('.input-notes').value;
         data.rest = row.querySelector('.input-rest').value;
+
         const intInput = row.querySelector('.input-intensity-val');
         if (intInput) data.intensityVal = intInput.value;
 
@@ -894,24 +1085,58 @@ function createExerciseRowHTML(container, data, index) {
             data.val1 = row.querySelector('.input-sets')?.value;
             data.val2 = row.querySelector('.input-reps')?.value;
         }
-        updateLiveStats();
+
+        // Aggiorna grafici
+        if (typeof isPlMode !== 'undefined' && isPlMode) {
+            if (typeof updateLiveStatsPL === 'function') updateLiveStatsPL();
+        } else {
+            if (typeof updateLiveStats === 'function') updateLiveStats();
+        }
     };
 
+    // Avvio Render Inputs
     renderCentralInputs();
 
-    // 4. LISTENERS GENERICI
+    // 4. LISTENERS GLOBALI RIGA
     row.querySelector('.input-notes').addEventListener('input', updateData);
     row.querySelector('.input-rest').addEventListener('input', updateData);
     row.querySelector('.input-intensity-val').addEventListener('input', updateData);
+
     row.querySelector('.select-technique').addEventListener('change', (e) => {
-        data.technique = e.target.value; renderCentralInputs(); updateData();
+        data.technique = e.target.value;
+        renderCentralInputs();
+        updateData();
     });
+
     row.querySelector('.select-metric').addEventListener('change', (e) => {
         data.metricType = e.target.value;
+        renderCentralInputs();
     });
+
     row.querySelector('.btn-remove-row').addEventListener('click', () => {
-        workoutData[currentDay].splice(index, 1);
-        renderDay(currentDay);
+        // Logica eliminazione flessibile
+        if (typeof isPlMode !== 'undefined' && isPlMode) {
+            // Modo PL: usa dayKey se disponibile, altrimenti cerca
+            // Per semplicità qui usiamo l'eliminazione diretta dall'array renderPlDay gestisce
+            if (confirm("Eliminare?")) {
+                // Nota: qui index potrebbe essere desincronizzato, meglio rimuovere dall'array e rirenderizzare
+                // Ma per ora lasciamo la gestione al chiamante se possibile o ricarichiamo la pagina
+                const currentArr = workoutData[`w${currentPlWeek}_d${currentPlDay}`];
+                const realIdx = currentArr.indexOf(data);
+                if (realIdx > -1) {
+                    currentArr.splice(realIdx, 1);
+                    renderPlDay();
+                }
+            }
+        } else {
+            // Modo BB
+            const currentArr = workoutData[currentDay];
+            const realIdx = currentArr.indexOf(data);
+            if (realIdx > -1) {
+                currentArr.splice(realIdx, 1);
+                renderDay(currentDay);
+            }
+        }
     });
 
     // 5. MUSCOLO PRIMARIO (Dropdown)
@@ -919,11 +1144,13 @@ function createExerciseRowHTML(container, data, index) {
     const onMuscleChange = (newValue) => {
         data.muscles = data.muscles.filter(m => m.type !== 'primary');
         if (newValue) data.muscles.unshift({ name: newValue, type: 'primary' });
-        updateData(); updateLiveStats();
+        updateData();
     };
-    const dropdownEl = createMuscleDropdown(primaryMuscle, onMuscleChange);
-    muscleContainer.appendChild(dropdownEl);
-    row.dropdownComponent = dropdownEl;
+    if (typeof createMuscleDropdown === 'function') {
+        const dropdownEl = createMuscleDropdown(primaryMuscle, onMuscleChange);
+        muscleContainer.appendChild(dropdownEl);
+        row.dropdownComponent = dropdownEl;
+    }
 
     // 6. SINERGICI
     const synList = row.querySelector('.synergists-list');
@@ -933,31 +1160,32 @@ function createExerciseRowHTML(container, data, index) {
         syns.forEach((m) => {
             const div = document.createElement('div'); div.className = 'synergist-row';
             const typeSelect = document.createElement('select');
-            typeSelect.innerHTML = `<option value="secondary" ${m.type==='secondary'?'selected':''}>Secondario</option><option value="tertiary" ${m.type==='tertiary'?'selected':''}>Terziario</option>`;
-            typeSelect.addEventListener('change', (e) => { m.type = e.target.value; updateLiveStats(); });
-            const onSynChange = (newVal) => { m.name = newVal; updateLiveStats(); };
-            const dd = createMuscleDropdown(m.name, onSynChange);
-            const delBtn = document.createElement('i'); delBtn.className = 'ph ph-x btn-del-syn';
-            delBtn.onclick = () => {
-                const realIndex = data.muscles.indexOf(m);
-                if (realIndex > -1) data.muscles.splice(realIndex, 1);
-                renderSynergists(); updateLiveStats();
-            };
-            div.appendChild(typeSelect); div.appendChild(dd); div.appendChild(delBtn);
-            synList.appendChild(div);
+            typeSelect.innerHTML = `<option value="secondary" ${m.type === 'secondary' ? 'selected' : ''}>Secondario</option><option value="tertiary" ${m.type === 'tertiary' ? 'selected' : ''}>Terziario</option>`;
+            typeSelect.addEventListener('change', (e) => { m.type = e.target.value; updateData(); });
+
+            const onSynChange = (newVal) => { m.name = newVal; updateData(); };
+
+            if (typeof createMuscleDropdown === 'function') {
+                const dd = createMuscleDropdown(m.name, onSynChange);
+                const delBtn = document.createElement('i');
+                delBtn.className = 'ph ph-x btn-del-syn';
+                delBtn.onclick = () => {
+                    const realIndex = data.muscles.indexOf(m);
+                    if (realIndex > -1) data.muscles.splice(realIndex, 1);
+                    renderSynergists(); updateData();
+                };
+                div.appendChild(typeSelect); div.appendChild(dd); div.appendChild(delBtn);
+                synList.appendChild(div);
+            }
         });
     };
     renderSynergists();
-    
-    // Listener custom per aggiornare sinergici quando cambia l'esercizio (triggerato sopra)
-    row.addEventListener('render-syn-trigger', renderSynergists);
 
     row.querySelector('.btn-add-synergist').addEventListener('click', () => {
         data.muscles.push({ name: "", type: "secondary" });
         renderSynergists();
     });
 }
-
 function updateLiveStats() {
     // 1. Struttura dati annidata: { "Schiena": { total: 0, children: { "Gran Dorsale": 0 } } }
     let hierarchyMap = {};
@@ -1062,15 +1290,16 @@ function initChart() {
             },
             // GESTIONE CLICK SULLE FETTE
             onClick: (event, elements) => {
-                if (elements.length > 0) {
-                    const index = elements[0].index;
-                    const labelClicked = volumeChartInstance.data.labels[index];
+                // FIX: Se siamo in PL mode o se non clicco nulla, non fare nulla (evita che scompaia)
+                if (isPlMode || elements.length === 0) return;
 
-                    // Se clicco su una categoria Padre (e non sono già dentro)
-                    if (!currentChartFocus) {
-                        currentChartFocus = labelClicked;
-                        updateLiveStats(); // Ridisegna focalizzato
-                    }
+                const index = elements[0].index;
+                const labelClicked = volumeChartInstance.data.labels[index];
+
+                // Se clicco su una categoria Padre (e non sono già dentro)
+                if (!currentChartFocus) {
+                    currentChartFocus = labelClicked;
+                    updateLiveStats(); // Ridisegna focalizzato (Solo BB)
                 }
             }
         }
@@ -1460,12 +1689,12 @@ function renderPlDay() {
     const exercises = workoutData[key];
 
     exercises.forEach((exData, index) => {
-        if(exData.isFundamental) {
+        if (exData.isFundamental) {
             createFundamentalRowHTML(listContainer, exData, index, key);
         } else {
             // Crea card standard
             createExerciseRowHTML(listContainer, exData, index);
-            
+
             // --- FIX DELETE PER COMPLEMENTARI PL ---
             // Sovrascriviamo l'onclick del cestino appena creato
             const row = listContainer.lastChild;
@@ -1473,14 +1702,14 @@ function renderPlDay() {
             // Clona il bottone per rimuovere i vecchi listener BB
             const newDelBtn = delBtn.cloneNode(true);
             delBtn.parentNode.replaceChild(newDelBtn, delBtn);
-            
+
             newDelBtn.onclick = () => {
-                if(confirm("Eliminare complementare?")) {
+                if (confirm("Eliminare complementare?")) {
                     workoutData[key].splice(index, 1);
                     renderPlDay();
                 }
             };
-            
+
             // Aggiungi tasto copia week
             addCopyToWeeksBtn(row, exData, index, key);
         }
@@ -1489,7 +1718,7 @@ function renderPlDay() {
     // ... (Il resto dei bottoni aggiungi rimane uguale) ...
     // ... Copia qui sotto i bottoni "Aggiungi Fondamentale/Complementare" e "Copia Tutto" dal codice precedente ...
     // (Se non vuoi ricopiarli dimmelo, ma è meglio avere la funzione pulita)
-    
+
     // CODICE BOTTONI (Riassunto per brevità, assicurati di averlo):
     const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex; gap:10px; margin-top:20px;';
     const addFundBtn = document.createElement('button'); addFundBtn.className = 'btn-primary'; addFundBtn.style.cssText = 'flex:1; background:#FF9500;'; addFundBtn.innerHTML = '<i class="ph ph-barbell"></i> + Fondamentale';
@@ -1507,216 +1736,491 @@ function renderPlDay() {
     const copyAllBtn = document.createElement('button'); copyAllBtn.className = 'btn-secondary'; copyAllBtn.style.cssText = 'width:100%; margin-top:15px; border-style:dashed; color:#0071E3;';
     copyAllBtn.innerHTML = `<i class="ph ph-copy-simple"></i> Copia tutti i complementari su Week 2-${plWeeks}`;
     copyAllBtn.onclick = () => {
-        if(!confirm("Copiare TUTTI i complementari?")) return;
+        if (!confirm("Copiare TUTTI i complementari?")) return;
         const accs = workoutData[key].filter(e => !e.isFundamental);
         const dayNum = currentPlDay;
-        for(let w=1; w<=plWeeks; w++) {
-            if(w === currentPlWeek) continue;
+        for (let w = 1; w <= plWeeks; w++) {
+            if (w === currentPlWeek) continue;
             const targetKey = `w${w}_d${dayNum}`;
-            if(!workoutData[targetKey]) workoutData[targetKey] = [];
+            if (!workoutData[targetKey]) workoutData[targetKey] = [];
             accs.forEach(acc => { const clone = JSON.parse(JSON.stringify(acc)); clone.id = Date.now() + Math.random(); workoutData[targetKey].push(clone); });
         }
         alert("Copiato!");
     };
     dayContentArea.appendChild(copyAllBtn);
-    
+    setupDragAndDrop(listContainer, workoutData[day]);
     updateLiveStatsPL();
 }
 
-// --- CREAZIONE CARD FONDAMENTALE (Arancione) ---
+// ============================================================
+// === HELPER FUNCTIONS PER IL CALCOLO LIVE (AGGIUNGERE QUI) ===
+// ============================================================
+
+// 1. Cerca di capire che esercizio è dal nome (per sapere quale massimale usare)
+function detectLiftType(name) {
+    if (!name) return null;
+    const n = name.toLowerCase();
+    if (n.includes('squat')) return 'squat';
+    if (n.includes('panca') || n.includes('bench') || n.includes('press')) return 'bench';
+    if (n.includes('stacco') || n.includes('deadlift') || n.includes('terra')) return 'deadlift';
+    if (n.includes('military') || n.includes('ohp') || n.includes('lento')) return 'ohp';
+    return null;
+}
+
+// 2. Calcola i Kg reali basandosi sulla % e sui massimali salvati
+function getRealKg(percent, liftType) {
+    // currentMaxes è la variabile globale definita all'inizio del file
+    if (!liftType || !currentMaxes[liftType]) return null;
+
+    // Accetta sia "80" che "80%"
+    const cleanPerc = percent.toString().replace('%', '');
+    const p = parseFloat(cleanPerc);
+
+    if (isNaN(p)) return null;
+
+    // Formula: (Massimale * Percentuale) / 100
+    return Math.round((currentMaxes[liftType] * p) / 100);
+}
+
+
+// ============================================================
+// === FUNZIONE PRINCIPALE FONDAMENTALI (SOSTITUISCE LA VECCHIA) ===
+// ============================================================
+
+
+// ============================================================
+// === 10. GENERATORE RIGA FONDAMENTALI (PL VERSION - FINAL FIX) ===
+// ============================================================
+
 function createFundamentalRowHTML(container, data, index, dayKey) {
     const row = document.createElement('div');
     row.className = 'exercise-row pl-fund-row';
+    row.style.display = 'grid';
+    row.style.gridTemplateColumns = '1fr 330px';
+    row.style.gap = '0';
+    row.style.padding = '0';
+    row.style.overflow = 'visible';
 
-    if (!data.sets || data.sets.length === 0) data.sets = [{ reps: 5, perc: '', target: '' }];
+    // --- 1. DATA SETUP ---
+    data.isFundamental = true;
 
-    row.innerHTML = `
-        <div class="drag-handle"><i class="ph ph-dots-six-vertical"></i></div>
-        <button class="btn-remove-row"><i class="ph ph-trash"></i></button>
+    if (!data.sets || data.sets.length === 0) {
+        data.sets = [{ numSets: 3, reps: '5', mode: 'PERC', val: '', role: 'normal' }];
+    }
 
-        <div style="margin-bottom: 12px; display:flex; gap:10px; align-items:flex-end;">
-            <div style="flex:1;">
-                <span class="tiny-label">Esercizio Base</span>
-                <input type="text" class="input-ex-name" value="${data.name}" placeholder="es. Squat" list="exercise-suggestions" style="font-weight:700; font-size:15px;">
-            </div>
-            <div style="flex:1;">
-            <span class="tiny-label">Variante</span>
+    if (!data.progression) data.progression = {
+        strategy: 'role_based',
+        all: { type: 'linear_kg', val: 2.5 },
+        top: { type: 'linear_kg', val: 2.5 },
+        backoff: { type: 'linear_perc', val: 2 }
+    };
+
+    // --- 2. LOGICA INIZIALE PARAMETRO EXTRA (FIX RELOAD) ---
+    // Calcoliamo queste variabili SUBITO, basandoci sui dati salvati
+    const hasParam = !!data.variantParamType && data.variantParamType !== 'none';
+    let paramLabelText = 'Extra';
+    let paramPlaceholder = 'Val';
+
+    if (hasParam) {
+        // Mettiamo la prima lettera maiuscola (es. time -> Tempo)
+        paramLabelText = data.variantParamType.charAt(0).toUpperCase() + data.variantParamType.slice(1);
+
+        if (data.variantParamType === 'time') paramPlaceholder = 'es. 3s';
+        else if (data.variantParamType === 'height') paramPlaceholder = 'es. 5cm';
+        else if (data.variantParamType === 'angle') paramPlaceholder = 'es. 45°';
+    }
+
+    // --- 3. COLONNA SINISTRA ---
+    const leftCol = document.createElement('div');
+    leftCol.style.padding = '20px';
+    leftCol.style.position = 'relative';
+    leftCol.style.zIndex = '20';
+
+    leftCol.innerHTML = `
+        <div class="drag-handle" style="left:6px; top:20px;"><i class="ph ph-dots-six-vertical"></i></div>
+        
+        <!-- HEADER ROW: ESERCIZIO + VARIANTE (50/50 SPLIT) -->
+        <div style="margin-bottom: 20px; display:flex; gap:15px; align-items:flex-end; padding-left:25px;">
             
-            <!-- SELECTOR MODIFICATO CON LA X -->
-            <div class="variant-selector" style="display:flex; justify-content:space-between; align-items:center;">
-                <span class="var-text">${data.variant || 'Nessuna'}</span>
-                
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <!-- TASTO X (appare solo se data.variant esiste) -->
-                    <i class="ph ph-x-circle btn-clear-var" 
-                       style="color:#FF3B30; font-size:16px; z-index:10; cursor:pointer; ${data.variant ? '' : 'display:none;'}"
-                       title="Rimuovi variante">
-                    </i>
-                    <i class="ph ph-caret-down"></i>
+            <!-- ESERCIZIO (Flex 1) -->
+            <div style="flex:1; min-width: 0;" class="smart-select-container">
+                <span class="tiny-label" style="margin-bottom:4px; display:block;">Esercizio (Target 1RM)</span>
+                <!-- Dropdown injected here -->
+            </div>
+            
+            <!-- VARIANTE (Flex 1 - Stessa larghezza Esercizio) -->
+            <div style="flex:1; min-width: 0;">
+                <span class="tiny-label" style="margin-bottom:4px; display:block;">Variante</span>
+                <div class="variant-selector" style="display:flex; justify-content:space-between; align-items:center; background:white; border:1px solid #E5E5EA; padding:0 12px; border-radius:8px; cursor:pointer; height:42px; transition:border 0.2s;">
+                    <span class="var-text" style="font-size:13px; font-weight:500; color:#1D1D1F; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${data.variant || 'Standard'}</span>
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <i class="ph ph-x-circle btn-clear-var" style="color:#FF3B30; font-size:16px; display:${data.variant ? 'block' : 'none'};"></i>
+                        <i class="ph ph-caret-down" style="color:#86868B;"></i>
+                    </div>
                 </div>
             </div>
-        </div>
-            
-            <!-- CAMPO EXTRA DINAMICO (Tempo/Altezza) -->
-            <div class="extra-param-wrapper" style="display:${data.variantParam && data.variantParam !== 'none' ? 'block' : 'none'};">
-                <span class="tiny-label" id="lbl-extra-param">${data.variantParam === 'time' ? 'Secondi' : 'Param'}</span>
-                <input type="text" class="pl-param-extra" value="${data.variantValue || ''}" placeholder="...">
+
+            <!-- PARAMETRO EXTRA (Larghezza fissa se presente) -->
+            <div class="var-param-container" style="flex: 0 0 80px; display:${hasParam ? 'block' : 'none'}; margin-left:-5px;">
+                <span class="tiny-label" style="margin-bottom:4px; display:block;">${paramLabelText}</span>
+                <input type="text" class="var-param-input" value="${data.variantValue || ''}" placeholder="${paramPlaceholder}" 
+                    style="width:100%; height:42px; border:1px solid #0071E3; background:#F0F8FF; border-radius:8px; text-align:center; font-weight:600; font-size:13px; color:#0071E3;">
             </div>
+
+            <!-- BADGE 1RM (Auto width) -->
+            <div class="max-badge-display" style="height:42px; display:flex; align-items:center; padding-left:5px;"></div>
         </div>
 
-        <!-- TRACKING SETTINGS -->
-        <div class="pl-tracking-row">
-            <div style="display:flex; flex-direction:column;">
-                <span class="tiny-label" style="margin-bottom:2px;">Progressione:</span>
-                <select class="input-tracking" style="padding:4px; font-size:12px;">
-                    <option value="Kg" ${data.trackingMetric === 'Kg' ? 'selected' : ''}>Kg (Carico)</option>
-                    <option value="RPE" ${data.trackingMetric === 'RPE' ? 'selected' : ''}>RPE (Sforzo)</option>
-                    <option value="Reps" ${data.trackingMetric === 'Reps' ? 'selected' : ''}>Reps (Volume)</option>
-                    <option value="Tech" ${data.trackingMetric === 'Tech' ? 'selected' : ''}>Tecnica (Voto)</option>
-                </select>
-            </div>
-            
-            <label class="vol-exclude-wrapper">
-                <input type="checkbox" class="chk-vol" ${!data.excludeVolume ? 'checked' : ''}>
-                Conta Vol.
-            </label>
+        <!-- HEADERS TABELLA SET -->
+        <div style="display:grid; grid-template-columns: 110px 140px 1fr 30px; gap:10px; padding-left:25px; margin-bottom:8px; font-size:10px; color:#86868B; font-weight:700; text-transform:uppercase;">
+            <span>Quantità (Sets x Reps)</span>
+            <span>Intensità (Mode & Value)</span>
+            <span>Ruolo (Tag)</span>
+            <span></span>
         </div>
+        
+        <div class="sets-container" style="display:flex; flex-direction:column; gap:8px; margin-left:25px;"></div>
+        
+        <button class="btn-add-set-pl" style="font-size:11px; margin-left:25px; width:calc(100% - 25px); margin-top:12px; padding:10px; background:#fff; border:1px dashed #C7C7CC; color:#0071E3; font-weight:600; cursor:pointer; border-radius:8px; display:flex; align-items:center; justify-content:center; gap:6px; transition:background 0.2s;">
+            <i class="ph ph-plus-circle" style="font-size:14px;"></i> Aggiungi Gruppo Set
+        </button>
 
-        <!-- SETS -->
-        <div class="sets-header" style="display:flex; gap:8px; margin-top:10px; padding-left:20px; font-size:10px; color:#888;">
-            <span style="width:50px;">REPS</span>
-            <span style="width:50px;">% 1RM</span>
-            <span style="flex:1;">TARGET</span>
-        </div>
-        <div class="sets-container" style="display:flex; flex-direction:column; gap:6px;"></div>
-        <button class="btn-add-set-pl" style="font-size:11px; width:100%; margin-top:8px; padding:6px; background:#fff; border:1px dashed #ccc; cursor:pointer;">+ Set</button>
-
-        <!-- NOTE -->
-        <textarea class="input-notes" placeholder="Note Tecniche..." style="margin-top:10px; height:50px; width:100%;">${data.notes || ''}</textarea>
+        <textarea class="input-notes" placeholder="Note tecniche per l'atleta..." style="margin-left:25px; width:calc(100% - 25px); margin-top:15px; height:50px; min-height:50px; border:1px solid #E5E5EA; border-radius:8px; padding:10px; font-family:inherit; font-size:12px; resize:vertical;">${data.notes || ''}</textarea>
     `;
 
+    // --- 4. COLONNA DESTRA (Automazione) ---
+    const rightCol = document.createElement('div');
+    rightCol.style.cssText = "background:#F9F9FB; border-left:1px solid #E5E5EA; padding:20px; display:flex; flex-direction:column; justify-content:flex-start; z-index:10; overflow-y:auto;";
+
+    const createProgControls = (label, configKey) => {
+        const cfg = data.progression[configKey];
+        return `
+            <div class="prog-box" style="background:white; border:1px solid #E5E5EA; border-radius:8px; padding:10px; margin-top:10px; box-shadow:0 1px 2px rgba(0,0,0,0.02);">
+                <div style="font-size:10px; font-weight:700; color:#1D1D1F; text-transform:uppercase; margin-bottom:8px;">${label}</div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <select class="prog-type" data-key="${configKey}" style="flex:1; height:32px; font-size:11px; border:1px solid #D2D2D7; border-radius:6px; background:white; cursor:pointer;">
+                        <option value="linear_kg" ${cfg.type === 'linear_kg' ? 'selected' : ''}>+ Kg (Lineare)</option>
+                        <option value="linear_perc" ${cfg.type === 'linear_perc' ? 'selected' : ''}>+ % (Lineare)</option>
+                        <option value="rpe_ramp" ${cfg.type === 'rpe_ramp' ? 'selected' : ''}>+ RPE (Ramp)</option>
+                        <option value="reps_drop" ${cfg.type === 'reps_drop' ? 'selected' : ''}>- Reps (Peaking)</option>
+                        <option value="vol_add" ${cfg.type === 'vol_add' ? 'selected' : ''}>+ 1 Set (Volume)</option>
+                    </select>
+                    <input type="number" class="prog-val" data-key="${configKey}" value="${cfg.val}" style="width:65px; flex-shrink:0; height:32px; font-size:12px; border:1px solid #D2D2D7; border-radius:6px; text-align:center; font-weight:600; padding:0 2px;">
+                </div>
+            </div>
+        `;
+    };
+
+    const renderRightCol = () => {
+        const strat = data.progression.strategy;
+        rightCol.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <span style="font-size:11px; font-weight:800; color:#86868B; letter-spacing:0.5px;">AUTOMAZIONE</span>
+                <button class="btn-remove-row" style="width:28px; height:28px; background:white; border:1px solid #E5E5EA; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="ph ph-trash" style="color:#FF3B30; font-size:16px;"></i></button>
+            </div>
+
+            <div style="margin-bottom:5px;">
+                <label style="font-size:10px; color:#666; font-weight:600; display:block; margin-bottom:4px;">Applica a:</label>
+                <select id="prog-strat-sel" style="width:100%; height:34px; font-size:12px; padding:0 8px; border:1px solid #D2D2D7; border-radius:6px; background:white; cursor:pointer;">
+                    <option value="all" ${strat === 'all' ? 'selected' : ''}>Tutto l'Esercizio (Globale)</option>
+                    <option value="role_based" ${strat === 'role_based' ? 'selected' : ''}>Per Ruolo (Top vs Backoff)</option>
+                </select>
+            </div>
+
+            <div id="prog-inputs">
+                ${strat === 'all'
+                ? createProgControls('Regola Unica', 'all')
+                : createProgControls('Top Set 👑', 'top') + createProgControls('Back-off / Normal 📉', 'backoff')
+            }
+            </div>
+
+            <button class="btn-generate-prog" style="margin-top:20px; width:100%; background:#1D1D1F; color:white; border:none; border-radius:8px; padding:12px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:transform 0.1s;">
+                <i class="ph ph-lightning" style="color:#FFD60A; font-size:16px;"></i> Genera Week Future
+            </button>
+        `;
+
+        // Listeners
+        rightCol.querySelector('#prog-strat-sel').onchange = (e) => {
+            data.progression.strategy = e.target.value;
+            renderRightCol();
+        };
+        rightCol.querySelectorAll('.prog-type').forEach(el => el.onchange = (e) => data.progression[e.target.dataset.key].type = e.target.value);
+        rightCol.querySelectorAll('.prog-val').forEach(el => el.oninput = (e) => data.progression[e.target.dataset.key].val = parseFloat(e.target.value) || 0);
+
+        rightCol.querySelector('.btn-generate-prog').onclick = handleGenerateProgression;
+        rightCol.querySelector('.btn-remove-row').onclick = () => {
+            if (confirm("Eliminare esercizio?")) { workoutData[dayKey].splice(index, 1); if (isPlMode) renderPlDay(); }
+        };
+
+        if (window.PhosphorIcons) window.PhosphorIcons.replace();
+    };
+
+    row.appendChild(leftCol);
+    row.appendChild(rightCol);
     container.appendChild(row);
 
-    // LOGICA INTERNA
+    // ================= 5. LOGICA FUNZIONALE & UI =================
 
-    // 1. Nome Esercizio
-    row.querySelector('.input-ex-name').oninput = (e) => data.name = e.target.value;
-
-    // 2. Logica Variante
-   
-    
-    
-    const varSelector = row.querySelector('.variant-selector');
-    const varText = row.querySelector('.var-text');     // Span del testo
-    const clearBtn = row.querySelector('.btn-clear-var'); // Icona X
-    const extraWrap = row.querySelector('.extra-param-wrapper');
-    const extraInput = row.querySelector('.pl-param-extra');
-    const extraLbl = row.querySelector('#lbl-extra-param');
-
-    // 1. APERTURA MENU
-    varSelector.onclick = (e) => {
-        // Se l'utente ha cliccato sulla X, non aprire il menu (gestito sotto)
-        if(e.target.classList.contains('btn-clear-var')) return;
-
-        e.stopPropagation();
-        openVariantDropdown(varSelector, (name, section, param) => {
-            // Salva i dati
-            data.variant = name;
-            data.variantSection = section;
-            data.variantParam = param;
-            
-            // Aggiorna UI
-            varText.textContent = name;
-            clearBtn.style.display = 'block'; // MOSTRA LA X ORA
-
-            // Gestione Input Extra (Tempo/Altezza)
-            if (param && param !== 'none') {
-                extraWrap.style.display = 'block';
-                if (param === 'time') { 
-                    extraLbl.textContent = 'Tempo (sec)'; 
-                    extraInput.placeholder = 'es. 3-0-3'; 
-                } else if (param === 'height') { 
-                    extraLbl.textContent = 'Altezza (cm)'; 
-                    extraInput.placeholder = 'es. 10cm'; 
-                } else if (param === 'angle') {
-                    extraLbl.textContent = 'Angolo (°)'; 
-                    extraInput.placeholder = 'es. 45°'; 
-                }
-            } else {
-                extraWrap.style.display = 'none';
-                data.variantValue = ""; // Resetta valore se la variante non ha parametri
-            }
-        });
+    // HEADER - ESERCIZIO
+    const selectContainer = leftCol.querySelector('.smart-select-container');
+    const onExerciseSelect = (name) => {
+        data.name = name;
+        updateMaxBadge();
+        renderSets();
     };
 
-    // 2. CLICK SULLA "X" (RIMUOVI VARIANTE)
-    clearBtn.onclick = (e) => {
-        e.stopPropagation(); // Impedisce che il click apra il menu a tendina
-        
-        // Resetta Dati
+    // Dropdown Esercizio (Altezza fissa per allineamento)
+    const exDropdown = createExerciseSmartDropdown(data.name, onExerciseSelect, true);
+    const exTrigger = exDropdown.querySelector('.exercise-trigger');
+    if (exTrigger) {
+        exTrigger.style.height = '42px';
+        exTrigger.style.display = 'flex';
+        exTrigger.style.alignItems = 'center';
+    }
+    selectContainer.appendChild(exDropdown);
+
+    // BADGE 1RM
+    const updateMaxBadge = () => {
+        const badgeArea = leftCol.querySelector('.max-badge-display');
+        const max = getReferenceMax(data.name);
+        badgeArea.innerHTML = max > 0
+            ? `<div style="background:#FFF8E1; color:#F57F17; font-size:11px; font-weight:700; padding:6px 12px; border-radius:6px; border:1px solid #FFD54F; white-space:nowrap;">1RM: ${max}kg</div>`
+            : ``;
+    };
+    updateMaxBadge();
+
+    // VARIANT SELECTOR LOGIC (Gestione Click)
+    const varSelector = leftCol.querySelector('.variant-selector');
+    const paramContainer = leftCol.querySelector('.var-param-container');
+    const paramLabel = paramContainer.querySelector('.tiny-label');
+    const paramInput = paramContainer.querySelector('.var-param-input');
+
+    // Listener Input Parametro
+    paramInput.oninput = (e) => {
+        data.variantValue = e.target.value;
+    };
+
+    varSelector.onclick = (e) => {
+        if (e.target.classList.contains('btn-clear-var') || e.target.closest('.btn-clear-var')) return;
+
+        if (typeof openVariantDropdown === 'function') {
+            openVariantDropdown(varSelector, (name, section, paramType) => {
+                data.variant = name;
+                data.variantParamType = paramType;
+                data.variantValue = '';
+
+                // Aggiorna UI Testo
+                leftCol.querySelector('.var-text').textContent = name;
+                leftCol.querySelector('.btn-clear-var').style.display = 'block';
+
+                // Mostra Input Extra se necessario
+                if (paramType && paramType !== 'none') {
+                    paramContainer.style.display = 'block';
+                    paramLabel.textContent = paramType.charAt(0).toUpperCase() + paramType.slice(1);
+                    paramInput.value = '';
+                    paramInput.placeholder = (paramType === 'time') ? 'es. 3s' : (paramType === 'height') ? 'es. 5cm' : 'Val';
+                } else {
+                    paramContainer.style.display = 'none';
+                }
+            });
+        }
+    };
+
+    // Clear Variante
+    leftCol.querySelector('.btn-clear-var').onclick = (e) => {
+        e.stopPropagation();
         data.variant = "";
-        data.variantSection = "";
-        data.variantParam = "";
+        data.variantParamType = null;
         data.variantValue = "";
 
-        // Resetta UI
-        varText.textContent = "Nessuna";
-        clearBtn.style.display = 'none'; // Nascondi la X
-        extraWrap.style.display = 'none'; // Nascondi input extra
+        leftCol.querySelector('.var-text').textContent = "Standard";
+        leftCol.querySelector('.btn-clear-var').style.display = 'none';
+        paramContainer.style.display = 'none';
     };
 
-    // Listener Input Extra
 
-    if(extraInput) extraInput.oninput = (e) => data.variantValue = e.target.value;
+    // SETS RENDERING
+    const setsCont = leftCol.querySelector('.sets-container');
 
-    // 3. Render Sets
-    const setsCont = row.querySelector('.sets-container');
     const renderSets = () => {
         setsCont.innerHTML = '';
+
         data.sets.forEach((set, sIdx) => {
             const div = document.createElement('div');
-            div.style.display = 'flex'; div.style.gap = '8px'; div.style.alignItems = 'center';
+            div.style.cssText = "display:grid; grid-template-columns: 110px 140px 1fr 30px; gap:10px; align-items:center; background:white; border:1px solid #E5E5EA; padding:10px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.02); transition:border 0.2s;";
+
+            const max = getReferenceMax(data.name);
+            let hintText = "";
+            let inputPlaceholder = "Val";
+            let isMav = (set.mode === 'MAV');
+
+            if (max > 0 && set.val) {
+                if (set.mode === 'PERC') {
+                    const kg = Math.round((max * parseFloat(set.val)) / 100);
+                    hintText = `${kg}kg`;
+                } else if (set.mode === 'KG') {
+                    const perc = Math.round((parseFloat(set.val) / max) * 100);
+                    hintText = `${perc}%`;
+                }
+            }
+            if (set.mode === 'RPE' || set.mode === 'RIR') inputPlaceholder = "es. 8";
+
             div.innerHTML = `
-                <span style="font-size:11px; font-weight:bold; width:15px; text-align:right;">${sIdx + 1}</span>
-                <input type="text" placeholder="Reps" value="${set.reps || ''}" class="pl-inp-reps" style="width:50px; text-align:center;">
-                <input type="text" placeholder="%" value="${set.perc || ''}" class="pl-inp-perc" style="width:50px; text-align:center;">
-                <input type="text" placeholder="Target" value="${set.target || ''}" class="pl-inp-target" style="flex:1;">
-                <i class="ph ph-x btn-del-set" style="cursor:pointer; color:#FF3B30;"></i>
+                <!-- COL 1: QUANTITÀ -->
+                <div style="display:flex; align-items:center; gap:5px;">
+                    <input type="number" class="inp-sets" value="${set.numSets || 1}" title="Sets" style="width:38px; height:32px; text-align:center; font-weight:700; border:1px solid #D2D2D7; border-radius:6px; padding:0;">
+                    <span style="font-size:11px; color:#888;">x</span>
+                    <input type="text" class="inp-reps" value="${set.reps}" title="Reps" style="flex:1; height:32px; text-align:center; font-weight:600; border:1px solid #D2D2D7; border-radius:6px; padding:0;">
+                </div>
+
+                <!-- COL 2: INTENSITÀ -->
+                <div style="display:flex; border:1px solid #D2D2D7; border-radius:6px; overflow:hidden; height:32px;">
+                    <select class="sel-mode" style="border:none; border-right:1px solid #E5E5EA; background:#F9F9FA; font-size:10px; font-weight:700; padding:0 2px; color:#1D1D1F; cursor:pointer; width:50px; text-align:center;">
+                        <option value="PERC" ${set.mode === 'PERC' ? 'selected' : ''}>%</option>
+                        <option value="KG" ${set.mode === 'KG' ? 'selected' : ''}>Kg</option>
+                        <option value="RPE" ${set.mode === 'RPE' ? 'selected' : ''}>RPE</option>
+                        <option value="RIR" ${set.mode === 'RIR' ? 'selected' : ''}>RIR</option>
+                        <option value="MAV" ${set.mode === 'MAV' ? 'selected' : ''}>MAV</option>
+                    </select>
+                    <div style="position:relative; flex:1;">
+                        <input type="text" class="inp-val" value="${set.val}" placeholder="${isMav ? 'Auto' : inputPlaceholder}" ${isMav ? 'disabled' : ''} 
+                            style="width:100%; height:100%; border:none; padding:4px; font-size:12px; font-weight:600; text-align:center; ${isMav ? 'background:#FAFAFC;' : ''} outline:none;">
+                        
+                        ${hintText ? `<div style="position:absolute; right:4px; top:50%; transform:translateY(-50%); font-size:9px; color:#0071E3; font-weight:700; background:rgba(0, 113, 227, 0.1); padding:2px 4px; border-radius:4px; pointer-events:none;">${hintText}</div>` : ''}
+                    </div>
+                </div>
+
+                <!-- COL 3: RUOLO -->
+                <select class="sel-role" style="width:100%; height:32px; font-size:11px; padding:0 8px; border:1px solid ${getRoleColor(set.role)}; color:${getRoleColor(set.role)}; font-weight:700; border-radius:6px; cursor:pointer; background:white;">
+                    <option value="normal" ${set.role === 'normal' ? 'selected' : ''}>Normal / Work</option>
+                    <option value="top" ${set.role === 'top' ? 'selected' : ''}>Top Set 👑</option>
+                    <option value="backoff" ${set.role === 'backoff' ? 'selected' : ''}>Back-off 📉</option>
+                    <option value="warmup" ${set.role === 'warmup' ? 'selected' : ''}>Warm-up 🔥</option>
+                </select>
+
+                <!-- COL 4: DELETE -->
+                <div class="btn-del-set" style="cursor:pointer; color:#C7C7CC; display:flex; justify-content:center; align-items:center; height:32px;"><i class="ph ph-x" style="font-size:16px;"></i></div>
             `;
-            // Bindings
-            div.querySelector('.pl-inp-reps').oninput = (e) => set.reps = e.target.value;
-            div.querySelector('.pl-inp-perc').oninput = (e) => set.perc = e.target.value;
-            div.querySelector('.pl-inp-target').oninput = (e) => set.target = e.target.value;
-            div.querySelector('.btn-del-set').onclick = () => {
+
+            // LISTENERS
+            const inpSets = div.querySelector('.inp-sets');
+            const inpReps = div.querySelector('.inp-reps');
+            const selMode = div.querySelector('.sel-mode');
+            const inpVal = div.querySelector('.inp-val');
+            const selRole = div.querySelector('.sel-role');
+            const delBtn = div.querySelector('.btn-del-set');
+
+            inpSets.oninput = (e) => set.numSets = parseInt(e.target.value) || 1;
+            inpReps.oninput = (e) => set.reps = e.target.value;
+            inpVal.oninput = (e) => {
+                set.val = e.target.value;
+                if (max > 0 && set.mode !== 'MAV' && set.mode !== 'RPE') renderSets();
+            };
+            selMode.onchange = (e) => {
+                set.mode = e.target.value;
+                set.val = '';
+                renderSets();
+            };
+            selRole.onchange = (e) => {
+                set.role = e.target.value;
+                selRole.style.borderColor = getRoleColor(set.role);
+                selRole.style.color = getRoleColor(set.role);
+            };
+            delBtn.onclick = () => {
                 data.sets.splice(sIdx, 1);
                 renderSets();
                 updateLiveStatsPL();
             };
+            div.addEventListener('focusin', () => div.style.borderColor = '#0071E3');
+            div.addEventListener('focusout', () => div.style.borderColor = '#E5E5EA');
+
             setsCont.appendChild(div);
         });
+
+        if (window.PhosphorIcons) window.PhosphorIcons.replace();
     };
+
+    function getRoleColor(role) {
+        if (role === 'top') return '#FFD60A';
+        if (role === 'backoff') return '#0071E3';
+        if (role === 'warmup') return '#FF9500';
+        return '#86868B';
+    }
+
+    renderRightCol();
     renderSets();
-    row.querySelector('.btn-add-set-pl').onclick = () => {
+
+    // ADD BUTTON
+    leftCol.querySelector('.btn-add-set-pl').onclick = () => {
         const last = data.sets[data.sets.length - 1];
-        data.sets.push(last ? { ...last } : { reps: 5, perc: '', target: '' });
+        let nextRole = 'normal';
+        if (last && last.role === 'top') nextRole = 'backoff';
+        if (last && last.role === 'backoff') nextRole = 'backoff';
+
+        data.sets.push({
+            numSets: 1,
+            reps: last ? last.reps : '5',
+            mode: last ? last.mode : 'PERC',
+            val: '',
+            role: nextRole
+        });
         renderSets();
         updateLiveStatsPL();
     };
 
-    // 4. Listeners
-    row.querySelector('.input-tracking').onchange = (e) => { data.trackingMetric = e.target.value; };
-    row.querySelector('.chk-vol').onchange = (e) => { data.excludeVolume = !e.target.checked; updateLiveStatsPL(); };
-    row.querySelector('.input-notes').oninput = (e) => { data.notes = e.target.value; };
+    // GENERAZIONE AUTOMATICA
+    function handleGenerateProgression() {
+        if (!confirm(`Generare settimane future per "${data.name}"?`)) return;
 
-    // 5. FIX ERRORE DELETE (Il punto cruciale)
-    row.querySelector('.btn-remove-row').onclick = () => {
-        if (confirm("Eliminare?")) {
-            // USIAMO dayKey, NON currentDay
-            workoutData[dayKey].splice(index, 1);
-            renderPlDay(); // Ricarica la vista corretta
+        const currentWeekNum = parseInt(dayKey.split('_')[0].replace('w', ''));
+        const dayPart = dayKey.split('_')[1];
+        const strat = data.progression.strategy;
+
+        for (let w = currentWeekNum + 1; w <= plWeeks; w++) {
+            const targetKey = `w${w}_${dayPart}`;
+            if (!workoutData[targetKey]) workoutData[targetKey] = [];
+            workoutData[targetKey] = workoutData[targetKey].filter(e => !(e.isFundamental && e.name === data.name));
+            const targetEx = JSON.parse(JSON.stringify(data));
+            targetEx.id = Date.now() + Math.random();
+            const weeksDelta = w - currentWeekNum;
+
+            targetEx.sets.forEach((tSet) => {
+                let config = data.progression.all;
+                if (strat === 'role_based') {
+                    if (tSet.role === 'top') config = data.progression.top;
+                    else if (tSet.role === 'backoff' || tSet.role === 'normal') config = data.progression.backoff;
+                }
+                const stepVal = config.val * weeksDelta;
+                const pType = config.type;
+
+                if (pType === 'linear_kg' && tSet.mode === 'KG') {
+                    const base = parseFloat(tSet.val);
+                    if (!isNaN(base)) tSet.val = (base + stepVal).toString();
+                }
+                else if (pType === 'linear_perc' && tSet.mode === 'PERC') {
+                    const base = parseFloat(tSet.val);
+                    if (!isNaN(base)) tSet.val = (base + stepVal).toString();
+                }
+                else if (pType === 'rpe_ramp' && (tSet.mode === 'RPE' || tSet.mode === 'RIR')) {
+                    const base = parseFloat(tSet.val);
+                    if (!isNaN(base)) tSet.val = Math.min(10, base + stepVal).toString();
+                }
+                else if (pType === 'reps_drop') {
+                    const base = parseFloat(tSet.reps);
+                    if (!isNaN(base)) tSet.reps = Math.max(1, base - stepVal).toString();
+                }
+                else if (pType === 'vol_add') {
+                    tSet.numSets = Math.round(tSet.numSets + stepVal);
+                }
+            });
+            workoutData[targetKey].unshift(targetEx);
         }
-    };
+        alert("Progressione applicata! 🚀");
+    }
 }
+
+
+
 
 // --- LOGICA COPIA AUTOMATICA COMPLEMENTARI ---
 function addCopyToWeeksBtn(rowElement, data, index, currentKey) {
@@ -1816,12 +2320,12 @@ function openVariantDropdown(targetElement, onSelect) {
             const section = document.getElementById('new-var-section').value || "Custom";
             const paramType = document.getElementById('new-var-param').value; // 'time', 'height', 'none'
 
-            if(name) {
-                if(!VARIANTS_DB[section]) VARIANTS_DB[section] = [];
-                
+            if (name) {
+                if (!VARIANTS_DB[section]) VARIANTS_DB[section] = [];
+
                 // Aggiungiamo la variante con il parametro (es. time)
                 VARIANTS_DB[section].push({ name: name, param: paramType, lifts: [] });
-                
+
                 // --- SALVATAGGIO SU FIREBASE ---
                 try {
                     const user = auth.currentUser;
@@ -1829,7 +2333,7 @@ function openVariantDropdown(targetElement, onSelect) {
                         savedVariants: VARIANTS_DB
                     });
                     console.log("Variante salvata su Cloud");
-                } catch(e) { console.error("Err salvataggio variante", e); }
+                } catch (e) { console.error("Err salvataggio variante", e); }
                 // -------------------------------
 
                 onSelect(name, section, paramType);
@@ -1861,78 +2365,81 @@ function openVariantDropdown(targetElement, onSelect) {
 // =========================================
 
 function updateLiveStatsPL() {
-    console.log(`Calcolo Volume PL per Week ${currentPlWeek}...`);
-    
-    let hierarchyMap = {};
-    Object.keys(MUSCLE_STRUCTURE).forEach(cat => {
-        hierarchyMap[cat] = { total: 0, children: {} };
-    });
+    // Se l'utente vuole vedere i Muscoli (come i complementari), usiamo la logica BB filtrata per la settimana corrente
+    if (plChartView === 'muscles') {
+        let hierarchyMap = {};
+        Object.keys(MUSCLE_STRUCTURE).forEach(cat => hierarchyMap[cat] = { total: 0, children: {} });
 
-    // 1. FILTRO: Prendi solo i giorni della SETTIMANA CORRENTE
-    // Le chiavi sono tipo "w1_d1", "w2_d1". Noi vogliamo solo quelle che iniziano con "w{currentPlWeek}_"
+        const weekPrefix = `w${currentPlWeek}_`;
+        Object.keys(workoutData).filter(k => k.startsWith(weekPrefix)).forEach(dayKey => {
+            workoutData[dayKey].forEach(ex => {
+                // Calcola sets
+                let sets = 0;
+                if (ex.isFundamental) sets = ex.sets.length;
+                else if (ex.technique === "Top set + back-off") sets = 1 + (parseFloat(ex.backSets) || 0);
+                else sets = parseFloat(ex.val1) || 0;
+
+                if (sets > 0) {
+                    ex.muscles.forEach(m => {
+                        // Logica standard BB per assegnare ai muscoli
+                        let parent = "Altro";
+                        for (const [cat, list] of Object.entries(MUSCLE_STRUCTURE)) {
+                            if (list.includes(m.name) || cat === m.name) { parent = cat; break; }
+                        }
+                        hierarchyMap[parent].total += sets;
+                        // ... children logic se serve ...
+                    });
+                }
+            });
+        });
+        renderStatsUI(hierarchyMap); // Usa il render BB standard
+        return;
+    }
+
+    // --- VISTA DEFAULT: PER ALZATA (SQUAT, PANCA, ETC) ---
+    let liftStats = { "Squat": 0, "Panca": 0, "Stacco": 0, "Military": 0, "Accessori": 0 };
+
     const weekPrefix = `w${currentPlWeek}_`;
-    const weeklyKeys = Object.keys(workoutData).filter(k => k.startsWith(weekPrefix));
-
-    weeklyKeys.forEach(dayKey => {
-        if (!workoutData[dayKey]) return;
-
+    Object.keys(workoutData).filter(k => k.startsWith(weekPrefix)).forEach(dayKey => {
         workoutData[dayKey].forEach(ex => {
-            // A. CHECK ESCLUSIONE
-            if (ex.isFundamental && ex.excludeVolume === true) return;
-
-            // B. CALCOLO SETS
             let sets = 0;
             if (ex.isFundamental) {
-                // Conta quanti oggetti ci sono nell'array 'sets'
-                sets = (ex.sets && Array.isArray(ex.sets)) ? ex.sets.length : 0;
+                sets = ex.sets.length;
+                const type = detectLiftType(ex.name);
+                if (type === 'squat') liftStats["Squat"] += sets;
+                else if (type === 'bench') liftStats["Panca"] += sets;
+                else if (type === 'deadlift') liftStats["Stacco"] += sets;
+                else if (type === 'ohp') liftStats["Military"] += sets;
+                else liftStats["Accessori"] += sets;
             } else {
-                // Complementari
-                if (ex.technique === "Top set + back-off") {
-                    sets = 1 + (parseFloat(ex.backSets) || 0);
-                } else {
-                    sets = parseFloat(ex.val1) || 0;
-                }
-            }
-
-            if (sets === 0) return;
-
-            // C. DISTRIBUZIONE MUSCOLI
-            if (ex.muscles && Array.isArray(ex.muscles)) {
-                ex.muscles.forEach(m => {
-                    if (!m.name) return;
-                    
-                    let mult = 0;
-                    if (m.type === 'primary') mult = 1.0; 
-                    else if (m.type === 'secondary') mult = userVolumeSettings.secondary; 
-                    else if (m.type === 'tertiary') mult = userVolumeSettings.tertiary; 
-                    else mult = userVolumeSettings.other;
-
-                    const volume = sets * mult;
-
-                    let parent = "Altro";
-                    for (const [cat, list] of Object.entries(MUSCLE_STRUCTURE)) {
-                        if (list.includes(m.name) || cat === m.name) {
-                            parent = cat;
-                            break;
-                        }
-                    }
-                    
-                    if (!hierarchyMap[parent]) hierarchyMap[parent] = { total: 0, children: {} };
-                    hierarchyMap[parent].total += volume;
-
-                    const childName = m.name;
-                    if (!hierarchyMap[parent].children[childName]) hierarchyMap[parent].children[childName] = 0;
-                    hierarchyMap[parent].children[childName] += volume;
-                });
+                if (ex.technique === "Top set + back-off") sets = 1 + (parseFloat(ex.backSets) || 0);
+                else sets = parseFloat(ex.val1) || 0;
+                liftStats["Accessori"] += sets;
             }
         });
     });
 
-    // Usa la funzione comune per disegnare
-    if (typeof renderStatsUI === "function") {
-        renderStatsUI(hierarchyMap);
-    } else {
-        console.warn("Manca renderStatsUI, impossibile aggiornare grafico.");
+    if (volumeChartInstance) {
+        const labels = Object.keys(liftStats);
+        const data = Object.values(liftStats);
+        const plColors = ['#FF3B30', '#0071E3', '#FF9500', '#AF52DE', '#8E8E93'];
+
+        volumeChartInstance.data.labels = labels;
+        volumeChartInstance.data.datasets[0].data = data;
+        volumeChartInstance.data.datasets[0].backgroundColor = plColors;
+        volumeChartInstance.update();
+
+        // Lista testuale
+        const statsList = document.getElementById('stats-breakdown');
+        statsList.innerHTML = '';
+        labels.forEach((label, i) => {
+            if (data[i] > 0) {
+                const row = document.createElement('div');
+                row.className = 'stat-item';
+                row.innerHTML = `<span class="muscle-label">${label}</span><span class="volume-value">${data[i]} Sets</span>`;
+                statsList.appendChild(row);
+            }
+        });
     }
 }
 //ancora pl fino a quiì
@@ -1944,7 +2451,7 @@ function updateLiveStatsPL() {
 
 
 function renderStatsUI(hierarchyMap) {
-// 3. RENDER LISTA (Sempre Completa con Accordion)
+    // 3. RENDER LISTA (Sempre Completa con Accordion)
     const statsList = document.getElementById('stats-breakdown');
     statsList.innerHTML = '';
 
@@ -2082,4 +2589,209 @@ function renderStatsUI(hierarchyMap) {
         volumeChartInstance.data.datasets[0].backgroundColor = colors;
         volumeChartInstance.update();
     }
+}
+
+// --- FUNZIONE PER ATTIVARE IL DRAG & DROP ---
+// ==========================================
+// === FUNZIONE GLOBALE DRAG & DROP ===
+// ==========================================
+function setupDragAndDrop(containerElement, dataArray) {
+    // Sicurezza: se la libreria non è caricata o il container non esiste, esci
+    if (typeof Sortable === 'undefined' || !containerElement) return;
+
+    // Se c'era già un'istanza attiva su questo container, distruggila per evitare conflitti
+    if (containerElement._sortable) containerElement._sortable.destroy();
+
+    // Crea la nuova istanza Sortable
+    containerElement._sortable = new Sortable(containerElement, {
+        handle: '.drag-handle', // La classe dell'icona da cliccare
+        animation: 150,         // Velocità animazione in ms
+        ghostClass: 'sortable-ghost', // Classe aggiunta all'elemento mentre lo trascini (opzionale)
+
+        // QUANDO HAI FINITO DI TRASCINARE:
+        onEnd: function (evt) {
+            // 1. Rimuovi l'elemento dalla vecchia posizione nell'array
+            const item = dataArray.splice(evt.oldIndex, 1)[0];
+            // 2. Inseriscilo nella nuova posizione
+            dataArray.splice(evt.newIndex, 0, item);
+
+            console.log("Nuovo ordine salvato!", dataArray);
+        }
+    });
+}
+
+// ==========================================
+// === ESPORTAZIONE EXCEL (STYLING PRO) ===
+// ==========================================
+
+document.getElementById('btn-import-excel').addEventListener('click', exportWorkoutToExcel);
+// Nota: Ho assunto che il tasto "Importa Excel" che hai nell'HTML
+// lo volessi usare per ESPORTARE (visto il nome della tua richiesta).
+// Se il tasto ha un altro ID, cambia 'btn-import-excel' con l'ID giusto.
+
+function exportWorkoutToExcel() {
+    if (!workoutData || Object.keys(workoutData).length === 0) {
+        alert("Nessun dato da esportare!");
+        return;
+    }
+
+    const workoutName = document.getElementById('workout-name').textContent.trim() || "Scheda Allenamento";
+    
+    // 1. DEFINIZIONE STILI
+    const styles = {
+        title: {
+            font: { bold: true, sz: 16, color: { rgb: "FFFFFF" } },
+            fill: { fgColor: { rgb: "1D1D1F" } }, // Nero Apple
+            alignment: { horizontal: "center", vertical: "center" }
+        },
+        dayHeader: {
+            font: { bold: true, sz: 14, color: { rgb: "000000" } },
+            fill: { fgColor: { rgb: "FFD60A" } }, // Giallo evidenziatore
+            alignment: { horizontal: "left", vertical: "center" },
+            border: { bottom: { style: "medium", color: { rgb: "000000" } } }
+        },
+        colHeader: {
+            font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
+            fill: { fgColor: { rgb: "0071E3" } }, // Blu Apple
+            alignment: { horizontal: "center", vertical: "center" },
+            border: { right: { style: "thin", color: { rgb: "FFFFFF" } } }
+        },
+        cellNormal: {
+            font: { sz: 11 },
+            alignment: { wrapText: true, vertical: "top" },
+            border: { bottom: { style: "thin", color: { rgb: "E5E5EA" } } }
+        },
+        cellCenter: {
+            font: { sz: 11 },
+            alignment: { horizontal: "center", vertical: "top", wrapText: true },
+            border: { bottom: { style: "thin", color: { rgb: "E5E5EA" } } }
+        }
+    };
+
+    // 2. PREPARAZIONE DATI
+    // Creiamo un array di righe per Excel
+    let wsData = [];
+    
+    // Titolo Scheda
+    wsData.push([{ v: workoutName.toUpperCase(), s: styles.title }]);
+    wsData.push([]); // Riga vuota
+
+    // Ordiniamo le chiavi (Giorni o Settimane)
+    const sortedKeys = Object.keys(workoutData).sort((a, b) => {
+        // Logica sort mista (numeri per BB, stringhe w1_d1 per PL)
+        return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    });
+
+    sortedKeys.forEach(key => {
+        const exercises = workoutData[key];
+        if (!exercises || exercises.length === 0) return;
+
+        // -- INTESTAZIONE GIORNO --
+        let dayTitle = "";
+        if (key.includes('w')) {
+            // Formato PL: w1_d1 -> Week 1 - Day 1
+            const parts = key.split('_');
+            dayTitle = `WEEK ${parts[0].replace('w','')} • DAY ${parts[1].replace('d','')}`;
+        } else {
+            // Formato BB: 1 -> Giorno 1
+            dayTitle = `GIORNO ${key}`;
+        }
+
+        wsData.push([{ v: dayTitle, s: styles.dayHeader }, null, null, null, null]); // Occupa 5 colonne
+
+        // -- INTESTAZIONE COLONNE --
+        const headers = ["ESERCIZIO", "SETS", "REPS", "CARICO / INTENSITÀ", "NOTE / RECUPERO"];
+        const headerRow = headers.map(h => ({ v: h, s: styles.colHeader }));
+        wsData.push(headerRow);
+
+        // -- RIGHE ESERCIZI --
+        exercises.forEach(ex => {
+            let name = ex.name;
+            if (ex.variant) name += ` (${ex.variant})`;
+            
+            let setsStr = "";
+            let repsStr = "";
+            let loadStr = "";
+            let notesStr = ex.notes || "";
+            if (ex.rest) notesStr += `\nRec: ${ex.rest}`;
+
+            // LOGICA FORMATTAZIONE (BB vs PL)
+            if (ex.isFundamental) {
+                // PL MODE: Struttura complessa
+                ex.sets.forEach(s => {
+                    const roleIcon = s.role === 'top' ? '👑' : (s.role === 'backoff' ? '📉' : '•');
+                    
+                    // Formattazione Sets
+                    setsStr += `${roleIcon} ${s.numSets || 1}\n`;
+                    
+                    // Formattazione Reps
+                    repsStr += `${s.reps}\n`;
+                    
+                    // Formattazione Carico (Smart)
+                    let loadLine = "";
+                    if (s.mode === 'PERC') loadLine = `${s.val}%`;
+                    else if (s.mode === 'KG') loadLine = `${s.val}Kg`;
+                    else if (s.mode === 'RPE') loadLine = `@RPE ${s.targetVal || ''}`;
+                    else if (s.mode === 'MAV') loadLine = `MAV`;
+                    else loadLine = s.val || "-";
+                    
+                    loadStr += `${loadLine}\n`;
+                });
+            } else {
+                // BB MODE o COMPLEMENTARE PL
+                if (ex.technique === 'Top set + back-off') {
+                     setsStr = "TOP\nBACK";
+                     repsStr = `${ex.topReps || '-'}\n${ex.backReps || '-'}`;
+                     loadStr = `${ex.topInt || '-'}\n${ex.backSets || '?'} set`;
+                } else {
+                    setsStr = ex.val1 || ex.sets || "-"; // val1 nel vecchio sistema BB è i Sets
+                    repsStr = ex.val2 || ex.reps || "-";
+                    loadStr = `${ex.metricType || ''} ${ex.intensityVal || ''}`;
+                }
+            }
+
+            // Crea la riga Excel
+            const row = [
+                { v: name, s: styles.cellNormal },
+                { v: setsStr.trim(), s: styles.cellCenter },
+                { v: repsStr.trim(), s: styles.cellCenter },
+                { v: loadStr.trim(), s: styles.cellCenter },
+                { v: notesStr.trim(), s: styles.cellNormal }
+            ];
+            wsData.push(row);
+        });
+
+        wsData.push([]); // Riga vuota tra i giorni
+    });
+
+    // 3. CREAZIONE FOGLIO
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Merge Celle (Titolo e Header Giorni sparsi su 5 colonne)
+    ws['!merges'] = [];
+    let currentRow = 0;
+    wsData.forEach((row, idx) => {
+        if (row[0] && row[0].s === styles.title) {
+             ws['!merges'].push({ s: { r: idx, c: 0 }, e: { r: idx, c: 4 } });
+        }
+        if (row[0] && row[0].s === styles.dayHeader) {
+             ws['!merges'].push({ s: { r: idx, c: 0 }, e: { r: idx, c: 4 } });
+        }
+    });
+
+    // Larghezza Colonne
+    ws['!cols'] = [
+        { wch: 35 }, // Esercizio
+        { wch: 8 },  // Sets
+        { wch: 10 }, // Reps
+        { wch: 20 }, // Carico
+        { wch: 30 }  // Note
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, "Scheda Allenamento");
+
+    // 4. DOWNLOAD
+    const fileName = `${workoutName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.xlsx`;
+    XLSX.writeFile(wb, fileName);
 }

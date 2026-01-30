@@ -9,7 +9,19 @@
     <!-- Font e Icone -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
+    <meta name="theme-color" content="#d32f2f"> <!-- Aggiungi questo per la coerenza su mobile -->
+    <link rel="apple-touch-icon" href="icon/icon-192.png"> <!-- Per dispositivi Apple -->
+
+    <link rel="manifest" href="manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registrato!', reg))
+                    .catch(err => console.log('Service Worker errore:', err));
+            });
+        }
+    </script>
     <!-- CSS (Lo creeremo nello step successivo) -->
     <link rel="stylesheet" href="onboarding-style.css">
 </head>

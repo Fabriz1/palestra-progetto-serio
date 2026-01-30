@@ -957,3 +957,53 @@ input:checked + .slider:before { transform: translateX(14px); }
 /* Scrollbar invisibile ma funzionale */
 .dropdown-items-container::-webkit-scrollbar { width: 4px; }
 .dropdown-items-container::-webkit-scrollbar-thumb { background: #D1D1D6; border-radius: 10px; }
+
+/* ========================================= */
+/* === 9. ADDONS POWERLIFTING & UTILITY === */
+/* ========================================= */
+
+/* Toolbar PL aggiuntiva nell'header */
+.pl-toolbar {
+    display: flex; gap: 8px; margin-left: 16px; 
+    padding-left: 16px; border-left: 1px solid #E5E5EA;
+}
+
+.btn-pl-tool {
+    font-size: 12px; font-weight: 600; padding: 6px 12px;
+    border-radius: 6px; background: #F5F5F7; color: #1D1D1F;
+    border: 1px solid #D2D2D7; cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: all 0.2s;
+}
+.btn-pl-tool:hover { background: #E5E5EA; border-color: #86868B; }
+
+/* Widget RPE Table (Floating) */
+#rpe-widget {
+    position: absolute; top: 80px; right: 20px;
+    width: 280px; background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0,0,0,0.1);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    border-radius: 12px; z-index: 9999;
+    padding: 16px; transform: scale(0.95); opacity: 0; pointer-events: none;
+    transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+#rpe-widget.visible { transform: scale(1); opacity: 1; pointer-events: auto; }
+
+.rpe-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+.rpe-table th { text-align: left; color: #86868B; border-bottom: 1px solid #E5E5EA; padding: 4px; }
+.rpe-table td { padding: 4px; border-bottom: 1px dashed #F5F5F7; color: #1D1D1F; font-weight: 500; }
+.rpe-table tr:last-child td { border: none; }
+
+/* Hint del calcolo Kg reali (appare vicino all'input %) */
+.real-kg-hint {
+    font-size: 10px; color: #0071E3; font-weight: 700;
+    margin-left: 4px; white-space: nowrap;
+}
+
+/* Modale Progressione */
+.progression-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid #F5F5F7;
+}
+.prog-input-group { display: flex; align-items: center; gap: 8px; }
+.prog-val-input { width: 60px; padding: 6px; text-align: center; border-radius: 6px; border: 1px solid #D2D2D7; }

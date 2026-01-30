@@ -14,7 +14,19 @@
     <!-- Chart.js per i Grafici -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- CSS Specifico -->
+    <meta name="theme-color" content="#d32f2f"> <!-- Aggiungi questo per la coerenza su mobile -->
+    <link rel="apple-touch-icon" href="icon/icon-192.png"> <!-- Per dispositivi Apple -->
+
+    <link rel="manifest" href="manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registrato!', reg))
+                    .catch(err => console.log('Service Worker errore:', err));
+            });
+        }
+    </script>
     <link rel="stylesheet" href="client-style.css">
 </head>
 

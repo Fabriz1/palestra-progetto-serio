@@ -13,8 +13,23 @@
 
     <!-- Chart.js per i grafici a torta -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+    <!-- Libreria Drag & Drop -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <!-- CSS (Useremo un file dedicato per non sporcare style.css generale) -->
+     <meta name="theme-color" content="#d32f2f"> <!-- Aggiungi questo per la coerenza su mobile -->
+    <link rel="apple-touch-icon" href="icon/icon-192.png"> <!-- Per dispositivi Apple -->
+
+    <link rel="manifest" href="manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registrato!', reg))
+                    .catch(err => console.log('Service Worker errore:', err));
+            });
+        }
+    </script>
     <link rel="stylesheet" href="builder-style.css">
 </head>
 
@@ -48,6 +63,13 @@
                         <span class="slider round"></span>
                     </label>
                     <label class="switch-label" id="lbl-pl">Powerlifting / S&C</label>
+                </div>
+
+                <!-- DENTRO header-center, dopo il div mode-switch-wrapper -->
+                <div id="pl-tools" class="pl-toolbar hidden">
+                    <button class="btn-pl-tool" id="btn-set-maxes"><i class="ph ph-trophy"></i> 1RM</button>
+
+                    <button class="btn-pl-tool" id="btn-toggle-rpe"><i class="ph ph-table"></i> RPE Ref</button>
                 </div>
 
                 <!-- STANDARD CONTROLS (Nascosti in PL Mode) -->
@@ -118,6 +140,14 @@
             <!-- COLONNA DESTRA: LIVE STATS -->
             <section class="stats-panel">
                 <h3>Analisi Volume Live</h3>
+                <div id="pl-chart-controls" class="hidden"
+                    style="margin-bottom: 15px; display: flex; gap: 5px; justify-content: center;">
+                    <button id="btn-chart-lifts" class="btn-secondary"
+                        style="font-size: 11px; padding: 6px 10px; background: #1D1D1F; color: white; border-color: #1D1D1F;">Per
+                        Alzata</button>
+                    <button id="btn-chart-muscles" class="btn-secondary" style="font-size: 11px; padding: 6px 10px;">Per
+                        Muscolo</button>
+                </div>
 
                 <div class="charts-container">
                     <div class="chart-box">
@@ -245,6 +275,117 @@
                 class="btn-secondary full-width" style="margin-top:5px;">Annulla</button>
         </div>
     </div>
+
+
+
+    <!-- WIDGET RPE TABELLA -->
+    <div id="rpe-widget">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h4 style="font-size:13px; margin:0;">Riferimento RPE / %</h4>
+            <button id="close-rpe" style="border:none; background:none; cursor:pointer;"><i
+                    class="ph ph-x"></i></button>
+        </div>
+        <table class="rpe-table">
+            <thead>
+                <tr>
+                    <th>Reps</th>
+                    <th>@RPE 8</th>
+                    <th>@RPE 9</th>
+                    <th>@RPE 10</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td>92%</td>
+                    <td>96%</td>
+                    <td>100%</td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td>89%</td>
+                    <td>94%</td>
+                    <td>96%</td>
+                </tr>
+                <tr>
+                    <td>3</td>
+                    <td>86%</td>
+                    <td>89%</td>
+                    <td>92%</td>
+                </tr>
+                <tr>
+                    <td>4</td>
+                    <td>84%</td>
+                    <td>86%</td>
+                    <td>89%</td>
+                </tr>
+                <tr>
+                    <td>5</td>
+                    <td>81%</td>
+                    <td>84%</td>
+                    <td>86%</td>
+                </tr>
+                <tr>
+                    <td>6</td>
+                    <td>79%</td>
+                    <td>81%</td>
+                    <td>84%</td>
+                </tr>
+                <tr>
+                    <td>8</td>
+                    <td>74%</td>
+                    <td>76%</td>
+                    <td>79%</td>
+                </tr>
+                <tr>
+                    <td>10</td>
+                    <td>70%</td>
+                    <td>73%</td>
+                    <td>75%</td>
+                </tr>
+            </tbody>
+        </table>
+        <p style="font-size:9px; color:#888; margin-top:8px; text-align:center;">Stime indicative su base lineare.</p>
+    </div>
+
+
+    <!-- NUOVO MODALE 1RM DINAMICO -->
+    <!-- MODALE 1RM (NUOVA VERSIONE CON RICERCA SMART) -->
+    <div id="maxes-modal" class="modal-overlay hidden">
+        <div class="modal-card"
+            style="width: 500px; min-height: 450px; display:flex; flex-direction:column; overflow:visible;">
+
+            <div class="modal-header">
+                <h3>Gestione Massimali (1RM)</h3>
+                <button onclick="document.getElementById('maxes-modal').classList.add('hidden')"
+                    style="border:none; background:none; cursor:pointer;"><i class="ph ph-x"
+                        style="font-size:20px;"></i></button>
+            </div>
+
+            <p style="font-size:13px; color:#666; margin-bottom:15px;">
+                Cerca un esercizio dalla libreria per aggiungerlo alla lista dei massimali monitorati.
+            </p>
+
+            <!-- QUI APPARIRÀ LA TENDINA DI RICERCA (È QUESTO CHE MANCAVA!) -->
+            <div id="max-add-area" style="margin-bottom: 20px; z-index: 100; position: relative;"></div>
+
+            <!-- Lista Massimali Esistenti -->
+            <div style="font-size:11px; font-weight:700; color:#86868B; text-transform:uppercase; margin-bottom:5px;">
+                Attualmente monitorati:</div>
+
+            <div id="maxes-list-container"
+                style="flex-grow:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px; padding-right:5px; margin-bottom:15px; border-top:1px solid #F5F5F7; padding-top:15px; max-height: 300px;">
+                <!-- Le righe verranno generate qui via JS -->
+            </div>
+
+            <button id="btn-save-maxes" class="btn-primary full-width">Salva e Chiudi</button>
+        </div>
+    </div>
+
+
+
+
+
     <!-- JS BUILDER -->
     <script type="module" src="workout-builder.js"></script>
 </body>
