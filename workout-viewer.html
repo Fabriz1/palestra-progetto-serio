@@ -28,7 +28,7 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
     <!-- CSS Nuovo -->
-    
+
 </head>
 
 <body>
@@ -47,13 +47,13 @@
 
     <!-- LISTA ESERCIZI (Accordion) -->
     <main class="exercises-stream">
-        
+
         <!-- NUOVO TITOLONE (Scrolla insieme alla pagina) -->
-        
+
 
         <!-- Qui dentro il JS inietterà le card -->
         <div id="exercises-list"></div>
-    
+
     </main>
 
     <!-- ACTION BAR FISSA IN BASSO -->
@@ -88,19 +88,43 @@
             </div>
         </div>
     </div>
+    <!-- CALCOLATORE DISCHI (Modal Bottom Sheet) -->
+    <div id="plate-modal-overlay" class="rest-overlay hidden" onclick="closePlateModal(event)">
+        <div class="plate-modal-content" onclick="event.stopPropagation()">
+            <div style="width:40px; height:5px; background:#E5E5EA; border-radius:10px; margin:0 auto 20px auto;"></div>
+
+            <div class="calc-result-text" id="plate-total-display">100 Kg</div>
+            <div class="calc-sub-text">Caricamento per lato (Bil. 20kg)</div>
+
+            <!-- Area Grafica -->
+            <div class="plate-display-area" id="plate-visual-container">
+                <div class="barbell-sleeve"></div>
+                <!-- I dischi verranno iniettati qui via JS -->
+            </div>
+
+            <div class="calc-sub-text" id="plate-text-list">1x20, 1x15, 1x5</div>
+
+            <div class="calc-inventory-toggle" id="inventory-toggle">
+                <i class="ph ph-gear"></i> Usa dischi da 25kg? <span id="status-25kg">SÌ</span>
+            </div>
+
+            <button class="btn-pill primary" style="width:100%; margin-top:20px;"
+                onclick="closePlateModal()">CHIUDI</button>
+        </div>
+    </div>
 
     <!-- SCRIPT -->
-     <script>
-    // FORZA L'AGGIORNAMENTO DELLA PWA/SERVICE WORKER
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-            for(let registration of registrations) {
-                registration.unregister();
-                console.log("Service Worker Rimosso/Aggiornato per forza");
-            }
-        });
-    }
-</script>
+    <script>
+        // FORZA L'AGGIORNAMENTO DELLA PWA/SERVICE WORKER
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                for (let registration of registrations) {
+                    registration.unregister();
+                    console.log("Service Worker Rimosso/Aggiornato per forza");
+                }
+            });
+        }
+    </script>
     <script type="module" src="workout-viewer.js"></script>
 </body>
 

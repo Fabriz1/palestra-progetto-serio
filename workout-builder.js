@@ -39,6 +39,7 @@ let plDaysPerWeek = 4;
 let currentPlWeek = 1;
 let currentPlDay = 1;
 let currentMaxes = {};
+let selectedPlClientId = null; // Tiene traccia di CHI stiamo modificando
 // Database Varianti (Hardcoded + Estensibile)
 let VARIANTS_DB = {
     "Gara (Comp)": [
@@ -240,30 +241,57 @@ onAuthStateChanged(auth, async (user) => {
     // 1. Funzione Render Lista Massimali
     function renderMaxesModal() {
         const container = document.getElementById('maxes-list-container');
-        if (!container) return; // Sicurezza
+        const modalTitle = document.querySelector('#maxes-modal h3'); // Assicurati di avere un h3 nel modale o usa un ID
+        
+        if (!container) return;
         container.innerHTML = '';
+
+        // Feedback visivo nel titolo del modale
+        if (selectedPlClientId) {
+            if(modalTitle) modalTitle.textContent = "Gestione Massimali (CLIENTE)";
+            if(modalTitle) modalTitle.style.color = "#0071E3";
+        } else {
+            if(modalTitle) modalTitle.textContent = "Lista Esercizi Monitorati (TEMPLATE)";
+            if(modalTitle) modalTitle.style.color = "#1D1D1F";
+        }
 
         const keys = Object.keys(currentMaxes).sort();
 
         if (keys.length === 0) {
-            container.innerHTML = `<div style="text-align:center; padding:10px; color:#999; font-size:12px;">Nessun esercizio monitorato. Cerca sopra per aggiungere.</div>`;
+            container.innerHTML = `<div style="text-align:center; padding:15px; color:#999; font-size:12px;">
+                ${selectedPlClientId ? "Il cliente non ha massimali salvati." : "La tua lista monitorati è vuota."}<br>
+                Usa la ricerca in alto per aggiungere esercizi.
+            </div>`;
         }
 
         keys.forEach(name => {
             const val = currentMaxes[name];
             const row = document.createElement('div');
-            row.style.cssText = "display:flex; gap:10px; align-items:center; background:#FAFAFC; padding:8px; border-radius:8px; border:1px solid #E5E5EA;";
+            row.style.cssText = "display:flex; gap:10px; align-items:center; background:#FAFAFC; padding:8px; border-radius:8px; border:1px solid #E5E5EA; margin-bottom:6px;";
+
+            // Logica Input: Se c'è un cliente, è modificabile. Se siamo in archivio, è disabilitato/nascosto.
+            let inputHtml = '';
+            if (selectedPlClientId) {
+                // Modo Cliente: Input numerico attivo
+                inputHtml = `<input type="number" class="max-val-inp" value="${val}" placeholder="Kg" style="width:80px; padding:6px; border:1px solid #D2D2D7; border-radius:6px; text-align:center; font-weight:700;">`;
+            } else {
+                // Modo Coach/Archivio: Solo testo o input disabilitato
+                inputHtml = `<div style="width:80px; text-align:center; font-size:11px; color:#888; background:#eee; padding:6px; border-radius:6px;">Monitorato</div>`;
+            }
 
             row.innerHTML = `
                 <div class="max-name-txt" style="flex:2; font-weight:600; font-size:13px; color:#1D1D1F;">${name}</div>
-                <input type="number" class="max-val-inp" value="${val}" placeholder="Kg" style="width:80px; padding:6px; border:1px solid #D2D2D7; border-radius:6px; text-align:center; font-weight:700;">
+                ${inputHtml}
                 <button class="btn-del-max" style="color:#FF3B30; background:white; border:1px solid #E5E5EA; border-radius:6px; width:30px; height:30px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="ph ph-trash"></i></button>
             `;
 
-            // Aggiorna valore nell'oggetto mentre scrivi
-            row.querySelector('.max-val-inp').oninput = (e) => {
-                currentMaxes[name] = parseFloat(e.target.value) || 0;
-            };
+            // Listener Input (Solo se esiste)
+            const input = row.querySelector('.max-val-inp');
+            if (input) {
+                input.oninput = (e) => {
+                    currentMaxes[name] = parseFloat(e.target.value) || 0;
+                };
+            }
 
             // Rimuovi dalla lista
             row.querySelector('.btn-del-max').onclick = () => {
@@ -280,30 +308,25 @@ onAuthStateChanged(auth, async (user) => {
     if (btnSetMaxes) {
         btnSetMaxes.addEventListener('click', () => {
             renderMaxesModal();
-            const modal = document.getElementById('maxes-modal');
-            modal.classList.remove('hidden');
+            document.getElementById('maxes-modal').classList.remove('hidden');
 
-            // Inserisci la Smart Dropdown nell'area dedicata
+            // Setup Area Aggiunta
             const addArea = document.getElementById('max-add-area');
             if (addArea) {
                 addArea.innerHTML = '';
-
                 const onSelectNewMax = (selectedName) => {
-                    if (!currentMaxes[selectedName]) {
-                        currentMaxes[selectedName] = 0; // Aggiungi nuovo con 0 kg
-                        renderMaxesModal(); // Ridisegna lista
+                    if (currentMaxes[selectedName] === undefined) {
+                        // Se sono coach (no client), aggiungo con valore 0 (placeholder)
+                        // Se sono cliente, aggiungo con valore 0 (da compilare)
+                        currentMaxes[selectedName] = 0;
+                        renderMaxesModal();
                     } else {
-                        alert("Esercizio già presente!");
+                        alert("Esercizio già in lista!");
                     }
                 };
-
-                // False = Mostra TUTTI gli esercizi per permettere di aggiungerli
-                const dropdown = createExerciseSmartDropdown("Cerca esercizio da aggiungere...", onSelectNewMax, false);
-
-                // Styling fix per il modale
-                const trig = dropdown.querySelector('.exercise-trigger');
-                if (trig) trig.style.background = "#F5F5F7";
-
+                // Qui mostriamo TUTTI gli esercizi per permettere di sceglierli
+                const dropdown = createExerciseSmartDropdown("Aggiungi esercizio alla lista...", onSelectNewMax, false);
+                dropdown.querySelector('.exercise-trigger').style.background = "#F5F5F7";
                 addArea.appendChild(dropdown);
             }
         });
@@ -312,18 +335,51 @@ onAuthStateChanged(auth, async (user) => {
     // 3. Listener Salvataggio (Btn Save Maxes)
     const btnSaveMaxes = document.getElementById('btn-save-maxes');
     if (btnSaveMaxes) {
-        btnSaveMaxes.addEventListener('click', async () => {
-            const user = auth.currentUser;
-            if (user) {
-                try {
-                    const userRef = doc(db, "users", user.uid);
-                    await updateDoc(userRef, { savedMaxes: currentMaxes });
-                    console.log("Massimali salvati su Cloud");
-                } catch (e) { console.error("Err salvataggio maxes:", e); }
-            }
+        // Rimuovi vecchi listener clonando il nodo (trucco rapido)
+        const newBtn = btnSaveMaxes.cloneNode(true);
+        btnSaveMaxes.parentNode.replaceChild(newBtn, btnSaveMaxes);
 
-            document.getElementById('maxes-modal').classList.add('hidden');
-            if (isPlMode) renderPlDay(); // Ricalcola la vista PL
+        newBtn.addEventListener('click', async () => {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            // Feedback visivo
+            const originalText = newBtn.textContent;
+            newBtn.textContent = "Salvataggio...";
+            newBtn.disabled = true;
+
+            try {
+                if (selectedPlClientId) {
+                    // CASO A: Salva sul CLIENTE
+                    const clientRef = doc(db, "users", selectedPlClientId);
+                    await updateDoc(clientRef, { savedMaxes: currentMaxes });
+                    console.log(`Massimali salvati per cliente ${selectedPlClientId}`);
+                    alert("Massimali del cliente aggiornati!");
+                } else {
+                    // CASO B: Salva sul COACH (Solo la lista/struttura)
+                    // Pulisci i valori a 0 per sicurezza, lasciando solo le chiavi
+                    // (Opzionale: se vuoi mantenere i tuoi massimali personali, togli il map)
+                    // Per un archivio "template", meglio avere solo le chiavi.
+                    
+                    // Nota: Se usi questo sistema anche per tracciare i TUOI massimali personali, 
+                    // allora non azzerare. Lascio i valori intatti per flessibilità.
+                    const coachRef = doc(db, "users", user.uid);
+                    await updateDoc(coachRef, { savedMaxes: currentMaxes });
+                    console.log("Lista monitorati Coach aggiornata");
+                    alert("Lista template aggiornata!");
+                }
+
+                // Chiudi e aggiorna vista
+                document.getElementById('maxes-modal').classList.add('hidden');
+                if (isPlMode) renderPlDay(); 
+
+            } catch (e) {
+                console.error("Errore salvataggio maxes:", e);
+                alert("Errore nel salvataggio: " + e.message);
+            } finally {
+                newBtn.textContent = originalText;
+                newBtn.disabled = false;
+            }
         });
     }
 
@@ -401,6 +457,7 @@ onAuthStateChanged(auth, async (user) => {
 
             if (isPlMode) {
                 // Setup Iniziale PL
+                setupPlClientSelector()
                 workoutData = {};
                 for (let w = 1; w <= plWeeks; w++) {
                     for (let d = 1; d <= plDaysPerWeek; d++) {
@@ -462,6 +519,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // --- LOAD DATA FUNCTION ---
+// --- LOAD DATA FUNCTION (AGGIORNATA PER PL) ---
 async function loadWorkoutToEdit(id, isCopy = false) {
     try {
         const docRef = doc(db, "workouts", id);
@@ -474,27 +532,89 @@ async function loadWorkoutToEdit(id, isCopy = false) {
 
         const data = snap.data();
 
-        // Popola variabili stato
+        // 1. Popola variabili stato base
         workoutData = data.data || {};
         totalDays = data.days || 3;
 
-        // UI
+        // UI Base
         workoutNameEl.textContent = isCopy ? `${data.name} (Copia)` : data.name;
         inputNumDays.value = totalDays;
 
+        // 2. CONTROLLO MODALITÀ (BB vs PL)
+        // Leggiamo il flag salvato. Se è undefined, assumiamo falso (vecchie schede BB)
+        isPowerliftingMode = !!data.isPlMode;
+
+        // Aggiorniamo lo Switch UI (senza triggerare l'evento 'change' che cancellerebbe i dati)
+        if (modeToggle) {
+            modeToggle.checked = isPowerliftingMode;
+        }
+
+        // Gestione Visibilità UI
+        const bbControls = document.getElementById('bb-controls');
+        const daysContainer = document.getElementById('days-tabs-container');
+        const plNav = document.getElementById('pl-navigation');
+        const plTools = document.getElementById('pl-tools');
+        const plChartControls = document.getElementById('pl-chart-controls');
+        
+        // Etichette Toggle
+        document.getElementById('lbl-bb').classList.toggle('selected', !isPowerliftingMode);
+        document.getElementById('lbl-pl').classList.toggle('selected', isPowerliftingMode);
+
+        if (isPowerliftingMode) {
+            // --- MODALITÀ POWERLIFTING ---
+            
+            // 1. Nascondi controlli BB
+            if(bbControls) bbControls.classList.add('hidden');
+            if(daysContainer) daysContainer.classList.add('hidden');
+            
+            // 2. Mostra controlli PL
+            if(plNav) plNav.classList.remove('hidden');
+            if(plTools) plTools.classList.remove('hidden');
+            if(plChartControls) {
+                plChartControls.classList.remove('hidden');
+                plChartControls.style.display = 'flex';
+            }
+
+            // 3. Recupera Metadati PL (Settimane e Giorni)
+            plWeeks = data.plWeeks || 4; // Default a 4 se manca
+            
+            // Calcolo giorni per settimana analizzando le chiavi (es. w1_d4 -> 4 giorni)
+            // Questo serve perché forse non abbiamo salvato plDaysPerWeek
+            let maxDayFound = 1;
+            Object.keys(workoutData).forEach(k => {
+                if(k.includes('_d')) {
+                    const dPart = parseInt(k.split('_d')[1]);
+                    if(dPart > maxDayFound) maxDayFound = dPart;
+                }
+            });
+            plDaysPerWeek = maxDayFound;
+
+            // 4. Renderizza interfaccia PL
+            renderPlNav();
+            renderPlDay();
+
+        } else {
+            // --- MODALITÀ BODYBUILDING ---
+            if(bbControls) bbControls.classList.remove('hidden');
+            if(daysContainer) daysContainer.classList.remove('hidden');
+            if(plNav) plNav.classList.add('hidden');
+            if(plTools) plTools.classList.add('hidden');
+            if(plChartControls) plChartControls.classList.add('hidden');
+
+            renderTabs();
+            renderDay(1);
+        }
+
+        // 3. Gestione Assegnazione (Solo se non è copia)
         if (!isCopy) {
             isEditMode = true;
             editingWorkoutId = id;
             originalAssignedTo = data.assignedTo;
-            // Pre-imposta modalità salvataggio
             saveMode = data.isTemplate ? 'archive' : 'assign';
-            if (data.assignedTo) modalClientSelect.value = data.assignedTo; // Nota: modalClientSelect va popolato
+            if (data.assignedTo) modalClientSelect.value = data.assignedTo;
         }
 
-        // Renderizza
-        renderTabs();
-        renderDay(1);
-        updateLiveStats();
+        updateLiveStats(); // Aggiorna grafici
 
     } catch (e) {
         console.error("Errore caricamento edit:", e);
@@ -1329,13 +1449,27 @@ let saveMode = 'assign';
 // --- CORREZIONE DEL LISTENER APERTURA MODALE ---
 
 btnOpenSave.addEventListener('click', async () => {
-    // 1. Validazione
+    // DEBUG: Apri la console (F12) per vedere cosa sta succedendo
+    console.log("Tentativo Salvataggio...");
+    console.log("Modalità PL:", isPowerliftingMode);
+    console.log("Chiavi in WorkoutData:", Object.keys(workoutData));
+
+    // 1. Validazione UNIVERSALE (Funziona per BB e PL)
     let hasExercises = false;
-    for (let i = 1; i <= totalDays; i++) {
-        if (workoutData[i] && workoutData[i].length > 0) hasExercises = true;
+    
+    // Prende TUTTI i valori dentro workoutData (liste di esercizi)
+    const allDays = Object.values(workoutData);
+
+    for (const dayList of allDays) {
+        // Se è una lista valida e contiene almeno 1 elemento...
+        if (Array.isArray(dayList) && dayList.length > 0) {
+            hasExercises = true;
+            break; // Trovato qualcosa, interrompiamo il ciclo
+        }
     }
 
     if (!hasExercises) {
+        console.warn("Nessun esercizio trovato in:", workoutData);
         alert("La scheda è vuota! Aggiungi almeno un esercizio.");
         return;
     }
@@ -1343,20 +1477,17 @@ btnOpenSave.addEventListener('click', async () => {
     // 2. Apri Modale
     modal.classList.remove('hidden');
 
-    // 3. CARICA SEMPRE I CLIENTI SE LA LISTA È VUOTA (Fix del bug)
+    // 3. Carica clienti
     if (modalClientSelect.options.length <= 1) {
         await loadClientsForModal();
     }
 
-    // 4. Gestione Stato Modifica (Pre-selezione)
+    // 4. Gestione Stato Modifica
     if (isEditMode) {
-        // Se la scheda era già assegnata a qualcuno, pre-selezionalo
         if (originalAssignedTo) {
-            // Assicuriamoci che l'opzione "Assegna" sia attiva visivamente
             optAssign.click();
             modalClientSelect.value = originalAssignedTo;
         } else {
-            // Se era in archivio, mantieni la selezione "Archivio" ma la lista clienti è pronta se cambi idea
             optArchive.click();
         }
     }
@@ -1366,24 +1497,33 @@ optAssign.addEventListener('click', () => { saveMode = 'assign'; optAssign.class
 optArchive.addEventListener('click', () => { saveMode = 'archive'; optArchive.classList.add('active'); optAssign.classList.remove('active'); modalClientSelect.classList.add('hidden'); modalTemplateName.classList.remove('hidden'); modalTemplateName.value = document.getElementById('workout-name').textContent.trim(); });
 optAssign.classList.add('active');
 
+// --- SALVATAGGIO REALE SU FIREBASE (VERSIONE BLINDATA) ---
 btnConfirmSave.addEventListener('click', async () => {
-    const user = auth.currentUser; if (!user) return;
-    btnConfirmSave.textContent = "Salvataggio..."; btnConfirmSave.disabled = true;
-    // ... dentro btnConfirmSave ... prima del try ...
+    const user = auth.currentUser; 
+    if (!user) return;
 
-    // --- APPRENDIMENTO AUTOMATICO AVANZATO (Con Tipi) ---
+    // 1. Feedback Visivo
+    const originalText = btnConfirmSave.textContent;
+    btnConfirmSave.textContent = "Salvataggio..."; 
+    btnConfirmSave.disabled = true;
+
+    // ============================================================
+    // A. APPRENDIMENTO AUTOMATICO
+    // ============================================================
     const newKnowledge = {};
     let hasNewKnowledge = false;
+    
+    // Usa Object.keys per sicurezza
+    const allDayKeys = Object.keys(workoutData); 
 
-    for (let i = 1; i <= totalDays; i++) {
-        if (workoutData[i]) {
-            workoutData[i].forEach(ex => {
-                const name = ex.name.trim();
-                if (!name) return;
+    for (const dayKey of allDayKeys) {
+        const exercises = workoutData[dayKey];
+        if (Array.isArray(exercises)) {
+            exercises.forEach(ex => {
+                const name = ex.name ? ex.name.trim() : "";
+                if (!name || !ex.muscles || ex.muscles.length === 0) return;
 
-                // Dati Attuali della Scheda
                 const currentPrimary = ex.muscles.find(m => m.type === 'primary')?.name;
-                // Prendiamo l'oggetto completo {name, type} per i sinergici, escludendo nomi vuoti
                 const currentSynergists = ex.muscles
                     .filter(m => m.type !== 'primary' && m.name)
                     .map(m => ({ name: m.name, type: m.type }));
@@ -1394,49 +1534,14 @@ btnConfirmSave.addEventListener('click', async () => {
                 let isDifferent = false;
 
                 if (!known) {
-                    isDifferent = true; // Nuovo esercizio
+                    isDifferent = true; 
                 } else {
-                    // 1. Confronta Primario
                     if (known.p !== currentPrimary) isDifferent = true;
-
-                    // 2. Confronta Sinergici (Normalizziamo il DB per il confronto)
-                    // Il DB base ha stringhe ["Tri"], noi abbiamo [{name:"Tri", type:"sec"}]
-                    // Dobbiamo convertire il DB base in formato oggetto per confrontare mele con mele.
-
-                    let knownSynergistsNorm = [];
-                    if (known.s) {
-                        knownSynergistsNorm = known.s.map(item => {
-                            if (typeof item === 'string') return { name: item, type: 'secondary' };
-                            return { name: item.name, type: item.type };
-                        });
-                    }
-
-                    // Logica di confronto array profonda
-                    if (knownSynergistsNorm.length !== currentSynergists.length) {
-                        isDifferent = true;
-                    } else {
-                        // Ordiniamo per nome per confrontare
-                        const sortFn = (a, b) => a.name.localeCompare(b.name);
-                        knownSynergistsNorm.sort(sortFn);
-                        const currentSynsSorted = [...currentSynergists].sort(sortFn);
-
-                        for (let k = 0; k < knownSynergistsNorm.length; k++) {
-                            // Se cambia il NOME o cambia il TIPO -> È diverso
-                            if (knownSynergistsNorm[k].name !== currentSynsSorted[k].name ||
-                                knownSynergistsNorm[k].type !== currentSynsSorted[k].type) {
-                                isDifferent = true;
-                                break;
-                            }
-                        }
-                    }
+                    if (known.s && currentSynergists.length !== known.s.length) isDifferent = true;
                 }
 
                 if (isDifferent) {
-                    // SALVA LA DEFINIZIONE COMPLETA (Con i tipi!)
-                    newKnowledge[name] = {
-                        p: currentPrimary,
-                        s: currentSynergists // Salva array di oggetti: [{name:'...', type:'tertiary'}]
-                    };
+                    newKnowledge[name] = { p: currentPrimary, s: currentSynergists };
                     hasNewKnowledge = true;
                 }
             });
@@ -1447,15 +1552,16 @@ btnConfirmSave.addEventListener('click', async () => {
         try {
             const userRef = doc(db, "users", user.uid);
             const updatePayload = {};
-            // Usa la dot notation per aggiornare chiavi specifiche nella mappa
             for (const [key, val] of Object.entries(newKnowledge)) {
                 updatePayload[`exerciseLibrary.${key}`] = val;
             }
-            // Salvataggio silenzioso
             updateDoc(userRef, updatePayload).catch(e => console.warn("Errore learning:", e));
-            console.log("🧠 Appreso nuove definizioni:", newKnowledge);
         } catch (e) { console.warn(e); }
     }
+
+    // ============================================================
+    // B. SALVATAGGIO SCHEDA
+    // ============================================================
     try {
         let finalName = document.getElementById('workout-name').textContent.trim();
         let assignedClientId = null;
@@ -1463,39 +1569,68 @@ btnConfirmSave.addEventListener('click', async () => {
 
         if (saveMode === 'assign') {
             assignedClientId = modalClientSelect.value;
-            if (!assignedClientId) { alert("Seleziona un atleta!"); btnConfirmSave.disabled = false; return; }
+            // Controllo sicurezza se il valore è vuoto
+            if (!assignedClientId || assignedClientId === "undefined") { 
+                alert("Seleziona un atleta valido dalla lista!"); 
+                btnConfirmSave.disabled = false; 
+                btnConfirmSave.textContent = originalText;
+                return; 
+            }
         } else {
             finalName = modalTemplateName.value.trim() || finalName;
             isTemplate = true;
         }
 
+        // TRUCCO DI PULIZIA: Rimuove tutti gli 'undefined' da workoutData
+        // Questo previene l'errore "Unsupported field value: undefined"
+        const cleanWorkoutData = JSON.parse(JSON.stringify(workoutData));
+
         const workoutPayload = {
-            coachId: user.uid, name: finalName, days: totalDays, data: workoutData,
-            assignedTo: assignedClientId, isTemplate: isTemplate, volumeSettingsUsed: userVolumeSettings,
-            updatedAt: serverTimestamp(), isArchived: false
+            coachId: user.uid,
+            name: finalName,
+            days: totalDays,
+            
+            // Gestione PL sicura
+            isPlMode: isPlMode === true, // Forza booleano
+            plWeeks: (isPlMode && plWeeks) ? plWeeks : null, 
+            
+            // Dati puliti
+            data: cleanWorkoutData,       
+            
+            assignedTo: assignedClientId, // Sarà una stringa o null
+            isTemplate: isTemplate,
+            volumeSettingsUsed: userVolumeSettings,
+            updatedAt: serverTimestamp(),
+            isArchived: false
         };
 
         if (isEditMode && editingWorkoutId) {
-            // UPDATE ESISTENTE
             const ref = doc(db, "workouts", editingWorkoutId);
             await updateDoc(ref, workoutPayload);
         } else {
-            // CREATE NUOVO
             workoutPayload.createdAt = serverTimestamp();
             const ref = await addDoc(collection(db, "workouts"), workoutPayload);
-            editingWorkoutId = ref.id; // Così se clicco ancora salva aggiorna
+            editingWorkoutId = ref.id;
             isEditMode = true;
         }
 
         if (assignedClientId) {
             const clientRef = doc(db, "users", assignedClientId);
-            await updateDoc(clientRef, { activeWorkoutId: editingWorkoutId || "pending", lastWorkoutUpdate: serverTimestamp() });
+            await updateDoc(clientRef, { 
+                activeWorkoutId: editingWorkoutId || "pending", 
+                lastWorkoutUpdate: serverTimestamp() 
+            });
         }
 
-        alert("Salvato con successo!");
+        alert("Salvato e Assegnato con successo!");
         window.location.href = "dashboard-pt.html";
 
-    } catch (error) { console.error(error); alert("Errore: " + error.message); btnConfirmSave.disabled = false; }
+    } catch (error) { 
+        console.error("ERRORE SALVATAGGIO:", error); 
+        alert("Errore critico salvataggio: " + error.message); 
+        btnConfirmSave.disabled = false; 
+        btnConfirmSave.textContent = originalText;
+    }
 });
 
 async function loadClientsForModal() {
@@ -1640,7 +1775,95 @@ function createPowerliftingRowHTML(container, data, index) {
 }
 
 
-//sezione pl2
+// --- NUOVA FUNZIONE: SETUP SELETTORE CLIENTE (PL CONTEXT) ---
+async function setupPlClientSelector() {
+    const toolbar = document.getElementById('pl-tools'); // Assicurati che questo ID esista nel tuo HTML nella barra PL
+    if (!toolbar) return;
+
+    // Evita duplicati se la funzione viene richiamata
+    if (document.getElementById('pl-client-context-select')) return;
+
+    const container = document.createElement('div');
+    container.style.cssText = "display:flex; align-items:center; gap:8px; margin-left:15px; border-left:1px solid #ccc; padding-left:15px;";
+    
+    container.innerHTML = `
+        <span class="tiny-label" style="margin:0;">Riferimento 1RM:</span>
+        <select id="pl-client-context-select" style="padding:4px; border-radius:6px; border:1px solid #D2D2D7; font-size:12px; font-weight:600; width:160px;">
+            <option value="">Nessuno (Archivio)</option>
+            <option disabled>--- Caricamento... ---</option>
+        </select>
+    `;
+
+    // Inseriamo il selettore nella toolbar (prima dei bottoni grafici)
+    toolbar.insertBefore(container, toolbar.firstChild);
+
+    const select = document.getElementById('pl-client-context-select');
+
+    // 1. Carica lista clienti
+    const q = query(collection(db, "users"), where("role", "==", "client"));
+    const snapshot = await getDocs(q);
+    
+    // Pulisci e popola
+    select.innerHTML = '<option value="">Nessuno (Archivio)</option>';
+    snapshot.forEach(doc => {
+        const c = doc.data();
+        const opt = document.createElement('option');
+        opt.value = doc.id;
+        opt.textContent = c.name || c.email;
+        select.appendChild(opt);
+    });
+
+    // 2. LISTENER AL CAMBIO
+    select.addEventListener('change', async (e) => {
+        const clientId = e.target.value;
+        const feedbackLabel = container.querySelector('.tiny-label');
+        selectedPlClientId = clientId || null; 
+        if (!clientId) {
+            // --- MODALITÀ COACH (Nessuno) ---
+            feedbackLabel.textContent = "Riferimento 1RM:";
+            feedbackLabel.style.color = "";
+            
+            // Carica i massimali (struttura) del Coach per averli come base
+            // (Assumiamo che userData sia accessibile o lo ricarichiamo)
+            const user = auth.currentUser;
+            if (user) {
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+                currentMaxes = userDoc.data().savedMaxes || {};
+            } else {
+                currentMaxes = {};
+            }
+            
+            renderPlDay(); 
+            return;
+        }
+
+        // Modalità Cliente
+        feedbackLabel.textContent = "Caricamento...";
+        try {
+            const userRef = doc(db, "users", clientId);
+            const userSnap = await getDoc(userRef);
+            
+            if (userSnap.exists()) {
+                const data = userSnap.data();
+                // Sovrascrivi i massimali globali con quelli del cliente
+                currentMaxes = data.savedMaxes || {}; 
+                
+                feedbackLabel.textContent = "✅ Dati caricati";
+                feedbackLabel.style.color = "green";
+                
+                // IMPORTANTE: Aggiorna tutta la vista
+                renderPlDay(); 
+                
+                // Aggiorna anche la tendina salvataggio finale per comodità
+                const modalSelect = document.getElementById('modal-client-select');
+                if(modalSelect) modalSelect.value = clientId;
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Errore caricamento dati cliente");
+        }
+    });
+}
 
 
 // =========================================
@@ -1677,6 +1900,7 @@ function renderPlNav() {
     }
 }
 
+
 // --- RENDER GIORNO CORRENTE (PL) ---
 function renderPlDay() {
     const key = `w${currentPlWeek}_d${currentPlDay}`;
@@ -1696,7 +1920,6 @@ function renderPlDay() {
             createExerciseRowHTML(listContainer, exData, index);
 
             // --- FIX DELETE PER COMPLEMENTARI PL ---
-            // Sovrascriviamo l'onclick del cestino appena creato
             const row = listContainer.lastChild;
             const delBtn = row.querySelector('.btn-remove-row');
             // Clona il bottone per rimuovere i vecchi listener BB
@@ -1715,14 +1938,11 @@ function renderPlDay() {
         }
     });
 
-    // ... (Il resto dei bottoni aggiungi rimane uguale) ...
-    // ... Copia qui sotto i bottoni "Aggiungi Fondamentale/Complementare" e "Copia Tutto" dal codice precedente ...
-    // (Se non vuoi ricopiarli dimmelo, ma è meglio avere la funzione pulita)
-
-    // CODICE BOTTONI (Riassunto per brevità, assicurati di averlo):
+    // BOTTONI AGGIUNTA
     const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex; gap:10px; margin-top:20px;';
     const addFundBtn = document.createElement('button'); addFundBtn.className = 'btn-primary'; addFundBtn.style.cssText = 'flex:1; background:#FF9500;'; addFundBtn.innerHTML = '<i class="ph ph-barbell"></i> + Fondamentale';
     addFundBtn.onclick = () => {
+        // MAV FIX: Default sets vuoto ma pronto
         workoutData[key].push({ id: Date.now(), isFundamental: true, excludeVolume: true, variant: "", name: "", trackingMetric: "Kg", sets: [] });
         renderPlDay();
     };
@@ -1748,7 +1968,11 @@ function renderPlDay() {
         alert("Copiato!");
     };
     dayContentArea.appendChild(copyAllBtn);
-    setupDragAndDrop(listContainer, workoutData[day]);
+    
+    // *** CORREZIONE QUI SOTTO ***
+    // Prima c'era workoutData[day], che causava l'errore. Ora usa workoutData[key].
+    setupDragAndDrop(listContainer, workoutData[key]);
+    
     updateLiveStatsPL();
 }
 
@@ -1815,22 +2039,18 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
         backoff: { type: 'linear_perc', val: 2 }
     };
 
-    // --- 2. LOGICA INIZIALE PARAMETRO EXTRA (FIX RELOAD) ---
-    // Calcoliamo queste variabili SUBITO, basandoci sui dati salvati
     const hasParam = !!data.variantParamType && data.variantParamType !== 'none';
     let paramLabelText = 'Extra';
     let paramPlaceholder = 'Val';
 
     if (hasParam) {
-        // Mettiamo la prima lettera maiuscola (es. time -> Tempo)
         paramLabelText = data.variantParamType.charAt(0).toUpperCase() + data.variantParamType.slice(1);
-
         if (data.variantParamType === 'time') paramPlaceholder = 'es. 3s';
         else if (data.variantParamType === 'height') paramPlaceholder = 'es. 5cm';
         else if (data.variantParamType === 'angle') paramPlaceholder = 'es. 45°';
     }
 
-    // --- 3. COLONNA SINISTRA ---
+    // --- 2. COLONNA SINISTRA ---
     const leftCol = document.createElement('div');
     leftCol.style.padding = '20px';
     leftCol.style.position = 'relative';
@@ -1839,16 +2059,11 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
     leftCol.innerHTML = `
         <div class="drag-handle" style="left:6px; top:20px;"><i class="ph ph-dots-six-vertical"></i></div>
         
-        <!-- HEADER ROW: ESERCIZIO + VARIANTE (50/50 SPLIT) -->
         <div style="margin-bottom: 20px; display:flex; gap:15px; align-items:flex-end; padding-left:25px;">
-            
-            <!-- ESERCIZIO (Flex 1) -->
             <div style="flex:1; min-width: 0;" class="smart-select-container">
                 <span class="tiny-label" style="margin-bottom:4px; display:block;">Esercizio (Target 1RM)</span>
-                <!-- Dropdown injected here -->
             </div>
             
-            <!-- VARIANTE (Flex 1 - Stessa larghezza Esercizio) -->
             <div style="flex:1; min-width: 0;">
                 <span class="tiny-label" style="margin-bottom:4px; display:block;">Variante</span>
                 <div class="variant-selector" style="display:flex; justify-content:space-between; align-items:center; background:white; border:1px solid #E5E5EA; padding:0 12px; border-radius:8px; cursor:pointer; height:42px; transition:border 0.2s;">
@@ -1860,18 +2075,15 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
                 </div>
             </div>
 
-            <!-- PARAMETRO EXTRA (Larghezza fissa se presente) -->
             <div class="var-param-container" style="flex: 0 0 80px; display:${hasParam ? 'block' : 'none'}; margin-left:-5px;">
                 <span class="tiny-label" style="margin-bottom:4px; display:block;">${paramLabelText}</span>
                 <input type="text" class="var-param-input" value="${data.variantValue || ''}" placeholder="${paramPlaceholder}" 
                     style="width:100%; height:42px; border:1px solid #0071E3; background:#F0F8FF; border-radius:8px; text-align:center; font-weight:600; font-size:13px; color:#0071E3;">
             </div>
 
-            <!-- BADGE 1RM (Auto width) -->
             <div class="max-badge-display" style="height:42px; display:flex; align-items:center; padding-left:5px;"></div>
         </div>
 
-        <!-- HEADERS TABELLA SET -->
         <div style="display:grid; grid-template-columns: 110px 140px 1fr 30px; gap:10px; padding-left:25px; margin-bottom:8px; font-size:10px; color:#86868B; font-weight:700; text-transform:uppercase;">
             <span>Quantità (Sets x Reps)</span>
             <span>Intensità (Mode & Value)</span>
@@ -1888,7 +2100,7 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
         <textarea class="input-notes" placeholder="Note tecniche per l'atleta..." style="margin-left:25px; width:calc(100% - 25px); margin-top:15px; height:50px; min-height:50px; border:1px solid #E5E5EA; border-radius:8px; padding:10px; font-family:inherit; font-size:12px; resize:vertical;">${data.notes || ''}</textarea>
     `;
 
-    // --- 4. COLONNA DESTRA (Automazione) ---
+    // --- 3. COLONNA DESTRA (Automazione) ---
     const rightCol = document.createElement('div');
     rightCol.style.cssText = "background:#F9F9FB; border-left:1px solid #E5E5EA; padding:20px; display:flex; flex-direction:column; justify-content:flex-start; z-index:10; overflow-y:auto;";
 
@@ -1939,7 +2151,6 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
             </button>
         `;
 
-        // Listeners
         rightCol.querySelector('#prog-strat-sel').onchange = (e) => {
             data.progression.strategy = e.target.value;
             renderRightCol();
@@ -1959,9 +2170,8 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
     row.appendChild(rightCol);
     container.appendChild(row);
 
-    // ================= 5. LOGICA FUNZIONALE & UI =================
+    // --- 4. LOGICA & UI ---
 
-    // HEADER - ESERCIZIO
     const selectContainer = leftCol.querySelector('.smart-select-container');
     const onExerciseSelect = (name) => {
         data.name = name;
@@ -1969,7 +2179,7 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
         renderSets();
     };
 
-    // Dropdown Esercizio (Altezza fissa per allineamento)
+    // Dropdown Esercizio
     const exDropdown = createExerciseSmartDropdown(data.name, onExerciseSelect, true);
     const exTrigger = exDropdown.querySelector('.exercise-trigger');
     if (exTrigger) {
@@ -1979,41 +2189,34 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
     }
     selectContainer.appendChild(exDropdown);
 
-    // BADGE 1RM
+    // BADGE 1RM (Logica corretta: se currentMaxes è vuoto, ritorna 0 e nasconde)
     const updateMaxBadge = () => {
         const badgeArea = leftCol.querySelector('.max-badge-display');
         const max = getReferenceMax(data.name);
+        // MOSTRA SOLO SE IL MASSIMALE ESISTE ED È > 0
         badgeArea.innerHTML = max > 0
             ? `<div style="background:#FFF8E1; color:#F57F17; font-size:11px; font-weight:700; padding:6px 12px; border-radius:6px; border:1px solid #FFD54F; white-space:nowrap;">1RM: ${max}kg</div>`
             : ``;
     };
     updateMaxBadge();
 
-    // VARIANT SELECTOR LOGIC (Gestione Click)
+    // VARIANT SELECTOR LOGIC
     const varSelector = leftCol.querySelector('.variant-selector');
     const paramContainer = leftCol.querySelector('.var-param-container');
     const paramLabel = paramContainer.querySelector('.tiny-label');
     const paramInput = paramContainer.querySelector('.var-param-input');
 
-    // Listener Input Parametro
-    paramInput.oninput = (e) => {
-        data.variantValue = e.target.value;
-    };
+    paramInput.oninput = (e) => data.variantValue = e.target.value;
 
     varSelector.onclick = (e) => {
         if (e.target.classList.contains('btn-clear-var') || e.target.closest('.btn-clear-var')) return;
-
         if (typeof openVariantDropdown === 'function') {
             openVariantDropdown(varSelector, (name, section, paramType) => {
                 data.variant = name;
                 data.variantParamType = paramType;
                 data.variantValue = '';
-
-                // Aggiorna UI Testo
                 leftCol.querySelector('.var-text').textContent = name;
                 leftCol.querySelector('.btn-clear-var').style.display = 'block';
-
-                // Mostra Input Extra se necessario
                 if (paramType && paramType !== 'none') {
                     paramContainer.style.display = 'block';
                     paramLabel.textContent = paramType.charAt(0).toUpperCase() + paramType.slice(1);
@@ -2026,34 +2229,32 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
         }
     };
 
-    // Clear Variante
     leftCol.querySelector('.btn-clear-var').onclick = (e) => {
         e.stopPropagation();
         data.variant = "";
         data.variantParamType = null;
         data.variantValue = "";
-
         leftCol.querySelector('.var-text').textContent = "Standard";
         leftCol.querySelector('.btn-clear-var').style.display = 'none';
         paramContainer.style.display = 'none';
     };
 
-
     // SETS RENDERING
     const setsCont = leftCol.querySelector('.sets-container');
-
     const renderSets = () => {
         setsCont.innerHTML = '';
+        const max = getReferenceMax(data.name); // Qui prende il massimale del cliente se selezionato
 
         data.sets.forEach((set, sIdx) => {
             const div = document.createElement('div');
             div.style.cssText = "display:grid; grid-template-columns: 110px 140px 1fr 30px; gap:10px; align-items:center; background:white; border:1px solid #E5E5EA; padding:10px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.02); transition:border 0.2s;";
 
-            const max = getReferenceMax(data.name);
             let hintText = "";
             let inputPlaceholder = "Val";
             let isMav = (set.mode === 'MAV');
+            let isSetDisabled = isMav;
 
+            // CALCOLO HINT KG: Solo se abbiamo un massimale > 0 (quindi cliente selezionato)
             if (max > 0 && set.val) {
                 if (set.mode === 'PERC') {
                     const kg = Math.round((max * parseFloat(set.val)) / 100);
@@ -2066,14 +2267,11 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
             if (set.mode === 'RPE' || set.mode === 'RIR') inputPlaceholder = "es. 8";
 
             div.innerHTML = `
-                <!-- COL 1: QUANTITÀ -->
                 <div style="display:flex; align-items:center; gap:5px;">
-                    <input type="number" class="inp-sets" value="${set.numSets || 1}" title="Sets" style="width:38px; height:32px; text-align:center; font-weight:700; border:1px solid #D2D2D7; border-radius:6px; padding:0;">
+                    <input type="number" class="inp-sets" value="${isSetDisabled ? 1 : (set.numSets || 1)}" ${isSetDisabled ? 'disabled' : ''} title="Sets" style="width:38px; height:32px; text-align:center; font-weight:700; border:1px solid #D2D2D7; border-radius:6px; padding:0; ${isSetDisabled ? 'background:#F2F2F7; color:#999;' : ''}">
                     <span style="font-size:11px; color:#888;">x</span>
                     <input type="text" class="inp-reps" value="${set.reps}" title="Reps" style="flex:1; height:32px; text-align:center; font-weight:600; border:1px solid #D2D2D7; border-radius:6px; padding:0;">
                 </div>
-
-                <!-- COL 2: INTENSITÀ -->
                 <div style="display:flex; border:1px solid #D2D2D7; border-radius:6px; overflow:hidden; height:32px;">
                     <select class="sel-mode" style="border:none; border-right:1px solid #E5E5EA; background:#F9F9FA; font-size:10px; font-weight:700; padding:0 2px; color:#1D1D1F; cursor:pointer; width:50px; text-align:center;">
                         <option value="PERC" ${set.mode === 'PERC' ? 'selected' : ''}>%</option>
@@ -2083,26 +2281,19 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
                         <option value="MAV" ${set.mode === 'MAV' ? 'selected' : ''}>MAV</option>
                     </select>
                     <div style="position:relative; flex:1;">
-                        <input type="text" class="inp-val" value="${set.val}" placeholder="${isMav ? 'Auto' : inputPlaceholder}" ${isMav ? 'disabled' : ''} 
-                            style="width:100%; height:100%; border:none; padding:4px; font-size:12px; font-weight:600; text-align:center; ${isMav ? 'background:#FAFAFC;' : ''} outline:none;">
-                        
+                        <input type="text" class="inp-val" value="${set.val}" placeholder="${isMav ? 'Auto' : inputPlaceholder}" ${isMav ? 'disabled' : ''} style="width:100%; height:100%; border:none; padding:4px; font-size:12px; font-weight:600; text-align:center; ${isMav ? 'background:#FAFAFC;' : ''} outline:none;">
                         ${hintText ? `<div style="position:absolute; right:4px; top:50%; transform:translateY(-50%); font-size:9px; color:#0071E3; font-weight:700; background:rgba(0, 113, 227, 0.1); padding:2px 4px; border-radius:4px; pointer-events:none;">${hintText}</div>` : ''}
                     </div>
                 </div>
-
-                <!-- COL 3: RUOLO -->
                 <select class="sel-role" style="width:100%; height:32px; font-size:11px; padding:0 8px; border:1px solid ${getRoleColor(set.role)}; color:${getRoleColor(set.role)}; font-weight:700; border-radius:6px; cursor:pointer; background:white;">
                     <option value="normal" ${set.role === 'normal' ? 'selected' : ''}>Normal / Work</option>
                     <option value="top" ${set.role === 'top' ? 'selected' : ''}>Top Set 👑</option>
                     <option value="backoff" ${set.role === 'backoff' ? 'selected' : ''}>Back-off 📉</option>
                     <option value="warmup" ${set.role === 'warmup' ? 'selected' : ''}>Warm-up 🔥</option>
                 </select>
-
-                <!-- COL 4: DELETE -->
                 <div class="btn-del-set" style="cursor:pointer; color:#C7C7CC; display:flex; justify-content:center; align-items:center; height:32px;"><i class="ph ph-x" style="font-size:16px;"></i></div>
             `;
 
-            // LISTENERS
             const inpSets = div.querySelector('.inp-sets');
             const inpReps = div.querySelector('.inp-reps');
             const selMode = div.querySelector('.sel-mode');
@@ -2114,11 +2305,12 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
             inpReps.oninput = (e) => set.reps = e.target.value;
             inpVal.oninput = (e) => {
                 set.val = e.target.value;
-                if (max > 0 && set.mode !== 'MAV' && set.mode !== 'RPE') renderSets();
+                if (max > 0 && set.mode !== 'MAV' && set.mode !== 'RPE') renderSets(); // Ricalcola hint live
             };
             selMode.onchange = (e) => {
                 set.mode = e.target.value;
                 set.val = '';
+                if (set.mode === 'MAV') set.numSets = 1;
                 renderSets();
             };
             selRole.onchange = (e) => {
@@ -2133,10 +2325,8 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
             };
             div.addEventListener('focusin', () => div.style.borderColor = '#0071E3');
             div.addEventListener('focusout', () => div.style.borderColor = '#E5E5EA');
-
             setsCont.appendChild(div);
         });
-
         if (window.PhosphorIcons) window.PhosphorIcons.replace();
     };
 
@@ -2150,25 +2340,17 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
     renderRightCol();
     renderSets();
 
-    // ADD BUTTON
     leftCol.querySelector('.btn-add-set-pl').onclick = () => {
         const last = data.sets[data.sets.length - 1];
         let nextRole = 'normal';
         if (last && last.role === 'top') nextRole = 'backoff';
         if (last && last.role === 'backoff') nextRole = 'backoff';
-
-        data.sets.push({
-            numSets: 1,
-            reps: last ? last.reps : '5',
-            mode: last ? last.mode : 'PERC',
-            val: '',
-            role: nextRole
-        });
+        data.sets.push({ numSets: 1, reps: last ? last.reps : '5', mode: last ? last.mode : 'PERC', val: '', role: nextRole });
         renderSets();
         updateLiveStatsPL();
     };
 
-    // GENERAZIONE AUTOMATICA
+    // --- GENERAZIONE AUTOMATICA FIXATA (ORDINAMENTO) ---
     function handleGenerateProgression() {
         if (!confirm(`Generare settimane future per "${data.name}"?`)) return;
 
@@ -2179,11 +2361,18 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
         for (let w = currentWeekNum + 1; w <= plWeeks; w++) {
             const targetKey = `w${w}_${dayPart}`;
             if (!workoutData[targetKey]) workoutData[targetKey] = [];
+            
+            // 1. RIMUOVI VECCHIA VERSIONE DELLO STESSO ESERCIZIO (Se esisteva)
+            // Nota: Se ci sono due "Squat" diversi nello stesso giorno, questo li rimuove entrambi.
+            // Per il PL solitamente va bene, altrimenti servirebbe un ID unico persistente.
             workoutData[targetKey] = workoutData[targetKey].filter(e => !(e.isFundamental && e.name === data.name));
+
+            // 2. CREA CLONE
             const targetEx = JSON.parse(JSON.stringify(data));
-            targetEx.id = Date.now() + Math.random();
+            targetEx.id = Date.now() + Math.random(); // Nuovo ID
             const weeksDelta = w - currentWeekNum;
 
+            // 3. APPLICA CALCOLI PROGRESSIONE
             targetEx.sets.forEach((tSet) => {
                 let config = data.progression.all;
                 if (strat === 'role_based') {
@@ -2213,7 +2402,18 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
                     tSet.numSets = Math.round(tSet.numSets + stepVal);
                 }
             });
-            workoutData[targetKey].unshift(targetEx);
+
+            // 4. INSERIMENTO NELLA POSIZIONE CORRETTA (FIX!)
+            // Usiamo l'indice originale ('index') passato alla funzione principale.
+            // Se l'array target è più corto dell'indice, splice lo aggiunge in fondo (corretto).
+            // Se l'indice esiste, lo inserisce LÌ e sposta gli altri sotto.
+            
+            // Caso speciale: se la week target è vuota o l'indice è troppo alto
+            if (index >= workoutData[targetKey].length) {
+                workoutData[targetKey].push(targetEx);
+            } else {
+                workoutData[targetKey].splice(index, 0, targetEx);
+            }
         }
         alert("Progressione applicata! 🚀");
     }

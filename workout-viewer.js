@@ -69,11 +69,55 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // Variabile globale per tenere i pesi vecchi
+
+
+
+// Funzione "Segugio" per trovare il massimale
+function findBestMaxMatch(exerciseName) {
+    if (!exerciseName || !userMaxes) return 0;
+    
+    // 1. Pulizia nome esercizio scheda (es. "Squat (Comp)" -> "squat")
+    const cleanEx = exerciseName.toLowerCase()
+        .replace('(comp)', '')
+        .replace('pl', '')
+        .trim();
+
+    // 2. Cerca nelle chiavi dei massimali salvati (es. "Squat", "Panca")
+    const maxKeys = Object.keys(userMaxes);
+    
+    // Tentativo 1: La chiave del massimale è contenuta nel nome esercizio?
+    // Es. Esercizio: "Panca Piana Manubri" -> Key: "Panca" -> Match!
+    let match = maxKeys.find(k => cleanEx.includes(k.toLowerCase()));
+    
+    // Tentativo 2: Il nome esercizio è contenuto nella chiave?
+    // Es. Esercizio: "Squat" -> Key: "Squat High Bar" -> Match!
+    if (!match) {
+        match = maxKeys.find(k => k.toLowerCase().includes(cleanEx));
+    }
+
+    return match ? userMaxes[match] : 0;
+}
+
+
+
+
+
 let historyMap = {}; 
+
+// Aggiungi questa variabile GLOBALE all'inizio del file, sotto le altre variabili let
+
+
+
+
+
+
+
+
+let userMaxes = {}; 
 
 async function loadData() {
     try {
-        // 1. Carica la Scheda (Come prima)
+        // 1. Carica la Scheda dal Database
         const docRef = doc(db, "workouts", currentWorkoutId);
         const snap = await getDoc(docRef);
 
@@ -83,101 +127,178 @@ async function loadData() {
             return;
         }
 
-        workoutData = snap.data();
-        dayTitle.textContent = `Giorno ${currentDay}`;
+        const docData = snap.data();
+        workoutData = docData; // Salva in variabile globale
 
-        // --- NUOVO: CARICA STORICO (PREVIOUS LIFTS) ---
+        // 2. RECUPERA MASSIMALI UTENTE (Per calcoli PL % e 1RM)
+        if (auth.currentUser) {
+            const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+            if (userDoc.exists()) {
+                userMaxes = userDoc.data().savedMaxes || {}; 
+            }
+        }
+
+        // ============================================================
+        // 3. TRADUZIONE CHIAVE GIORNO (IL FIX FONDAMENTALE)
+        // ============================================================
+        // Il Dashboard passa numeri (es. "1", "5"), ma il PL usa chiavi (es. "w1_d1", "w2_d1").
+        
+        let targetKey = currentDay; // Partiamo assumendo sia "1" o "w1_d1" esatto
+        let exercises = [];
+
+        // Se l'accesso diretto fallisce (es. cerco "1" ma esiste solo "w1_d1")
+        if (!workoutData.data[targetKey]) {
+            
+            // Recuperiamo tutte le chiavi che sembrano giorni PL (iniziano con 'w')
+            const plKeys = Object.keys(workoutData.data).filter(k => k.startsWith('w'));
+            
+            if (plKeys.length > 0) {
+                // Li ordiniamo logicamente: w1_d1, w1_d2 ... w2_d1 ...
+                plKeys.sort((a, b) => {
+                    // Estrae i numeri dalla stringa (es. w1_d2 -> [1, 2])
+                    const numsA = a.match(/\d+/g).map(Number);
+                    const numsB = b.match(/\d+/g).map(Number);
+                    
+                    // Confronta Settimana
+                    if (numsA[0] !== numsB[0]) return numsA[0] - numsB[0];
+                    // Se settimana uguale, confronta Giorno
+                    return numsA[1] - numsB[1];
+                });
+
+                // Convertiamo il currentDay (es. "1") in indice array (0)
+                const index = parseInt(currentDay) - 1;
+                
+                // Se esiste una chiave a quell'indice, usiamo quella!
+                if (plKeys[index]) {
+                    targetKey = plKeys[index];
+                    console.log(`🔀 Mapping PL attivo: Giorno ${currentDay} -> Chiave ${targetKey}`);
+                }
+            }
+        }
+
+        // Ora recuperiamo gli esercizi con la chiave corretta
+        exercises = workoutData.data[targetKey] || [];
+
+        // ============================================================
+        // 4. GESTIONE TITOLO
+        // ============================================================
+        let displayTitle = `Giorno ${currentDay}`;
+        
+        // Se la chiave finale è in formato PL (wX_dY), creiamo un titolo bello
+        if (targetKey.includes('w') && targetKey.includes('d')) {
+            const parts = targetKey.split('_'); 
+            const weekNum = parts[0].replace('w', '');
+            const dayNum = parts[1].replace('d', '');
+            displayTitle = `Week ${weekNum} • Day ${dayNum}`;
+        }
+        
+        dayTitle.textContent = displayTitle;
+
+        // --- CARICA STORICO (PREVIOUS LIFTS) ---
+        // Nota: Per lo storico usiamo il `dayIndex` numerico originale (currentDay)
+        // perché è così che viene salvato nei log.
         try {
             const logsRef = collection(db, "users", auth.currentUser.uid, "logs");
-            // Cerchiamo l'ultimo log DI QUESTO GIORNO DI QUESTA SCHEDA
             const q = query(
                 logsRef, 
                 where("workoutId", "==", currentWorkoutId),
-                where("dayIndex", "==", parseInt(currentDay)),
+                where("dayIndex", "==", parseInt(currentDay)), 
                 orderBy("date", "desc"),
                 limit(1)
             );
             
             const logSnap = await getDocs(q);
-            
             if (!logSnap.empty) {
                 const lastLog = logSnap.docs[0].data();
-                // Creiamo una mappa facile da leggere: { "Panca": [100, 100, 90], "Squat": [120, 120] }
                 if (lastLog.exercises) {
                     lastLog.exercises.forEach(ex => {
-                        // Salviamo solo i pesi (kg) in un array ordinato per set
                         historyMap[ex.name] = ex.sets.map(s => s.kg);
                     });
                 }
             }
-        } catch (err) {
-            console.log("Nessun storico trovato o errore fetch:", err);
-        }
-        // ----------------------------------------------
+        } catch (err) { console.log("Nessun storico trovato:", err); }
 
-        const exercises = workoutData.data[currentDay] || workoutData.data[String(currentDay)] || [];
+        // Renderizza la lista
         renderList(exercises);
-        restoreSession(); // Ripristina eventuale sessione in corso
+        
+        // Ripristina input se c'erano
+        restoreSession(); 
 
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Errore critico loadData:", e); }
 }
 
 // 2. RENDER ACCORDION LIST
+// Funzione "Vigile Urbano"
 function renderList(exercises) {
     listContainer.innerHTML = '';
 
-    if (exercises.length === 0) {
+    if (!exercises || exercises.length === 0) {
         listContainer.innerHTML = '<div style="text-align:center; padding:40px; color:#888;">Riposo! 💤</div>';
         return;
     }
 
     exercises.forEach((ex, idx) => {
-        const card = document.createElement('div');
-        card.className = 'ex-card';
-        card.dataset.idx = idx;
-
-        // --- CALCOLO SUMMARY ---
-        let summaryText = "";
-        if (ex.technique === "Top set + back-off") {
-            summaryText = `Top Set + ${ex.backSets || 2} Backoff`;
-        } else if (ex.technique === "Myo-reps") {
-            summaryText = "Activation + Myo Series";
+        // IL BIVIO CRUCIALE:
+        if (ex.isFundamental) {
+            // Chiama la funzione PL che hai già scritto/incollato (Punto C)
+            renderFundamentalCard(ex, idx);
         } else {
-            const s = parseInt(ex.val1) || 3;
-            const r = ex.val2 || "10";
-            summaryText = `${s} Serie x ${r} Reps`;
+            // Chiama la funzione BB Standard (scritta qui sotto)
+            renderStandardCard(ex, idx);
         }
-
-        let summaryHtml = `
-            <div class="ex-summary" onclick="toggleCard(this)">
-                <div class="ex-info">
-                    <h3>${ex.name}</h3>
-                    <div class="ex-meta">
-                        <span class="badge-info">${summaryText}</span>
-                        ${ex.muscles[0]?.name ? `<span>${ex.muscles[0].name}</span>` : ''}
-                    </div>
-                </div>
-                <div class="icon-ring"><i class="ph ph-caret-down"></i></div>
-            </div>
-        `;
-
-        let detailsHtml = `<div class="ex-details"><div class="details-content">`;
-        if (ex.notes) detailsHtml += `<div class="coach-tip">💡 ${ex.notes}</div>`;
-        detailsHtml += generateInputRows(ex);
-
-        const setsCount = parseInt(ex.val1) || (ex.backSets ? parseInt(ex.backSets) + 1 : 0);
-        if (setsCount > 1) {
-            detailsHtml += `
-                <button class="btn-copy" onclick="smartCopy(this)">
-                    <i class="ph ph-copy"></i> Copia peso su tutti i set
-                </button>
-            `;
-        }
-        detailsHtml += `</div></div>`;
-
-        card.innerHTML = summaryHtml + detailsHtml;
-        listContainer.appendChild(card);
     });
+}
+
+// Funzione estratta per renderizzare le card "vecchio stile" (Complementari)
+function renderStandardCard(ex, idx) {
+    const card = document.createElement('div');
+    card.className = 'ex-card';
+    card.dataset.idx = idx;
+
+    // --- CALCOLO SUMMARY ---
+    let summaryText = "";
+    if (ex.technique === "Top set + back-off") {
+        summaryText = `Top Set + ${ex.backSets || 2} Backoff`;
+    } else if (ex.technique === "Myo-reps") {
+        summaryText = "Activation + Myo Series";
+    } else {
+        const s = parseInt(ex.val1) || 3;
+        const r = ex.val2 || "10";
+        summaryText = `${s} Serie x ${r} Reps`;
+    }
+
+    // HTML IDENTICO A PRIMA
+    let summaryHtml = `
+        <div class="ex-summary" onclick="toggleCard(this)">
+            <div class="ex-info">
+                <h3>${ex.name}</h3>
+                <div class="ex-meta">
+                    <span class="badge-info">${summaryText}</span>
+                    ${ex.muscles && ex.muscles[0]?.name ? `<span>${ex.muscles[0].name}</span>` : ''}
+                </div>
+            </div>
+            <div class="icon-ring"><i class="ph ph-caret-down"></i></div>
+        </div>
+    `;
+
+    let detailsHtml = `<div class="ex-details"><div class="details-content">`;
+    if (ex.notes) detailsHtml += `<div class="coach-tip">💡 ${ex.notes}</div>`;
+    
+    // Usa la vecchia funzione generateInputRows (che immagino sia rimasta nel tuo file)
+    detailsHtml += generateInputRows(ex);
+
+    const setsCount = parseInt(ex.val1) || (ex.backSets ? parseInt(ex.backSets) + 1 : 0);
+    if (setsCount > 1) {
+        detailsHtml += `
+            <button class="btn-copy" onclick="smartCopy(this)">
+                <i class="ph ph-copy"></i> Copia peso su tutti i set
+            </button>
+        `;
+    }
+    detailsHtml += `</div></div>`;
+
+    card.innerHTML = summaryHtml + detailsHtml;
+    listContainer.appendChild(card);
 }
 
 window.toggleCard = (header) => {
@@ -557,3 +678,299 @@ requestAnimationFrame(animateTimer);
 window.autoSaveSession = autoSaveSession;
 window.toggleSet = toggleSet;
 window.smartCopy = smartCopy;
+function renderFundamentalCard(ex, idx) {
+    const card = document.createElement('div');
+    card.className = 'ex-card fundamental'; // Attiva CSS Hero
+    card.dataset.idx = idx;
+
+    // BADGES
+    let badgesHtml = '';
+    if (ex.variant) badgesHtml += `<div class="variant-badge"><i class="ph ph-shuffle"></i> ${ex.variant}</div>`;
+    // ... codice param badge (uguale a prima) ...
+    if (ex.variantParamType && ex.variantParamType !== 'none' && ex.variantValue) {
+        let icon = 'clock';
+        if (ex.variantParamType === 'height') icon = 'ruler';
+        if (ex.variantParamType === 'angle') icon = 'angle';
+        badgesHtml += `<div class="variant-badge param"><i class="ph ph-${icon}"></i> ${ex.variantValue}</div>`;
+    }
+
+    // CERCA 1RM CON LA NUOVA LOGICA
+    const userMax = findBestMaxMatch(ex.name);
+    let maxLabel = userMax > 0 
+        ? `<div class="one-rm-label" style="color:#1D1D1F;">Max: ${userMax}kg</div>` 
+        : '';
+
+    const summaryHtml = `
+        <div class="ex-summary" onclick="toggleCard(this)">
+            <div class="ex-info">
+                <div style="margin-bottom:8px; display:flex; gap:5px;">${badgesHtml} ${maxLabel}</div>
+                <h3>${ex.name}</h3>
+                <div class="ex-meta">
+                    ${ex.sets.length} Gruppi di Lavoro
+                </div>
+            </div>
+            <div class="icon-ring"><i class="ph ph-caret-down"></i></div>
+        </div>
+    `;
+
+    // BODY (Esplosione Set)
+    let detailsHtml = `<div class="ex-details"><div class="details-content">`;
+    if (ex.notes) detailsHtml += `<div class="coach-tip">💡 ${ex.notes}</div>`;
+
+    let absoluteSetIndex = 0;
+    ex.sets.forEach((group) => {
+        const numSets = parseInt(group.numSets) || 1;
+        for (let i = 0; i < numSets; i++) {
+            absoluteSetIndex++;
+            // Passiamo il massimale trovato alla funzione della riga
+            detailsHtml += createFundamentalRow(group, absoluteSetIndex, userMax);
+        }
+    });
+
+    detailsHtml += `</div></div>`;
+    card.innerHTML = summaryHtml + detailsHtml;
+    listContainer.appendChild(card);
+}
+
+
+// Helper per creare la riga PL (VERSIONE FIXATA)
+function createFundamentalRow(group, setIdx, userMax) {
+    const roleClass = group.role || 'normal'; 
+    const isTop = roleClass === 'top';
+    const isMav = group.mode === 'MAV';
+    
+    // Calcoli Target
+    let targetKg = 0;
+    let placeholder = "Kg";
+    let targetDisplay = "";
+
+    // LOGICA DI VISUALIZZAZIONE E INPUT
+    let showRpeInput = false; // Flag per decidere se mostrare l'input RPE extra
+
+    if (group.mode === 'PERC') {
+        // Se è %, l'utente ha un carico target, quindi tracciamo l'RPE
+        showRpeInput = true; 
+        if (group.val) targetDisplay = `<span style="font-size:11px; color:#888; font-weight:700;">${group.val}%</span>`;
+        
+        if (userMax > 0 && group.val) {
+            targetKg = Math.round((userMax * parseFloat(group.val)) / 100 / 2.5) * 2.5; 
+            placeholder = targetKg; 
+        } else {
+            placeholder = "Kg (no 1RM)";
+        }
+    } 
+    else if (group.mode === 'KG') {
+        // Se è Kg fissi, tracciamo l'RPE
+        showRpeInput = true;
+        targetKg = parseFloat(group.val);
+        placeholder = targetKg;
+        targetDisplay = `<span style="font-size:11px; color:#888;">Carico fisso</span>`;
+    } 
+    else if (group.mode === 'RPE') {
+        // Se è RPE, dobbiamo trovare i Kg (Niente input RPE extra, è già il target)
+        targetDisplay = `<span class="badge-tech">@RPE ${group.val}</span>`;
+        placeholder = "Kg?";
+    } 
+    else if (isMav) {
+        // Se è MAV, dobbiamo trovare i Kg
+        targetDisplay = `<span class="mav-badge">MAV</span>`;
+        placeholder = "Kg?";
+    }
+
+    // Bottone Disco (solo se abbiamo un peso ipotetico)
+    const plateBtn = (targetKg > 0) 
+        ? `<button class="btn-plate-calc" onclick="window.openDynamicPlateModal(this)"><i class="ph ph-disc"></i></button>`
+        : `<button class="btn-plate-calc" style="opacity:0.2;" onclick="alert('Inserisci prima i Kg')"><i class="ph ph-disc"></i></button>`;
+
+    // Input RPE HTML (Solo se necessario)
+    const rpeInputHtml = showRpeInput 
+        ? `<input type="number" class="input-rpe" placeholder="RPE" oninput="window.autoSaveSession()">` 
+        : ``;
+
+    let idxLabel = setIdx;
+    if (isTop) idxLabel = `👑 ${setIdx}`;
+
+    return `
+        <div class="set-row ${roleClass}">
+            <div class="set-info">
+                <div class="set-idx">${idxLabel}</div>
+                <div style="display:flex; flex-direction:column;">
+                    <span class="set-target" style="color:#000; font-weight:700;">${group.reps} reps</span>
+                    ${targetDisplay}
+                </div>
+            </div>
+            
+            <!-- Gruppo Input -->
+            <div class="set-input-area">
+                <div class="set-input-group">
+                    <!-- Input Kg Principale -->
+                    <input type="number" class="input-kg" 
+                        value="${targetKg > 0 ? targetKg : ''}"
+                        placeholder="${placeholder}" 
+                        ${isTop ? 'style="border-color:#FFD60A;"' : ''}
+                        oninput="window.autoSaveSession()">
+                    
+                    ${plateBtn}
+
+                    <!-- Input RPE (Opzionale) -->
+                    ${rpeInputHtml}
+                </div>
+            </div>
+
+            <button class="btn-check" onclick="toggleSet(this)"><i class="ph ph-check"></i></button>
+        </div>
+    `;
+}
+
+
+// =========================================
+// PLATE CALCULATOR LOGIC
+// =========================================
+
+// Configurazione
+let use25kg = true; // Default
+const inventoryToggle = document.getElementById('inventory-toggle');
+const status25kg = document.getElementById('status-25kg');
+
+// Toggle Inventory
+if(inventoryToggle) {
+    inventoryToggle.addEventListener('click', () => {
+        use25kg = !use25kg;
+        status25kg.textContent = use25kg ? "SÌ" : "NO";
+        status25kg.style.color = use25kg ? "#0071E3" : "#FF3B30";
+        // Ricalcola se aperto
+        const currentWeight = parseFloat(document.getElementById('plate-total-display').dataset.val);
+        if(currentWeight) calculateAndRenderPlates(currentWeight);
+    });
+}
+
+window.openPlateModal = (weight) => {
+    if (!weight || weight < 20) { alert("Peso troppo basso (min 20kg)"); return; }
+    
+    const modal = document.getElementById('plate-modal-overlay');
+    modal.classList.remove('hidden');
+    
+    // Salva valore corrente per ricalcoli
+    const display = document.getElementById('plate-total-display');
+    display.textContent = `${weight} Kg`;
+    display.dataset.val = weight;
+
+    calculateAndRenderPlates(weight);
+};
+
+window.closePlateModal = (e) => {
+    if(e) e.stopPropagation();
+    document.getElementById('plate-modal-overlay').classList.add('hidden');
+};
+
+function calculateAndRenderPlates(targetWeight) {
+    const barWeight = 20;
+    let remainder = (targetWeight - barWeight) / 2;
+    
+    const plates = [];
+    // Inventario dischi disponibili
+    const inventory = [
+        { w: 25, color: 'red' },
+        { w: 20, color: 'blue' },
+        { w: 15, color: 'yellow' },
+        { w: 10, color: 'green' },
+        { w: 5,  color: 'white' },
+        { w: 2.5, color: 'black' },
+        { w: 1.25, color: 'silver' }
+    ];
+
+    // Se disabilitato 25kg, filtra
+    const available = use25kg ? inventory : inventory.filter(p => p.w !== 25);
+
+    // Algoritmo Greedy
+    available.forEach(plate => {
+        while (remainder >= plate.w) {
+            plates.push(plate);
+            remainder -= plate.w;
+        }
+    });
+
+    // Render Grafico
+    const container = document.getElementById('plate-visual-container');
+    // Rimuovi vecchi dischi (mantieni barbell-sleeve)
+    const sleeve = container.querySelector('.barbell-sleeve');
+    container.innerHTML = ''; 
+    container.appendChild(sleeve);
+
+    plates.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'plate';
+        div.dataset.w = p.w; // Per CSS styling altezza/colore
+        div.textContent = p.w;
+        container.appendChild(div);
+    });
+
+    // Render Testo
+    const textList = document.getElementById('plate-text-list');
+    if (plates.length === 0) {
+        textList.textContent = "Solo Bilanciere Vuoto";
+    } else {
+        // Raggruppa per testo (es. 2x20, 1x10)
+        const counts = {};
+        plates.forEach(p => counts[p.w] = (counts[p.w] || 0) + 1);
+        textList.textContent = Object.entries(counts)
+            .sort((a,b) => parseFloat(b[0]) - parseFloat(a[0]))
+            .map(([w, count]) => `${count}x${w}`)
+            .join(', ');
+    }
+}
+
+
+// NUOVA FUNZIONE DINAMICA PER IL BOTTONE DISCHI
+// RENDIAMO LA FUNZIONE GLOBALE (Fix per onclick nell'HTML)
+window.openDynamicPlateModal = function(btnElement) {
+    // 1. Trova l'input Kg vicino al bottone premuto
+    // La struttura è: .set-input-group -> [input-kg] [btn]
+    const inputGroup = btnElement.closest('.set-input-group');
+    if (!inputGroup) {
+        console.error("Errore struttura HTML: .set-input-group non trovato");
+        return;
+    }
+
+    const inputField = inputGroup.querySelector('.input-kg');
+    if (!inputField) return;
+
+    // 2. Determina il peso
+    let weight = parseFloat(inputField.value);
+    
+    // Se l'utente non ha scritto, prova a leggere il placeholder (peso calcolato)
+    if (isNaN(weight)) {
+        const ph = parseFloat(inputField.placeholder);
+        if (!isNaN(ph)) weight = ph;
+    }
+
+    // 3. Validazione e Apertura
+    if (!weight || weight < 20) {
+        // Feedback visivo rapido (shake o alert)
+        alert("Peso non valido o troppo basso (<20kg). Inserisci i Kg.");
+        inputField.focus();
+        return;
+    }
+
+    // Chiama la logica di renderizzazione (che deve essere accessibile)
+    // Assicurati che calculateAndRenderPlates sia definita nel file
+    window.openPlateModal(weight); 
+};
+
+// ANCHE QUESTE DEVONO ESSERE GLOBALI
+window.openPlateModal = (weight) => {
+    const modal = document.getElementById('plate-modal-overlay');
+    const display = document.getElementById('plate-total-display');
+    
+    if(modal && display) {
+        modal.classList.remove('hidden');
+        display.textContent = `${weight} Kg`;
+        display.dataset.val = weight;
+        calculateAndRenderPlates(weight);
+    }
+};
+
+window.closePlateModal = (e) => {
+    if(e) e.stopPropagation();
+    document.getElementById('plate-modal-overlay').classList.add('hidden');
+};

@@ -7,16 +7,13 @@ body {
     background-color: #F5F7FA;
     font-family: 'Inter', sans-serif;
     color: #1D1D1F;
-    
-    /* MODIFICA FONDAMENTALE: */
     height: 100dvh; 
     width: 100vw;
     display: flex; 
     flex-direction: column;
-    overflow: hidden; /* Il body non scrolla, scrolla solo la lista interna */
+    overflow: hidden; 
 }
 
-/* UTILS */
 .hidden { display: none !important; opacity: 0; pointer-events: none; }
 
 /* =========================================
@@ -45,44 +42,28 @@ body {
 .circle-btn:active { transform: scale(0.9); }
 
 .header-titles { 
-     flex-grow: 1; /* Si prende tutto lo spazio centrale */
-    padding: 0 10px;
+    flex-grow: 1; padding: 0 10px;
     text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis; /* Se è lunghissimo mette i puntini */
-
-
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.sub-label { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: #86868B; text-transform: uppercase; display: block; }
-#day-title { font-size: 16px; font-weight: 700; margin: 0; color: #1D1D1F; }
+.sub-label { display: none; } 
+#day-title { font-size: 17px; font-weight: 700; margin: 0; color: #1D1D1F; }
 
+/* Timer Header */
 .timer-container {
-    position: relative;
-    padding: 3px; /* Spessore del bordo verde */
-    border-radius: 20px;
-    background: #E5E5EA; /* Colore traccia vuota */
-    overflow: hidden;
-    /* La magia: usiamo un gradiente conico controllato da variabile --p */
+    position: relative; padding: 3px; border-radius: 20px;
+    background: #E5E5EA; overflow: hidden;
     background: conic-gradient(#34C759 var(--p), #E5E5EA 0); 
     box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     min-width: 70px;
-    
 }
-
-/* Serve per registrare la variabile e animarla (supporto moderno) */
-@property --p {
-  syntax: '<percentage>';
-  inherits: false;
-  initial-value: 0%;
-}
+@property --p { syntax: '<percentage>'; inherits: false; initial-value: 0%; }
 
 .timer-content {
     background: #1D1D1F; color: white;
-    padding: 4px 12px; border-radius: 18px; /* Un po' meno del container */
+    padding: 4px 12px; border-radius: 18px;
     font-family: 'Courier New', monospace; font-weight: 700; font-size: 13px;
-    text-align: center;
-    position: relative; z-index: 2;
+    text-align: center; position: relative; z-index: 2;
 }
 
 /* =========================================
@@ -90,29 +71,25 @@ body {
    ========================================= */
 .exercises-stream {
     flex-grow: 1; overflow-y: auto; overflow-x: hidden;
-    padding: 20px; padding-bottom: 150px !important; /* Spazio per footer */
+    padding: 20px; padding-bottom: 150px !important;
     display: flex; flex-direction: column; gap: 16px;
     -webkit-overflow-scrolling: touch;
 }
 
-/* EXERCISE CARD (Accordion) */
+/* --- EXERCISE CARD STANDARD (BB) --- */
 .ex-card {
     background: white; border-radius: 20px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.03);
     border: 1px solid white;
     transition: transform 0.3s, box-shadow 0.3s;
-    overflow: hidden;
-    margin-bottom: 16px; 
-    
+    overflow: hidden; margin-bottom: 16px; 
 }
-
 .ex-card.active {
     box-shadow: 0 10px 40px rgba(0, 113, 227, 0.1);
     border-color: rgba(0, 113, 227, 0.1);
     transform: scale(1.01);
 }
 
-/* SUMMARY (Header cliccabile) */
 .ex-summary {
     padding: 20px; cursor: pointer;
     display: flex; justify-content: space-between; align-items: center;
@@ -127,36 +104,25 @@ body {
     width: 36px; height: 36px; border-radius: 50%;
     background: #F9F9FA; color: #86868B;
     display: flex; align-items: center; justify-content: center;
-    transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55), background 0.3s;
+    transition: transform 0.4s, background 0.3s;
 }
+.ex-card.active .icon-ring { transform: rotate(180deg); background: #0071E3; color: white; }
 
-.ex-card.active .icon-ring {
-    transform: rotate(180deg);
-    background: #0071E3; color: white;
-}
-
-/* DETAILS (Area Input a scomparsa) */
 .ex-details {
     max-height: 0; opacity: 0;
     transition: max-height 0.4s ease-in-out, opacity 0.3s ease;
     background: #FAFAFC; border-top: 1px solid #F2F2F7;
 }
-
-.ex-card.active .ex-details {
-    max-height: 500px; /* Abbastanza per contenere i set */
-    opacity: 1;
-}
-
+.ex-card.active .ex-details { max-height: 500px; opacity: 1; }
 .details-content { padding: 20px; }
 
-/* NOTES */
 .coach-tip {
     background: #FFF8E1; color: #F57F17; font-size: 13px; padding: 12px;
-    border-radius: 12px; margin-bottom: 20px; display: flex; gap: 8px; align-items: flex-start;
+    border-radius: 12px; margin-bottom: 20px; display: flex; gap: 8px;
     line-height: 1.4;
 }
 
-/* SET ROWS */
+/* SET ROWS BASE */
 .set-row {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 12px; padding-bottom: 12px;
@@ -164,7 +130,6 @@ body {
 }
 .set-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 
-/* Left: Label e Info Reps */
 .set-info { display: flex; align-items: center; gap: 12px; width: 40%; }
 .set-idx {
     width: 28px; height: 28px; background: #E5E5EA; border-radius: 8px;
@@ -173,7 +138,7 @@ body {
 }
 .set-target { font-size: 13px; color: #86868B; font-weight: 500; }
 
-/* Center: Input Kg */
+/* INPUTS BASE */
 .set-input-area { flex-grow: 1; display: flex; justify-content: flex-end; padding-right: 15px; }
 .input-kg {
     width: 80px; padding: 10px; font-size: 18px; font-weight: 700;
@@ -184,111 +149,58 @@ body {
 .input-kg:focus { border-color: #0071E3; outline: none; transform: scale(1.05); }
 .input-kg::placeholder { color: #D1D1D6; font-size: 14px; font-weight: 500; }
 
-/* Right: Check Button */
 .btn-check {
     width: 44px; height: 44px; border-radius: 14px; border: none;
     background: #E5E5EA; color: white; font-size: 20px;
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    cursor: pointer; transition: all 0.3s;
 }
-.btn-check.done {
-    background: #34C759; box-shadow: 0 4px 15px rgba(52, 199, 89, 0.4);
-    transform: scale(1.1);
-}
+.btn-check.done { background: #34C759; transform: scale(1.1); }
 
-/* SMART COPY BUTTON */
 .btn-copy {
     width: 100%; margin-top: 15px;
     background: rgba(0, 113, 227, 0.1); color: #0071E3;
     border: none; padding: 12px; border-radius: 12px;
     font-weight: 700; font-size: 13px; cursor: pointer;
     display: flex; align-items: center; justify-content: center; gap: 6px;
-    transition: background 0.2s;
 }
-.btn-copy:active { background: rgba(0, 113, 227, 0.2); }
-.sub-label { display: none; } /* Nascondiamo la scritta piccola sopra */
-#day-title { font-size: 17px; margin: 0; } /* Titolo header più compatto */
 
-/* NUOVO TITOLONE PAGINA */
-.page-intro-header {
-    padding: 10px 0 25px 0;
-}
-.page-intro-header h2 {
-    font-size: 28px;
-    font-weight: 800;
-    color: #1D1D1F;
-    line-height: 1.2;
-    margin-bottom: 6px;
-}
-.page-intro-header p {
-    font-size: 15px;
-    color: #86868B;
-    font-weight: 500;
-}
+.prev-val { font-size: 10px; color: #98989D; margin-top: 2px; text-align: center; font-weight: 500; }
+
 /* =========================================
-   4. ACTION BAR (Footer)
+   4. ACTION BAR & FOOTER
    ========================================= */
 .action-bar {
     position: fixed; bottom: 0; left: 0; width: 100%;
     background: white; padding: 16px 20px 30px 20px;
     box-shadow: 0 -10px 40px rgba(0,0,0,0.05); z-index: 90;
-    
-    display: flex; /* Flexbox */
-    align-items: center; 
-    gap: 15px; /* Spazio REALE tra i bottoni */
-    
-    /* Nota: Se vuoi il cestino a DESTRA e lo slider a SINISTRA,
-       tieni row-reverse se l'HTML ha prima cestino poi slider.
-       Altrimenti rimuovilo per ordine naturale. */
-    flex-direction: row-reverse; 
+    display: flex; align-items: center; gap: 15px; flex-direction: row-reverse; 
 }
 .btn-action-secondary {
-    width: 56px; /* Stessa altezza dello slider */
-    height: 56px;
-    border-radius: 50%; /* O 16px se lo vuoi quadrato smussato */
-    border: none;
-    background: #FFF4F4; /* Rosso chiarissimo */
-    color: #FF3B30; /* Rosso Apple */
-    font-size: 24px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-    flex-shrink: 0; /* Non si schiaccia mai */
-    transition: transform 0.1s;
+    width: 56px; height: 56px; border-radius: 50%; border: none;
+    background: #FFF4F4; color: #FF3B30; font-size: 24px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;
 }
-
-/* Slide to Finish (Simulato) */
 .btn-finish-slide {
-    /* width: 100%;  <--- RIMOSSO: Questo causava il problema */
-    flex: 1;      /* <--- AGGIUNTO: Occupa solo lo spazio disponibile */
-    
-    height: 56px; border: none; border-radius: 30px;
+    flex: 1; height: 56px; border: none; border-radius: 30px;
     background: #1D1D1F; position: relative; overflow: hidden;
     cursor: pointer; display: flex; align-items: center; justify-content: center;
     box-shadow: 0 8px 20px rgba(0,0,0,0.2);
 }
 .slide-text { color: white; font-weight: 700; letter-spacing: 2px; font-size: 14px; z-index: 2; }
 .slide-knob {
-    position: absolute; 
-    left: 6px; /* CORRETTO: Parte da sinistra */
-    top: 6px; bottom: 6px; width: 44px;
+    position: absolute; left: 6px; top: 6px; bottom: 6px; width: 44px;
     background: #34C759; border-radius: 50%;
     display: flex; align-items: center; justify-content: center; color: white;
-    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
-    z-index: 10; /* Assicura che sia sopra al testo */
+    z-index: 10;
 }
 .badge-info {
-    background: #EAF2FF; color: #0071E3; /* Azzurro Apple */
-    padding: 4px 10px; border-radius: 8px;
-    font-size: 11px; font-weight: 700; 
-    text-transform: uppercase; letter-spacing: 0.5px;
-}
-.timer-badge {
-    min-width: 60px; /* Larghezza fissa minima */
-    text-align: center;
+    background: #EAF2FF; color: #0071E3; padding: 4px 10px; border-radius: 8px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
 }
 
 /* =========================================
-   5. TIMER MODAL (Bello)
+   5. TIMER MODAL
    ========================================= */
 .rest-overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -297,50 +209,174 @@ body {
     opacity: 1; transition: opacity 0.3s;
 }
 .rest-overlay.hidden { opacity: 0; pointer-events: none; }
-
-.rest-modal {
-    width: 300px; text-align: center;
-    animation: scaleIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
+.rest-modal { width: 300px; text-align: center; animation: scaleIn 0.4s; }
 .rest-circle { position: relative; width: 200px; height: 200px; margin: 0 auto 30px auto; }
 svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 circle { fill: none; stroke-width: 6; stroke-linecap: round; }
 .bg { stroke: rgba(255,255,255,0.1); }
-.progress {
-    stroke: #34C759; stroke-dasharray: 283; stroke-dashoffset: 0; /* 2*PI*45 */
-    transition: stroke-dashoffset 1s linear;
-}
-
+.progress { stroke: #34C759; stroke-dasharray: 283; stroke-dashoffset: 0; transition: stroke-dashoffset 1s linear; }
 .time-text {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     color: white; font-size: 40px; font-weight: 800; font-family: monospace;
 }
-
 .rest-actions { display: flex; gap: 15px; justify-content: center; }
-.btn-pill {
-    padding: 12px 24px; border-radius: 30px; border: none; font-weight: 700; cursor: pointer;
-    font-size: 14px; transition: transform 0.1s;
-}
-.btn-pill:active { transform: scale(0.95); }
+.btn-pill { padding: 12px 24px; border-radius: 30px; border: none; font-weight: 700; cursor: pointer; font-size: 14px; }
 .btn-pill.primary { background: white; color: #1D1D1F; }
 .btn-pill.secondary { background: rgba(255,255,255,0.2); color: white; }
-
 @keyframes scaleIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-/* Scrittina peso precedente */
-.prev-val {
-    font-size: 10px;
-    color: #98989D; /* Grigio Apple */
-    margin-top: 2px;
-    text-align: center;
-    font-weight: 500;
-    line-height: 1;
+
+/* =========================================
+   6. POWERLIFTING & FUNDAMENTALS (SUPER FOCUS)
+   ========================================= */
+
+/* Card Base */
+.ex-card.fundamental {
+    border: none;
+    background: white;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    margin-bottom: 15px;
+    transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
 }
 
-/* Assicuriamo che l'area input possa contenere input + scritta */
-.set-input-area {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
+/* HEADER: Scuro e Pulito */
+.ex-card.fundamental .ex-summary {
+    background: #1C1C1E; /* Nero Apple */
+    padding: 20px;
+    display: flex; align-items: center; justify-content: space-between;
 }
+
+.ex-card.fundamental h3 {
+    color: white; font-size: 20px; margin: 0 0 5px 0; letter-spacing: 0.5px;
+}
+.ex-card.fundamental .ex-meta { color: #8E8E93; font-size: 13px; font-weight: 500; }
+.ex-card.fundamental .icon-ring { background: rgba(255,255,255,0.2); color: white; border:none; }
+
+/* BADGES HEADER */
+.variant-badge {
+    background: rgba(255,255,255,0.15); color: #FFD60A;
+    font-size: 11px; padding: 4px 8px; border-radius: 6px;
+    display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; font-weight: 600;
+}
+.one-rm-label {
+    background: #FFD60A; color: black; font-size: 10px; font-weight: 800;
+    padding: 3px 6px; border-radius: 4px; display: inline-block; vertical-align: middle;
+}
+
+/* --- STATO ATTIVO (APERTO) - SUPER FOCUS --- */
+.ex-card.fundamental.active {
+    margin: 30px -20px; /* Esce dai margini */
+    width: calc(100% + 40px); /* Larghezza totale */
+    border-radius: 0; 
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    z-index: 100; /* Sopra tutto */
+    min-height: 60vh; /* Occupa gran parte dello schermo */
+}
+
+.ex-card.fundamental.active .ex-summary {
+    padding: 30px 20px; /* Header più alto */
+    background: #000; /* Nero profondo */
+}
+
+.ex-card.fundamental.active h3 { font-size: 28px; }
+
+/* Area Dettagli Espansa */
+.ex-card.fundamental.active .ex-details {
+    max-height: 2000px; 
+    opacity: 1;
+    background: #F2F2F7; 
+    padding-bottom: 40px;
+}
+
+/* INPUT RPE & KG STYLES */
+.set-input-group { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+.input-rpe {
+    width: 50px; height: 44px; text-align: center; border-radius: 10px; border: 1px solid #D1D1D6;
+    font-weight: 700; font-size: 14px; background: white;
+}
+.input-rpe::placeholder { color: #C7C7CC; font-weight: 500; font-size: 12px; }
+.input-kg { height: 44px; font-size: 16px; width: 80px; }
+
+/* Bottone Disco */
+.btn-plate-calc {
+    width: 36px; height: 36px; background: #1C1C1E; color: white;
+    border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2); cursor: pointer;
+}
+.btn-plate-calc:active { transform: scale(0.9); }
+
+/* =========================================
+   7. ROW STYLES (HIERARCHY)
+   ========================================= */
+
+/* Warmup Row */
+.set-row.warmup { opacity: 0.7; transform: scale(0.98); }
+.set-row.warmup .set-idx { background: #E5E5EA; color: #8E8E93; font-size: 10px; }
+
+/* TOP SET (Protagonista) */
+.set-row.top {
+    background: rgba(255, 214, 10, 0.08); /* Giallo Apple molto chiaro */
+    border-left: 4px solid #FFD60A;
+    padding-left: 12px; margin-left: -10px; width: calc(100% + 20px);
+    border-radius: 4px;
+}
+.set-row.top .set-idx { background: #FFD60A; color: black; box-shadow: 0 2px 5px rgba(255, 214, 10, 0.4); }
+.set-row.top .input-kg { border-color: #FFD60A; font-weight: 800; }
+
+/* BACK-OFF SET */
+.set-row.backoff {
+    background: rgba(0, 113, 227, 0.03);
+    border-left: 4px solid #0071E3;
+    padding-left: 12px; margin-left: -10px; width: calc(100% + 20px);
+    border-radius: 4px;
+}
+.set-row.backoff .set-idx { background: #0071E3; color: white; }
+
+/* MAV Label */
+.mav-badge {
+    font-size: 10px; font-weight: 800; background: #34C759; color: white;
+    padding: 2px 6px; border-radius: 4px; margin-left: 5px;
+}
+
+/* =========================================
+   8. PLATE CALCULATOR MODAL
+   ========================================= */
+.plate-modal-content {
+    background: white; border-radius: 24px 24px 0 0;
+    width: 100%; padding: 30px 20px 50px 20px;
+    text-align: center;
+    position: absolute; bottom: 0; left: 0;
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+.plate-display-area {
+    display: flex; align-items: center; justify-content: center;
+    margin: 30px 0; height: 160px;
+    position: relative; background: #F5F5F7; border-radius: 12px; overflow: hidden; 
+}
+.barbell-sleeve {
+    position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    width: 100%; height: 20px; background: #D1D1D6; z-index: 1; border-radius: 0 4px 4px 0;
+}
+.plate {
+    width: 25px; border-radius: 4px; margin-right: 2px; position: relative; z-index: 2;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.2) inset; border: 1px solid rgba(0,0,0,0.1);
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.8); font-size: 9px; font-weight: bold;
+    writing-mode: vertical-rl; text-orientation: mixed;
+}
+/* Colori IPF */
+.plate[data-w="25"]   { height: 140px; background: #FF3B30; width: 32px; border: 2px solid #D70015; }
+.plate[data-w="20"]   { height: 140px; background: #0071E3; width: 28px; border: 2px solid #0056B3; }
+.plate[data-w="15"]   { height: 140px; background: #FFCC00; width: 24px; border: 2px solid #D7B900; }
+.plate[data-w="10"]   { height: 140px; background: #34C759; width: 20px; border: 2px solid #248A3D; }
+.plate[data-w="5"]    { height: 80px;  background: #FFFFFF; width: 18px; border: 2px solid #C7C7CC; color: #333; }
+.plate[data-w="2.5"]  { height: 60px;  background: #1D1D1F; width: 16px; border: 2px solid black; }
+.plate[data-w="1.25"] { height: 50px;  background: #E5E5EA; width: 12px; border: 2px solid #C7C7CC; color: #333; }
+
+.calc-result-text { font-size: 42px; font-weight: 800; font-family: 'Inter', sans-serif; letter-spacing: -1px; margin-bottom: 5px; }
+.calc-sub-text { color: #86868B; font-size: 14px; font-weight: 500; }
+.calc-inventory-toggle { margin-top: 20px; font-size: 13px; color: #0071E3; cursor: pointer; }
