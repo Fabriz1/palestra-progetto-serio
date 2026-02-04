@@ -112,7 +112,32 @@
                 onclick="closePlateModal()">CHIUDI</button>
         </div>
     </div>
+    <!-- NUOVO: PL FOCUS MODAL (Schermata Intera) -->
+    <div id="pl-focus-modal" class="pl-focus-overlay hidden">
+        <!-- Header Fisso -->
+        <div class="pl-focus-header">
+            <button class="circle-btn small" id="btn-close-focus"><i class="ph ph-caret-down"></i></button>
+            <div class="pl-header-info">
+                <span id="focus-variant-badge" class="variant-badge">Standard</span>
+                <h2 id="focus-ex-title">SQUAT</h2>
+            </div>
+            <div class="pl-header-meta" id="focus-meta-box">
+                <!-- 1RM e Note inseriti via JS -->
+            </div>
+        </div>
 
+        <!-- Corpo Scrollabile -->
+        <div class="pl-focus-body" id="focus-sets-container">
+            <!-- Qui veranno iniettati i set divisi per gruppi -->
+        </div>
+
+        <!-- Footer Fisso -->
+        <div class="pl-focus-footer">
+            <button class="btn-focus-save" id="btn-save-focus">
+                <i class="ph ph-check-circle"></i> SALVA E CHIUDI
+            </button>
+        </div>
+    </div>
     <!-- SCRIPT -->
     <script>
         // FORZA L'AGGIORNAMENTO DELLA PWA/SERVICE WORKER

@@ -217,7 +217,7 @@ async function loadData() {
                 }
             }
         } catch (err) { console.log("Nessun storico trovato:", err); }
-
+        window.currentExercisesList = exercises; 
         // Renderizza la lista
         renderList(exercises);
         
@@ -269,7 +269,7 @@ function renderStandardCard(ex, idx) {
 
     // HTML IDENTICO A PRIMA
     let summaryHtml = `
-        <div class="ex-summary" onclick="toggleCard(this)">
+        <div class="ex-summary" onclick="window.toggleCard(this, event)">
             <div class="ex-info">
                 <h3>${ex.name}</h3>
                 <div class="ex-meta">
@@ -301,8 +301,18 @@ function renderStandardCard(ex, idx) {
     listContainer.appendChild(card);
 }
 
-window.toggleCard = (header) => {
-    const card = header.parentElement;
+window.toggleCard = (header, event) => {
+    // 1. Ferma ogni propagazione (evita che il click passi sotto o sopra)
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+
+    // 2. Trova la card genitore
+    const card = header.closest('.ex-card');
+    if (!card) return;
+
+    // 3. Toggle classe
     card.classList.toggle('active');
 };
 
@@ -362,12 +372,21 @@ function createRow(label, targetReps, rest, prevVal) {
 
 // LOGICA INTERATTIVA
 window.toggleSet = (btn) => {
-    const row = btn.closest('.set-row');
+    // FIX: Cerca sia la classe vecchia (.set-row) che quella nuova (.pl-set-row)
+    const row = btn.closest('.set-row, .pl-set-row'); 
+    
+    if (!row) {
+        console.error("Errore: Riga non trovata per il bottone", btn);
+        return;
+    }
+
     btn.classList.toggle('done');
     
     // Se è done, vibra e parte timer
     if (btn.classList.contains('done')) {
-        startTimer(row.dataset.rest);
+        // Se c'è un tempo di recupero salvato nel dataset, usalo, altrimenti 90s
+        const restTime = row.dataset.rest || 90;
+        startTimer(restTime);
         if (navigator.vibrate) navigator.vibrate(50);
     }
     
@@ -678,58 +697,199 @@ requestAnimationFrame(animateTimer);
 window.autoSaveSession = autoSaveSession;
 window.toggleSet = toggleSet;
 window.smartCopy = smartCopy;
+// A. ANTEPRIMA NELLA LISTA (Semplice)
+// ==========================================
+// NUOVA FUNZIONE RENDER PL (DASHBOARD STYLE)
+// ==========================================
 function renderFundamentalCard(ex, idx) {
     const card = document.createElement('div');
-    card.className = 'ex-card fundamental'; // Attiva CSS Hero
+    card.className = 'ex-card fundamental'; 
     card.dataset.idx = idx;
 
-    // BADGES
-    let badgesHtml = '';
-    if (ex.variant) badgesHtml += `<div class="variant-badge"><i class="ph ph-shuffle"></i> ${ex.variant}</div>`;
-    // ... codice param badge (uguale a prima) ...
-    if (ex.variantParamType && ex.variantParamType !== 'none' && ex.variantValue) {
-        let icon = 'clock';
-        if (ex.variantParamType === 'height') icon = 'ruler';
-        if (ex.variantParamType === 'angle') icon = 'angle';
-        badgesHtml += `<div class="variant-badge param"><i class="ph ph-${icon}"></i> ${ex.variantValue}</div>`;
+    // 1. HEADER DATI
+    const userMax = findBestMaxMatch(ex.name);
+    // Se non c'è variante scritta, non mostrare "Standard", lascia vuoto o metti un placeholder stiloso
+    const variant = ex.variant ? ex.variant : 'COMPETITION / STANDARD';
+    
+    // Badges
+    let metaTags = '';
+    if(userMax > 0) metaTags += `<span class="meta-tag rm">🎯 1RM: ${userMax}kg</span>`;
+    
+    // Totale Sets
+    metaTags += `<span class="meta-tag">📊 ${ex.sets.length} Serie</span>`;
+
+    // Note Coach (Badge tecnico)
+    if(ex.notes) {
+        // Tagliamo le note lunghe per l'header
+        const shortNote = ex.notes.length > 20 ? ex.notes.substring(0, 20) + '...' : ex.notes;
+        metaTags += `<span class="meta-tag">💡 ${shortNote}</span>`;
     }
 
-    // CERCA 1RM CON LA NUOVA LOGICA
-    const userMax = findBestMaxMatch(ex.name);
-    let maxLabel = userMax > 0 
-        ? `<div class="one-rm-label" style="color:#1D1D1F;">Max: ${userMax}kg</div>` 
-        : '';
-
+    // HTML HEADER
     const summaryHtml = `
         <div class="ex-summary" onclick="toggleCard(this)">
-            <div class="ex-info">
-                <div style="margin-bottom:8px; display:flex; gap:5px;">${badgesHtml} ${maxLabel}</div>
-                <h3>${ex.name}</h3>
-                <div class="ex-meta">
-                    ${ex.sets.length} Gruppi di Lavoro
-                </div>
+            <!-- VARIANTE BEN VISIBILE SOPRA IL TITOLO -->
+            <div class="variant-large">${variant}</div>
+            
+            <h3>${ex.name}</h3>
+            
+            <div class="pl-meta-row">
+                ${metaTags}
             </div>
+
             <div class="icon-ring"><i class="ph ph-caret-down"></i></div>
         </div>
     `;
 
-    // BODY (Esplosione Set)
+    // 2. BODY (Espandibile)
     let detailsHtml = `<div class="ex-details"><div class="details-content">`;
-    if (ex.notes) detailsHtml += `<div class="coach-tip">💡 ${ex.notes}</div>`;
+    
+    // Note Coach Complete (se presenti) all'interno
+    if (ex.notes) {
+        detailsHtml += `<div class="coach-tip" style="background:#333; color:#FFD60A; border:1px solid #FFD60A;">💡 <b>Note Coach:</b> ${ex.notes}</div>`;
+    }
 
-    let absoluteSetIndex = 0;
-    ex.sets.forEach((group) => {
-        const numSets = parseInt(group.numSets) || 1;
-        for (let i = 0; i < numSets; i++) {
-            absoluteSetIndex++;
-            // Passiamo il massimale trovato alla funzione della riga
-            detailsHtml += createFundamentalRow(group, absoluteSetIndex, userMax);
+    // Divisione Gruppi (Warmup, Top, Backoff)
+    const warmups = ex.sets.filter(s => s.role === 'warmup');
+    const mains = ex.sets.filter(s => s.role !== 'warmup');
+
+    // Helper render gruppo
+    const renderSetGroup = (sets, title, isMainList = false) => {
+        if(sets.length === 0) return '';
+        
+        let html = '';
+        if(title) html += `<div class="pl-section-header">${title}</div>`;
+        
+        // Se è una lista principale (Backoff o 5x5), usiamo il contenitore unito
+        if(isMainList) {
+            html += `<div style="background: rgba(255,255,255,0.03); border-radius: 16px; overflow:hidden; border: 1px solid rgba(255,255,255,0.05);">`;
         }
-    });
 
-    detailsHtml += `</div></div>`;
+        sets.forEach(group => {
+            const realIdx = ex.sets.indexOf(group);
+            const numSets = parseInt(group.numSets) || 1;
+            
+            for(let i=0; i < numSets; i++) {
+                html += createPLSetRow(group, realIdx, i, userMax, ex.rest);
+            }
+        });
+
+        if(isMainList) html += `</div>`; // Chiudi contenitore
+        return html;
+    };
+
+    // 1. RENDER WARMUP (Sempre lista unita)
+    detailsHtml += renderSetGroup(warmups, "Riscaldamento", true);
+    
+    // 2. RENDER MAIN WORK (Logica Adattiva)
+    const hasTopSet = mains.some(s => s.role === 'top');
+
+    if (hasTopSet) {
+        // --- CASO A: TOP SET + BACKOFF ---
+        const topSets = mains.filter(s => s.role === 'top');
+        const backoffSets = mains.filter(s => s.role !== 'top');
+
+        // Render Top Sets (Senza contenitore, così prendono lo stile Eroe staccato)
+        if(topSets.length > 0) {
+            detailsHtml += `<div class="pl-section-header">Top Set</div>`;
+            topSets.forEach(group => {
+                 const realIdx = ex.sets.indexOf(group);
+                 // Nota: Qui assumiamo che sia 1 solo top set solitamente
+                 detailsHtml += createPLSetRow(group, realIdx, 0, userMax, ex.rest);
+            });
+        }
+
+        // Render Back-offs (Contenitore unito)
+        if(backoffSets.length > 0) {
+            detailsHtml += renderSetGroup(backoffSets, "Volume & Back-off", true);
+        }
+
+    } else {
+        // --- CASO B: STRAIGHT SETS (Es. 5x5 Carico Fisso) ---
+        // Nessun Top Set rilevato. Renderizziamo tutto come una lista pulita unica.
+        // Titolo generico "Allenamento" o "Working Sets"
+        if(mains.length > 0) {
+            detailsHtml += renderSetGroup(mains, "Allenamento", true);
+        }
+    }
+
+    detailsHtml += `</div></div>`; // Chiusura details
+
     card.innerHTML = summaryHtml + detailsHtml;
     listContainer.appendChild(card);
+}
+
+// HELPER CREAZIONE RIGA SINGOLA (GRID LAYOUT)
+function createPLSetRow(group, groupIdx, subIdx, userMax, rest) {
+    const isTop = group.role === 'top';
+    const rowClass = isTop ? 'top' : (group.role === 'warmup' ? 'warmup' : '');
+    
+    // Calcolo Target Visivo
+    let targetText = "";
+    let placeholder = "Kg";
+    let prefillKg = "";
+
+    if (group.mode === 'PERC') {
+        if(userMax > 0 && group.val) {
+            const kg = Math.round((userMax * parseFloat(group.val)) / 100 / 2.5) * 2.5;
+            targetText = `<span class="target-val">${kg}kg</span> (${group.val}%)`;
+            placeholder = kg;
+            // prefillKg = kg; // Decommenta se vuoi precompilare il campo
+        } else {
+            targetText = `${group.val}% (No 1RM)`;
+        }
+    } else if (group.mode === 'KG') {
+        targetText = `<span class="target-val">${group.val}kg</span> (Fissi)`;
+        placeholder = group.val;
+        prefillKg = group.val; // Kg fissi si precompilano spesso
+    } else if (group.mode === 'RPE') {
+        targetText = `Target: <span class="target-val">RPE ${group.val}</span>`;
+        placeholder = "Kg?";
+    } else if (group.mode === 'MAV') {
+        targetText = `Target: <span class="target-val">MAV</span>`;
+        placeholder = "Kg";
+    }
+
+    const repsDisplay = `${group.reps} reps`;
+
+    // Recupero valori salvati (Auto-restore)
+    // Nota: idx corrente è 'card.dataset.idx'. Qui non lo abbiamo diretto,
+    // ma la funzione autoSaveSession rilegge il DOM, quindi basta generare classi giuste.
+    // Per il restore "al volo" servirebbe passare l'idx dell'esercizio.
+    // (Per semplicità qui generiamo input puliti, il restoreSession li riempirà dopo il render)
+
+    return `
+        <div class="pl-set-row ${rowClass}" data-rest="${rest || 90}">
+            
+            <!-- 1. Indice -->
+            <div class="pl-set-idx">${isTop ? '👑' : (groupIdx + 1)}</div>
+
+            <!-- 2. Info Centrale -->
+            <div class="pl-set-body">
+                <!-- ... (tutto uguale a prima) ... -->
+                <div class="pl-target-line">
+                    <span>${group.reps} reps</span> ${targetText ? '• ' + targetText : ''}
+                </div>
+                
+                <div class="pl-input-line">
+                     <input type="number" class="pl-big-input input-kg" 
+                        placeholder="${placeholder}" value="${prefillKg}"
+                        oninput="window.autoSaveSession()">
+                    
+                    <button class="pl-disc-btn" onclick="window.openDynamicPlateModal(this)">
+                        <i class="ph ph-disc"></i>
+                    </button>
+
+                    ${group.role !== 'warmup' ? `<input type="number" class="pl-rpe-input" placeholder="RPE">` : ''}
+                </div>
+            </div>
+
+            <!-- 3. Check -->
+            <button class="pl-check-btn btn-check" onclick="toggleSet(this)">
+                <i class="ph ph-check"></i>
+            </button>
+        </div>
+    `;
 }
 
 
@@ -924,36 +1084,27 @@ function calculateAndRenderPlates(targetWeight) {
 // NUOVA FUNZIONE DINAMICA PER IL BOTTONE DISCHI
 // RENDIAMO LA FUNZIONE GLOBALE (Fix per onclick nell'HTML)
 window.openDynamicPlateModal = function(btnElement) {
-    // 1. Trova l'input Kg vicino al bottone premuto
-    // La struttura è: .set-input-group -> [input-kg] [btn]
-    const inputGroup = btnElement.closest('.set-input-group');
-    if (!inputGroup) {
-        console.error("Errore struttura HTML: .set-input-group non trovato");
-        return;
-    }
-
-    const inputField = inputGroup.querySelector('.input-kg');
+    // Nel nuovo layout .pl-input-line, l'input è fratello precedente del bottone
+    const container = btnElement.parentElement; // .pl-input-line
+    const inputField = container.querySelector('.input-kg'); 
+    
     if (!inputField) return;
 
-    // 2. Determina il peso
     let weight = parseFloat(inputField.value);
     
-    // Se l'utente non ha scritto, prova a leggere il placeholder (peso calcolato)
+    // Se vuoto, usa il placeholder
     if (isNaN(weight)) {
         const ph = parseFloat(inputField.placeholder);
         if (!isNaN(ph)) weight = ph;
+        else {
+            alert("Inserisci un peso valido.");
+            inputField.focus();
+            return;
+        }
     }
-
-    // 3. Validazione e Apertura
-    if (!weight || weight < 20) {
-        // Feedback visivo rapido (shake o alert)
-        alert("Peso non valido o troppo basso (<20kg). Inserisci i Kg.");
-        inputField.focus();
-        return;
-    }
-
-    // Chiama la logica di renderizzazione (che deve essere accessibile)
-    // Assicurati che calculateAndRenderPlates sia definita nel file
+    
+    if(weight < 20) { alert("Minimo 20kg"); return; }
+    
     window.openPlateModal(weight); 
 };
 
@@ -973,4 +1124,178 @@ window.openPlateModal = (weight) => {
 window.closePlateModal = (e) => {
     if(e) e.stopPropagation();
     document.getElementById('plate-modal-overlay').classList.add('hidden');
+};
+
+
+
+// B. LOGICA MODALITÀ FOCUS (FULLSCREEN)
+window.openFundamentalFocus = function(idx) {
+    // 1. Recupera Dati
+    // Usa la logica di mapping corretta per trovare la chiave PL
+    // (Assumiamo che loadData abbia già settato workoutData correttamente)
+    // Per sicurezza ricalcoliamo l'esercizio dall'array visualizzato
+    // Nota: Il renderList originale lavorava su un array 'exercises'. 
+    // Dobbiamo recuperare quell'oggetto specifico.
+    
+    // Trucco: recuperiamo l'esercizio direttamente dalla lista renderizzata o dallo state globale
+    // Usiamo una variabile globale temporanea se necessario o riaccediamo a workoutData
+    // Per semplicità, assumiamo che workoutData.data[currentKey] sia accessibile.
+    
+    // FIX RAPIDO: Poiché idx è l'indice nell'array visualizzato:
+    // Dobbiamo sapere quale array stiamo guardando.
+    // Nel loadData, salviamo l'array corrente in una variabile globale 'currentExercisesList'
+    
+    if(!window.currentExercisesList) {
+        console.error("Errore: lista esercizi non trovata");
+        return;
+    }
+
+    const ex = window.currentExercisesList[idx];
+    const userMax = findBestMaxMatch(ex.name);
+
+    // 2. Popola Header
+    document.getElementById('focus-ex-title').textContent = ex.name;
+    document.getElementById('focus-variant-badge').textContent = ex.variant || 'Standard';
+    
+    let metaHtml = '';
+    if (userMax > 0) metaHtml += `<span>🎯 1RM: <b>${userMax}kg</b></span>`;
+    if (ex.notes) metaHtml += `<span style="border-left:1px solid #ccc; padding-left:10px;">💡 ${ex.notes}</span>`;
+    document.getElementById('focus-meta-box').innerHTML = metaHtml || '<span>Nessuna nota particolare</span>';
+
+    // 3. Popola Body (Set)
+    const container = document.getElementById('focus-sets-container');
+    container.innerHTML = '';
+
+    // Raggruppa i set
+    const warmups = ex.sets.filter(s => s.role === 'warmup');
+    const tops = ex.sets.filter(s => s.role === 'top');
+    const backoffs = ex.sets.filter(s => s.role === 'backoff' || s.role === 'normal' || !s.role);
+
+    // Render Function Helper
+    const renderGroup = (sets, title, typeClass) => {
+        if (sets.length === 0) return;
+        
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'focus-section-title';
+        titleDiv.textContent = title;
+        container.appendChild(titleDiv);
+
+        sets.forEach((set) => {
+            // Trova l'indice assoluto del set originale per il salvataggio
+            const absoluteIdx = ex.sets.indexOf(set);
+            
+            // Calcolo Target (Logica identica a prima ma pulita)
+            let targetText = "";
+            let placeholder = "Kg";
+            let calcKg = 0;
+
+            if(set.mode === 'PERC' && userMax > 0 && set.val) {
+                calcKg = Math.round((userMax * parseFloat(set.val)) / 100 / 2.5) * 2.5;
+                targetText = `${set.reps} reps @ ${set.val}% (~${calcKg}kg)`;
+                placeholder = calcKg;
+            } else if (set.mode === 'RPE') {
+                targetText = `${set.reps} reps @ RPE ${set.val}`;
+                placeholder = "Kg?";
+            } else if (set.mode === 'KG') {
+                targetText = `${set.reps} reps @ ${set.val} Kg`;
+                calcKg = parseFloat(set.val);
+                placeholder = calcKg;
+            } else {
+                targetText = `${set.reps} reps`;
+            }
+
+            // Recupera valore salvato se esiste (auto-restore)
+            // Nota: Qui dovremmo leggere dal localStorage se c'è un valore temporaneo
+            // Per ora usiamo input vuoti, il restoreSession popolerà dopo se implementato correttamente
+            // Ma dato che stiamo creando DOM dinamico, dobbiamo leggere manually.
+            const savedState = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            let savedKg = '';
+            let savedDone = false;
+            
+            // Logica recupero salvataggio un po' complessa per il modal dinamico
+            // Per semplicità: Quando apriamo il modal, cerchiamo se c'è un valore salvato per questo 'idx' e 'sub-index'
+            if(savedState[idx] && savedState[idx].sets[absoluteIdx]) {
+                 savedKg = savedState[idx].sets[absoluteIdx].kg || '';
+                 savedDone = savedState[idx].sets[absoluteIdx].done || false;
+            }
+
+            const card = document.createElement('div');
+            card.className = `focus-set-card ${typeClass}`;
+            card.innerHTML = `
+                <div class="card-header-row">
+                    <span class="set-badge">${typeClass === 'top' ? '👑 TOP SET' : (typeClass === 'warmup' ? 'Warmup' : `Set ${absoluteIdx+1}`)}</span>
+                    <span class="target-text">${targetText}</span>
+                </div>
+                <div class="controls-row">
+                    <input type="number" class="big-input js-kg-input" 
+                        data-ex-idx="${idx}" data-set-idx="${absoluteIdx}"
+                        value="${savedKg}" placeholder="${placeholder}"
+                        oninput="window.handleFocusInput(this)">
+                    
+                    <button class="btn-plate-calc" onclick="window.openDynamicPlateModal(this)">
+                        <i class="ph ph-disc"></i>
+                    </button>
+                    
+                    ${typeClass !== 'warmup' ? `<input type="number" class="rpe-input-small" placeholder="RPE">` : ''}
+
+                    <button class="btn-check-focus ${savedDone ? 'done' : ''}" 
+                        onclick="window.toggleFocusSet(this, ${idx}, ${absoluteIdx})">
+                        <i class="ph ph-check"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    };
+
+    renderGroup(warmups, "Riscaldamento", "warmup");
+    renderGroup(tops, "🏆 Top Set (Main Work)", "top");
+    renderGroup(backoffs, "📉 Volume / Back-off", "backoff");
+
+    // 4. Mostra Modale
+    document.getElementById('pl-focus-modal').classList.remove('hidden');
+};
+
+// C. UTILITY DEL MODALE
+document.getElementById('btn-close-focus').onclick = () => {
+    document.getElementById('pl-focus-modal').classList.add('hidden');
+};
+document.getElementById('btn-save-focus').onclick = () => {
+    document.getElementById('pl-focus-modal').classList.add('hidden');
+    // Feedback opzionale
+};
+
+// Gestione Input nel Modale (Salvataggio Live)
+window.handleFocusInput = (input) => {
+    // Qui dobbiamo aggiornare lo stato "ombra" che poi verrà salvato
+    // Poiché autoSaveSession legge dal DOM della lista principale (che ora è vuota di input),
+    // dobbiamo aggiornare una struttura dati centrale o scrivere nel localStorage direttamente.
+    
+    // SOLUZIONE RAPIDA: Aggiorniamo direttamente il localStorage
+    const exIdx = input.dataset.exIdx;
+    const setIdx = input.dataset.setIdx;
+    
+    const sessionState = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    if(!sessionState[exIdx]) sessionState[exIdx] = { sets: [] };
+    if(!sessionState[exIdx].sets[setIdx]) sessionState[exIdx].sets[setIdx] = {};
+    
+    sessionState[exIdx].sets[setIdx].kg = input.value;
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionState));
+};
+
+window.toggleFocusSet = (btn, exIdx, setIdx) => {
+    btn.classList.toggle('done');
+    const isDone = btn.classList.contains('done');
+    
+    // Vibrazione
+    if(isDone && navigator.vibrate) navigator.vibrate(50);
+    
+    // Salva stato
+    const sessionState = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    if(!sessionState[exIdx]) sessionState[exIdx] = { sets: [] };
+    if(!sessionState[exIdx].sets[setIdx]) sessionState[exIdx].sets[setIdx] = {};
+    
+    sessionState[exIdx].sets[setIdx].done = isDone;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionState));
 };

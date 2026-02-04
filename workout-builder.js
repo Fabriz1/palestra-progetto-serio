@@ -400,22 +400,30 @@ onAuthStateChanged(auth, async (user) => {
     const btnChartLifts = document.getElementById('btn-chart-lifts');
     const btnChartMuscles = document.getElementById('btn-chart-muscles');
 
+    // Funzione helper per cambiare stile
+    function updateChartToggles() {
+        if (plChartView === 'lifts') {
+            btnChartLifts.style.background = '#1D1D1F'; btnChartLifts.style.color = 'white';
+            btnChartMuscles.style.background = 'white'; btnChartMuscles.style.color = '#1D1D1F';
+        } else {
+            btnChartMuscles.style.background = '#1D1D1F'; btnChartMuscles.style.color = 'white';
+            btnChartLifts.style.background = 'white'; btnChartLifts.style.color = '#1D1D1F';
+        }
+    }
+
     if (btnChartLifts && btnChartMuscles) {
         btnChartLifts.addEventListener('click', () => {
             plChartView = 'lifts';
-            btnChartLifts.style.background = '#1D1D1F'; btnChartLifts.style.color = 'white';
-            btnChartMuscles.style.background = 'white'; btnChartMuscles.style.color = '#1D1D1F';
-            updateLiveStatsPL();
+            updateChartToggles();
+            updateLiveStatsPL(); // Forza ricalcolo immediato
         });
 
         btnChartMuscles.addEventListener('click', () => {
             plChartView = 'muscles';
-            btnChartMuscles.style.background = '#1D1D1F'; btnChartMuscles.style.color = 'white';
-            btnChartLifts.style.background = 'white'; btnChartLifts.style.color = '#1D1D1F';
-            updateLiveStatsPL();
+            updateChartToggles();
+            updateLiveStatsPL(); // Forza ricalcolo immediato
         });
     }
-
 
 
 
@@ -2029,7 +2037,7 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
     data.isFundamental = true;
 
     if (!data.sets || data.sets.length === 0) {
-        data.sets = [{ numSets: 3, reps: '5', mode: 'PERC', val: '', role: 'normal' }];
+        data.sets = [{ numSets: 1, reps: '', mode: 'PERC', val: '', role: 'normal' }];
     }
 
     if (!data.progression) data.progression = {
@@ -2301,7 +2309,12 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
             const selRole = div.querySelector('.sel-role');
             const delBtn = div.querySelector('.btn-del-set');
 
-            inpSets.oninput = (e) => set.numSets = parseInt(e.target.value) || 1;
+            inpSets.oninput = (e) => {
+                // Se cancello tutto, metto 0, altrimenti il numero
+                const val = e.target.value;
+                set.numSets = val === '' ? 0 : (parseInt(val) || 0);
+                updateLiveStatsPL(); // <--- QUESTO AGGIORNA IL GRAFICO MENTRE SCRIVI
+            };
             inpReps.oninput = (e) => set.reps = e.target.value;
             inpVal.oninput = (e) => {
                 set.val = e.target.value;
@@ -2321,7 +2334,7 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
             delBtn.onclick = () => {
                 data.sets.splice(sIdx, 1);
                 renderSets();
-                updateLiveStatsPL();
+                updateLiveStatsPL(); // <--- Aggiorna grafico dopo eliminazione
             };
             div.addEventListener('focusin', () => div.style.borderColor = '#0071E3');
             div.addEventListener('focusout', () => div.style.borderColor = '#E5E5EA');
@@ -2564,61 +2577,105 @@ function openVariantDropdown(targetElement, onSelect) {
 // 9. CALCOLO VOLUME POWERLIFTING (Safety Version)
 // =========================================
 
+
+
 function updateLiveStatsPL() {
-    // Se l'utente vuole vedere i Muscoli (come i complementari), usiamo la logica BB filtrata per la settimana corrente
+    
+    // 1. HELPER: Calcola i set reali (ignora vuoti e warmup)
+    const getRealSets = (ex) => {
+        if (ex.isFundamental) {
+            // Fondamentali: Somma i set della tabella
+            if (!ex.sets || !Array.isArray(ex.sets)) return 0;
+            return ex.sets.reduce((total, s) => {
+                if (s.role === 'warmup') return total; // Ignora riscaldamento
+                return total + (parseInt(s.numSets) || 0); // Se vuoto o NaN, aggiunge 0
+            }, 0);
+        } else {
+            // Complementari: Logica standard
+            // Se i campi sono vuoti, restituisce 0 (fix set fantasma)
+            if (ex.technique === "Top set + back-off") {
+                const back = ex.backSets === '' ? 0 : (parseFloat(ex.backSets) || 0);
+                // Conta 1 (top set) solo se i campi top set sono compilati, altrimenti 0? 
+                // Per semplicità: se backSets è > 0 o c'è un top set, contiamo.
+                return 1 + back; 
+            }
+            const val = ex.val1 === '' ? 0 : (parseFloat(ex.val1) || 0);
+            return val;
+        }
+    };
+
+    // 2. RECUPERA DATI SETTIMANA CORRENTE
+    const weekPrefix = `w${currentPlWeek}_`;
+    const daysInWeek = Object.keys(workoutData).filter(k => k.startsWith(weekPrefix));
+
+    // --- MODO 1: VISTA MUSCOLI (Dettagliata) ---
     if (plChartView === 'muscles') {
         let hierarchyMap = {};
         Object.keys(MUSCLE_STRUCTURE).forEach(cat => hierarchyMap[cat] = { total: 0, children: {} });
+        hierarchyMap["Altro"] = { total: 0, children: {} };
 
-        const weekPrefix = `w${currentPlWeek}_`;
-        Object.keys(workoutData).filter(k => k.startsWith(weekPrefix)).forEach(dayKey => {
+        daysInWeek.forEach(dayKey => {
             workoutData[dayKey].forEach(ex => {
-                // Calcola sets
-                let sets = 0;
-                if (ex.isFundamental) sets = ex.sets.length;
-                else if (ex.technique === "Top set + back-off") sets = 1 + (parseFloat(ex.backSets) || 0);
-                else sets = parseFloat(ex.val1) || 0;
-
+                const sets = getRealSets(ex);
                 if (sets > 0) {
-                    ex.muscles.forEach(m => {
-                        // Logica standard BB per assegnare ai muscoli
-                        let parent = "Altro";
-                        for (const [cat, list] of Object.entries(MUSCLE_STRUCTURE)) {
-                            if (list.includes(m.name) || cat === m.name) { parent = cat; break; }
-                        }
-                        hierarchyMap[parent].total += sets;
-                        // ... children logic se serve ...
-                    });
+                    // Se non ha muscoli, va in Altro
+                    if (!ex.muscles || ex.muscles.length === 0) {
+                        hierarchyMap["Altro"].total += sets;
+                    } else {
+                        ex.muscles.forEach(m => {
+                            let parent = "Altro";
+                            // Cerca categoria padre
+                            for (const [cat, list] of Object.entries(MUSCLE_STRUCTURE)) {
+                                if (list.includes(m.name) || cat === m.name) { parent = cat; break; }
+                            }
+                            
+                            // Logica pesi muscolari (Primario 100%, Secondario 50%)
+                            let mult = 1.0;
+                            if (m.type === 'secondary') mult = 0.5;
+                            
+                            const vol = sets * mult;
+                            if(hierarchyMap[parent]) {
+                                hierarchyMap[parent].total += vol;
+                                if (!hierarchyMap[parent].children[m.name]) hierarchyMap[parent].children[m.name] = 0;
+                                hierarchyMap[parent].children[m.name] += vol;
+                            }
+                        });
+                    }
                 }
             });
         });
-        renderStatsUI(hierarchyMap); // Usa il render BB standard
-        return;
+        
+        // Renderizza usando la UI del BB (Liste + Grafico dettagliato)
+        renderStatsUI(hierarchyMap); 
+        return; 
     }
 
-    // --- VISTA DEFAULT: PER ALZATA (SQUAT, PANCA, ETC) ---
+    // --- MODO 2: VISTA ALZATE (Sintetica PL) ---
+    // Resetta UI BB se presente
+    const statsList = document.getElementById('stats-breakdown');
+    statsList.innerHTML = ''; 
+
     let liftStats = { "Squat": 0, "Panca": 0, "Stacco": 0, "Military": 0, "Accessori": 0 };
 
-    const weekPrefix = `w${currentPlWeek}_`;
-    Object.keys(workoutData).filter(k => k.startsWith(weekPrefix)).forEach(dayKey => {
+    daysInWeek.forEach(dayKey => {
         workoutData[dayKey].forEach(ex => {
-            let sets = 0;
+            const sets = getRealSets(ex);
+            if (sets === 0) return; // Salta se 0
+
             if (ex.isFundamental) {
-                sets = ex.sets.length;
                 const type = detectLiftType(ex.name);
                 if (type === 'squat') liftStats["Squat"] += sets;
                 else if (type === 'bench') liftStats["Panca"] += sets;
                 else if (type === 'deadlift') liftStats["Stacco"] += sets;
                 else if (type === 'ohp') liftStats["Military"] += sets;
-                else liftStats["Accessori"] += sets;
+                else liftStats["Accessori"] += sets; // Fondamentali non standard contano come accessori o propria cat? Mettiamo acc per ora
             } else {
-                if (ex.technique === "Top set + back-off") sets = 1 + (parseFloat(ex.backSets) || 0);
-                else sets = parseFloat(ex.val1) || 0;
                 liftStats["Accessori"] += sets;
             }
         });
     });
 
+    // Aggiorna Grafico
     if (volumeChartInstance) {
         const labels = Object.keys(liftStats);
         const data = Object.values(liftStats);
@@ -2629,17 +2686,25 @@ function updateLiveStatsPL() {
         volumeChartInstance.data.datasets[0].backgroundColor = plColors;
         volumeChartInstance.update();
 
-        // Lista testuale
-        const statsList = document.getElementById('stats-breakdown');
-        statsList.innerHTML = '';
+        // Renderizza Lista Laterale Semplice (Solo per modo PL)
         labels.forEach((label, i) => {
             if (data[i] > 0) {
                 const row = document.createElement('div');
-                row.className = 'stat-item';
-                row.innerHTML = `<span class="muscle-label">${label}</span><span class="volume-value">${data[i]} Sets</span>`;
+                row.className = 'stat-group'; // Usa classi esistenti per layout corretto
+                row.style.marginBottom = "5px";
+                row.innerHTML = `
+                    <div class="stat-parent" style="cursor:default; background:transparent; padding:5px 0; border-bottom:1px solid #f0f0f0;">
+                        <span style="color:${plColors[i]}; font-weight:700;">${label}</span>
+                        <span class="volume-value">${data[i]} Sets</span>
+                    </div>`;
                 statsList.appendChild(row);
             }
         });
+        
+        // Se tutto è vuoto
+        if (data.every(v => v === 0)) {
+            statsList.innerHTML = '<div style="text-align:center; color:#ccc; font-size:12px; padding:20px;">Nessun dato</div>';
+        }
     }
 }
 //ancora pl fino a quiì
