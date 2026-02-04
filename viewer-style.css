@@ -527,3 +527,17 @@ circle { fill: none; stroke-width: 6; stroke-linecap: round; }
 .calc-result-text { font-size: 42px; font-weight: 800; font-family: 'Inter', sans-serif; letter-spacing: -1px; margin-bottom: 5px; }
 .calc-sub-text { color: #86868B; font-size: 14px; font-weight: 500; }
 .calc-inventory-toggle { margin-top: 20px; font-size: 13px; color: #0071E3; cursor: pointer; }
+/* INPUT BLOCCATO (READONLY) */
+.pl-big-input[readonly] {
+    background: transparent !important;
+    border-color: transparent !important;
+    color: #FFFFFF; /* Testo bianco brillante */
+    pointer-events: none; /* IMPEDISCE IL CLICK E IL FOCUS */
+    box-shadow: none;
+    opacity: 1; /* Assicura che sia ben leggibile */
+    font-weight: 800; /* Ancora più "bold" per sembrare definitivo */
+}
+/* Opzionale: se vuoi che il numero bloccato nel top set sia dorato */
+.pl-set-row.top .pl-big-input[readonly] {
+    color: #FFD60A;
+}
