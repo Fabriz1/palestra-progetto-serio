@@ -542,7 +542,7 @@ function renderClients(clients) {
             
             <div class="client-header">
                 <div class="client-avatar-wrapper">
-                ${c.photoURL? `<img src="${c.photoURL}" class="client-avatar-img" alt="${c.name}">`: `<div class="client-avatar">${getInitials(c.name)}</div>`
+                ${c.photoURL ? `<img src="${c.photoURL}" class="client-avatar-img" alt="${c.name}">` : `<div class="client-avatar">${getInitials(c.name)}</div>`
             }
             </div>
                 <div>
@@ -1290,18 +1290,224 @@ async function loadClientCharts(clientId) {
     }
 }
 
-window.openWorkoutAnalysis = (workoutId, workoutName, days) => {
+// =========================================
+// NUOVA LOGICA ANALISI
+// =========================================
+
+window.openWorkoutAnalysis = async (workoutId, workoutName, days) => {
+    // 1. Setup UI
     document.getElementById('view-history').classList.add('hidden');
     document.getElementById('view-analysis').classList.remove('hidden');
     document.getElementById('analysis-title').textContent = workoutName;
 
+    // Reset viste: Mostra Riepilogo, Nascondi Grafici
+    document.getElementById('analysis-summary-view').classList.remove('hidden');
+    document.getElementById('analysis-charts-view').classList.add('hidden');
+    document.getElementById('workout-structure-container').innerHTML = '<p class="empty-msg">Calcolo progressi...</p>';
+
+    // 2. Filtra Logs
     currentAnalysisLogs = allClientLogs.filter(l => l.workoutId === workoutId);
     currentWorkoutDays = parseInt(days) || 7;
 
+    // 3. Recupera la Scheda Originale (per avere l'ordine esercizi)
+    try {
+        const wkDoc = await getDoc(doc(db, "workouts", workoutId));
+        if (wkDoc.exists()) {
+            const wkData = wkDoc.data();
+            // Lancia il rendering del riepilogo
+            renderWorkoutSummary(wkData);
+        } else {
+            // Fallback se la scheda originale è stata cancellata: Vai subito ai grafici
+            switchToDeepAnalysis();
+        }
+    } catch (e) {
+        console.error("Errore recupero scheda originale:", e);
+        switchToDeepAnalysis();
+    }
+};
+
+// Funzione per passare ai grafici completi (Logica vecchia)
+window.switchToDeepAnalysis = () => {
+    document.getElementById('analysis-summary-view').classList.add('hidden');
+    document.getElementById('analysis-charts-view').classList.remove('hidden');
+
+    // Inizializza i grafici come faceva prima
     analysisType = 'exercise';
     updateToggleButtons();
     renderAnalysisList();
 };
+
+window.backToSummaryView = () => {
+    document.getElementById('analysis-charts-view').classList.add('hidden');
+    document.getElementById('analysis-summary-view').classList.remove('hidden');
+};
+
+// =========================================
+// FUNZIONI RENDER RIEPILOGO E CALCOLO
+// =========================================
+
+function renderWorkoutSummary(workoutData) {
+    const container = document.getElementById('workout-structure-container');
+    container.innerHTML = '';
+
+    const dataObj = workoutData.data || {};
+
+    // Ordina le chiavi (Giorni): "1", "2" oppure "w1_d1", "w1_d2"
+    const sortedKeys = Object.keys(dataObj).sort((a, b) => {
+        return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    });
+
+    if (sortedKeys.length === 0) {
+        container.innerHTML = '<p class="empty-msg">Scheda vuota.</p>';
+        return;
+    }
+
+    sortedKeys.forEach(dayKey => {
+        const exercises = dataObj[dayKey];
+        if (!exercises || exercises.length === 0) return;
+
+        // --- 1. HEADER GIORNO (Calcolo Volume Sessione) ---
+        // Se è formato PL (w1_d1), estraiamo solo il Day Index per aggregare i log
+        let dayIndexForLogs = dayKey;
+        if (dayKey.includes('d')) dayIndexForLogs = dayKey.split('_')[1].replace('d', ''); // Es. "1" da "w1_d1"
+
+        // Titolo Visualizzato
+        let dayLabel = dayKey.includes('w') ?
+            `Week ${dayKey.split('_')[0].replace('w', '')} - Day ${dayKey.split('_')[1].replace('d', '')}` :
+            `Giorno ${dayKey}`;
+
+        const volStats = calculateProgressStats(dayIndexForLogs, 'session');
+        const badgeDay = createProgressBadge(volStats.perc);
+
+        // --- 2. HTML GIORNO ---
+        const dayBlock = document.createElement('div');
+        dayBlock.className = 'day-summary-block';
+        
+        // Icona diversa in base al nome (se contiene Week/Giorno)
+        const iconClass = dayLabel.includes('Week') ? 'ph-calendar' : 'ph-barbell';
+        
+        dayBlock.innerHTML = `
+            <div class="day-summary-header">
+                <div class="day-title">
+                    <div class="day-icon"><i class="ph ${iconClass}"></i></div>
+                    ${dayLabel}
+                </div>
+                ${badgeDay}
+            </div>
+            <div class="day-exercises-list"></div>
+        `;
+
+        const exList = dayBlock.querySelector('.day-exercises-list');
+
+        // --- 3. LISTA ESERCIZI ---
+        exercises.forEach(ex => {
+            // Calcolo Max Load per questo esercizio
+            const exStats = calculateProgressStats(ex.name, 'exercise');
+            const badgeEx = createProgressBadge(exStats.perc);
+
+            // Dettagli Tecnici (Sets x Reps)
+            let details = "";
+            if (ex.isFundamental) {
+                // PL style
+                details = "Fondamentale (PL)";
+            } else {
+                // BB style
+                if (ex.technique === 'Top set + back-off') details = "Top + Backoff";
+                else details = `${ex.val1 || '?'} x ${ex.val2 || '?'} ${ex.metricType || ''}`;
+            }
+
+            const row = document.createElement('div');
+            row.className = 'ex-summary-row';
+            row.innerHTML = `
+                <div class="ex-info">
+                    <h5>${ex.name}</h5>
+                    <span>${details}</span>
+                </div>
+                <div class="ex-leader"></div>
+                ${badgeEx}
+            `;
+            exList.appendChild(row);
+        });
+
+        container.appendChild(dayBlock);
+    });
+}
+
+// Funzione "Magica" di calcolo (Primo vs Ultimo)
+function calculateProgressStats(identifier, type) {
+    // Filtra i log pertinenti
+    let pertinentLogs = [];
+
+    if (type === 'session') {
+        // Cerca log con questo dayIndex (o dayKey)
+        // Nota: i log salvati hanno dayIndex numerico (1, 2...). 
+        pertinentLogs = currentAnalysisLogs.filter(l => l.dayIndex == identifier);
+    } else {
+        // Cerca log che contengono questo esercizio
+        pertinentLogs = currentAnalysisLogs.filter(l => l.exercises && l.exercises.some(e => e.name === identifier));
+    }
+
+    if (pertinentLogs.length < 2) return { perc: null }; // Serve almeno prima e ultima volta
+
+    // Ordina per data
+    pertinentLogs.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const firstLog = pertinentLogs[0];
+    const lastLog = pertinentLogs[pertinentLogs.length - 1];
+
+    let startVal = 0;
+    let endVal = 0;
+
+    if (type === 'session') {
+        // Calcola Volume Totale Sessione (Kg * Reps)
+        const getVol = (log) => {
+            let v = 0;
+            if (log.exercises) log.exercises.forEach(e => {
+                if (e.sets) e.sets.forEach(s => v += (parseFloat(s.kg) || 0) * (parseFloat(s.reps) || 0));
+            });
+            return v;
+        };
+        startVal = getVol(firstLog);
+        endVal = getVol(lastLog);
+    } else {
+        // Calcola Max Kg Esercizio
+        const getMax = (log) => {
+            let m = 0;
+            const ex = log.exercises.find(e => e.name === identifier);
+            if (ex && ex.sets) ex.sets.forEach(s => {
+                const k = parseFloat(s.kg) || 0;
+                if (k > m) m = k;
+            });
+            return m;
+        };
+        startVal = getMax(firstLog);
+        endVal = getMax(lastLog);
+    }
+
+    if (startVal === 0) return { perc: 0 };
+
+    const perc = ((endVal - startVal) / startVal) * 100;
+    return { perc: parseFloat(perc.toFixed(1)) };
+}
+
+// Generatore HTML Badge
+function createProgressBadge(perc) {
+    if (perc === null) return `<span class="prog-badge gray">N.D.</span>`;
+
+    let colorClass = 'orange'; // 0-5%
+    let icon = 'minus';
+
+    if (perc > 5) {
+        colorClass = 'green';
+        icon = 'trend-up';
+    } else if (perc < 0) {
+        colorClass = 'red';
+        icon = 'trend-down';
+    }
+
+    const sign = perc > 0 ? '+' : '';
+    return `<span class="prog-badge ${colorClass}"><i class="ph ph-${icon}"></i> ${sign}${perc}%</span>`;
+}
 
 window.closeWorkoutAnalysis = () => {
     document.getElementById('view-analysis').classList.add('hidden');
@@ -2032,7 +2238,7 @@ const btnGenDummy = document.getElementById('btn-generate-dummy');
 if (btnGenDummy) {
     btnGenDummy.addEventListener('click', async () => {
         if (!confirm("Generare 'Mario Test'?\nQuesto creerà dati specifici per testare la gerarchia Muscolare (Padre/Figli).")) return;
-        
+
         btnGenDummy.textContent = "Generazione in corso...";
         btnGenDummy.disabled = true;
 
@@ -2079,15 +2285,15 @@ async function generateHierarchyDummyData() {
             name: "Panca Piana (Gen)",
             baseKg: 80,
             // Questo esercizio targetta il PADRE generico
-            muscles: [{ name: "Pettorali" }] 
+            muscles: [{ name: "Pettorali" }]
         },
         {
             name: "Croci ai Cavi Alti",
             baseKg: 20,
             // Questo esercizio targetta un FIGLIO specifico
-            muscles: [{ name: "Pettorale Alto (Clavicolare)" }] 
+            muscles: [{ name: "Pettorale Alto (Clavicolare)" }]
         },
-        
+
         // --- GIORNO B: GAMBE (Padre vs Figlio) ---
         {
             name: "Squat (Gen)",
@@ -2118,26 +2324,26 @@ async function generateHierarchyDummyData() {
     // 3. GENERAZIONE LOGS (3 Mesi)
     const logsCollection = collection(db, "users", dummyId, "logs");
     const startDate = new Date();
-    startDate.setDate(today.getDate() - 90); 
+    startDate.setDate(today.getDate() - 90);
 
     let sessionCount = 0;
-    
+
     // Simuliamo un allenamento ogni 2 giorni
     for (let i = 0; i < 90; i += 2) {
         const currentDate = new Date(startDate);
         currentDate.setDate(startDate.getDate() + i);
 
         // Progressione Lineare (+10% in 3 mesi)
-        const progression = 1 + (i * 0.0015); 
+        const progression = 1 + (i * 0.0015);
 
         // Dividiamo in Giorno A (Petto) e Giorno B (Gambe/Schiena)
         const isDayA = (sessionCount % 2 === 0);
-        
+
         // Filtriamo gli esercizi in base al giorno
         let dailyExercises = [];
         if (isDayA) {
             // Prende i primi 2 esercizi (Petto)
-            dailyExercises = exercisesDef.slice(0, 2); 
+            dailyExercises = exercisesDef.slice(0, 2);
         } else {
             // Prende gli altri (Gambe e Schiena)
             dailyExercises = exercisesDef.slice(2);
@@ -2146,7 +2352,7 @@ async function generateHierarchyDummyData() {
         // Costruiamo l'oggetto esercizi con i carichi calcolati
         const sessionExercisesMapped = dailyExercises.map(ex => {
             // Aggiungiamo un po' di rumore casuale (+/- 2kg) per rendere il grafico realistico
-            const noise = (Math.random() * 4) - 2; 
+            const noise = (Math.random() * 4) - 2;
             const currentKg = Math.round((ex.baseKg * progression) + noise);
 
             return {
@@ -2180,7 +2386,7 @@ async function generateHierarchyDummyData() {
         days: 2,
         isTemplate: false
     });
-    
+
     // 5. MISURE CORPOREE (Per non lasciare vuota quella tab)
     const measuresCollection = collection(db, "users", dummyId, "measurements");
     await addDoc(measuresCollection, {
@@ -2205,7 +2411,7 @@ const btnGenAdv = document.getElementById('btn-generate-advanced');
 if (btnGenAdv) {
     btnGenAdv.addEventListener('click', async () => {
         if (!confirm("Creare 'Luigi Advanced'?\nQuesto genererà molti dati dettagliati per testare le linee multiple nei grafici.")) return;
-        
+
         btnGenAdv.textContent = "Generazione complessa in corso...";
         btnGenAdv.disabled = true;
 
@@ -2246,82 +2452,82 @@ async function generateAdvancedHierarchyData() {
 
     // 2. DEFINIZIONE ESERCIZI (SPLIT 3 GIORNI: PUSH / PULL / LEGS)
     // Qui usiamo i nomi specifici dei FIGLI definiti nella tua mappa
-    
+
     const exercisesLibrary = {
         // --- GIORNO A: PUSH (Petto, Spalle Avanti, Tricipiti) ---
         dayA: [
-            { 
-                name: "Panca Piana Power", 
-                baseKg: 100, 
-                muscles: [{name: "Gran Pettorale (Generale)"}] // Padre: Pettorali
+            {
+                name: "Panca Piana Power",
+                baseKg: 100,
+                muscles: [{ name: "Gran Pettorale (Generale)" }] // Padre: Pettorali
             },
-            { 
-                name: "Panca Inclinata Manubri", 
+            {
+                name: "Panca Inclinata Manubri",
                 baseKg: 32, // (x2 manubri)
-                muscles: [{name: "Pettorale Alto (Clavicolare)"}] // Figlio 1
+                muscles: [{ name: "Pettorale Alto (Clavicolare)" }] // Figlio 1
             },
-            { 
-                name: "Cross-over Cavi Bassi", 
-                baseKg: 20, 
-                muscles: [{name: "Pettorale Basso (Sternocostale)"}] // Figlio 2
+            {
+                name: "Cross-over Cavi Bassi",
+                baseKg: 20,
+                muscles: [{ name: "Pettorale Basso (Sternocostale)" }] // Figlio 2
             },
-            { 
-                name: "French Press", 
-                baseKg: 40, 
-                muscles: [{name: "Tricipite (Capo Lungo)"}] // Figlio A Tricipiti
+            {
+                name: "French Press",
+                baseKg: 40,
+                muscles: [{ name: "Tricipite (Capo Lungo)" }] // Figlio A Tricipiti
             },
-            { 
-                name: "Pushdown Corda", 
-                baseKg: 25, 
-                muscles: [{name: "Tricipite (Capo Laterale)"}] // Figlio B Tricipiti
+            {
+                name: "Pushdown Corda",
+                baseKg: 25,
+                muscles: [{ name: "Tricipite (Capo Laterale)" }] // Figlio B Tricipiti
             }
         ],
 
         // --- GIORNO B: PULL (Schiena, Spalle Dietro, Bicipiti) ---
         dayB: [
-            { 
-                name: "Trazioni Zavorrate", 
+            {
+                name: "Trazioni Zavorrate",
                 baseKg: 85, // Peso corpo + zavorra
-                muscles: [{name: "Gran Dorsale (Lats)"}] // Padre: Schiena Ampiezza
+                muscles: [{ name: "Gran Dorsale (Lats)" }] // Padre: Schiena Ampiezza
             },
-            { 
-                name: "Rematore Bilanciere", 
-                baseKg: 90, 
-                muscles: [{name: "Schiena (Alta/Spessore)"}] // Padre: Schiena Spessore
+            {
+                name: "Rematore Bilanciere",
+                baseKg: 90,
+                muscles: [{ name: "Schiena (Alta/Spessore)" }] // Padre: Schiena Spessore
             },
-            { 
-                name: "Scrollate Manubri", 
-                baseKg: 40, 
-                muscles: [{name: "Trapezio (Superiore)"}] // Figlio di Schiena Spessore
+            {
+                name: "Scrollate Manubri",
+                baseKg: 40,
+                muscles: [{ name: "Trapezio (Superiore)" }] // Figlio di Schiena Spessore
             },
-            { 
-                name: "Alzate 90°", 
-                baseKg: 12, 
-                muscles: [{name: "Deltoide Posteriore"}] // Figlio di Deltoidi Posteriori
+            {
+                name: "Alzate 90°",
+                baseKg: 12,
+                muscles: [{ name: "Deltoide Posteriore" }] // Figlio di Deltoidi Posteriori
             }
         ],
 
         // --- GIORNO C: LEGS (Quad, Femorali, Polpacci) ---
         dayC: [
-            { 
-                name: "Squat", 
-                baseKg: 140, 
-                muscles: [{name: "Quadricipiti (Generale)"}] // Padre
+            {
+                name: "Squat",
+                baseKg: 140,
+                muscles: [{ name: "Quadricipiti (Generale)" }] // Padre
             },
-            { 
-                name: "Leg Extension Unilaterale", 
-                baseKg: 35, 
-                muscles: [{name: "Vasto Laterale"}] // Figlio 1 Quad
+            {
+                name: "Leg Extension Unilaterale",
+                baseKg: 35,
+                muscles: [{ name: "Vasto Laterale" }] // Figlio 1 Quad
             },
-            { 
-                name: "Stacco Rumeno", 
-                baseKg: 110, 
-                muscles: [{name: "Bicipite Femorale (Capo Lungo)"}] // Figlio 1 Femorali
+            {
+                name: "Stacco Rumeno",
+                baseKg: 110,
+                muscles: [{ name: "Bicipite Femorale (Capo Lungo)" }] // Figlio 1 Femorali
             },
-            { 
-                name: "Nordic Curl", 
+            {
+                name: "Nordic Curl",
                 baseKg: 0, // Peso corpo (ma mettiamo un valore fittizio per il grafico)
-                muscles: [{name: "Semitendinoso"}] // Figlio 2 Femorali
+                muscles: [{ name: "Semitendinoso" }] // Figlio 2 Femorali
             }
         ]
     };
@@ -2329,10 +2535,10 @@ async function generateAdvancedHierarchyData() {
     // 3. GENERAZIONE LOGS (3 Mesi - 90 Giorni)
     const logsCollection = collection(db, "users", dummyId, "logs");
     const startDate = new Date();
-    startDate.setDate(today.getDate() - 90); 
+    startDate.setDate(today.getDate() - 90);
 
     let sessionCount = 0;
-    
+
     // Allenamento 4 volte a settimana (Lun, Mar, Gio, Ven) simulato
     // Semplicemente iteriamo ogni 2 giorni per semplicità
     for (let i = 0; i < 90; i += 2) {
@@ -2350,14 +2556,14 @@ async function generateAdvancedHierarchyData() {
         let selectedRoutine = [];
         let routineName = "";
 
-        if (rotation === 0) { 
-            selectedRoutine = exercisesLibrary.dayA; 
+        if (rotation === 0) {
+            selectedRoutine = exercisesLibrary.dayA;
             routineName = "Push (Petto Focus)";
-        } else if (rotation === 1) { 
-            selectedRoutine = exercisesLibrary.dayB; 
+        } else if (rotation === 1) {
+            selectedRoutine = exercisesLibrary.dayB;
             routineName = "Pull (Back Focus)";
-        } else { 
-            selectedRoutine = exercisesLibrary.dayC; 
+        } else {
+            selectedRoutine = exercisesLibrary.dayC;
             routineName = "Legs Hypertrophy";
         }
 
@@ -2395,13 +2601,13 @@ async function generateAdvancedHierarchyData() {
         days: 3,
         isTemplate: false
     });
-    
+
     // 5. MISURE (Massa pura)
     const measuresCollection = collection(db, "users", dummyId, "measurements");
-    for(let k=0; k<12; k++) {
-         const mD = new Date(startDate);
-         mD.setDate(startDate.getDate() + (k*7));
-         await addDoc(measuresCollection, {
+    for (let k = 0; k < 12; k++) {
+        const mD = new Date(startDate);
+        mD.setDate(startDate.getDate() + (k * 7));
+        await addDoc(measuresCollection, {
             date: mD.toISOString().split('T')[0],
             weight: 90 + (k * 0.2), // Massa: sale di peso
             bia: { muscle: 45 + (k * 0.15), fat: 12 },
@@ -2463,7 +2669,7 @@ async function loadClientMiniChart(clientId) {
             if (daysSeenInCycle.has(dayIndex)) {
                 // Salviamo il ciclo concluso
                 cycles.push(currentCycleVol);
-                
+
                 // Resettiamo per il nuovo ciclo
                 currentCycleVol = 0;
                 daysSeenInCycle.clear();
@@ -2495,18 +2701,18 @@ async function loadClientMiniChart(clientId) {
         const lastVal = dataPoints[dataPoints.length - 1];
         const prevVal = dataPoints[dataPoints.length - 2];
         const isUp = lastVal >= prevVal;
-        
+
         // Logica colore: Se il ciclo corrente è molto basso (es. appena iniziato), 
         // mostriamo grigio invece di rosso panico, altrimenti verde/rosso.
         // Se è > 80% del precedente lo consideriamo stabile/buono (dato che magari non è finito)
-        let color = "#86868B"; 
+        let color = "#86868B";
         if (lastVal >= prevVal) color = "#34C759"; // Verde (Superato il precedente)
         else if (lastVal < prevVal * 0.5) color = "#FF9F0A"; // Arancione (Forse ciclo in corso?)
         else color = "#FF3B30"; // Rosso (Calo effettivo)
 
         // SVG
         const svgHTML = generateSparklineSVG(dataPoints, color);
-        const displayVal = (lastVal / 1000).toFixed(1) + 't'; 
+        const displayVal = (lastVal / 1000).toFixed(1) + 't';
         const arrow = isUp ? '▲' : ''; // Mostriamo freccia solo se sale, se scende potrebbe essere incompleto
 
         container.innerHTML = `
@@ -2529,11 +2735,11 @@ async function loadClientMiniChart(clientId) {
 function generateSparklineSVG(data, color) {
     if (!data || data.length < 2) return ''; // Serve almeno una linea (2 punti)
 
-    const width = 100; 
+    const width = 100;
     const height = 40;
     const max = Math.max(...data);
     const min = Math.min(...data);
-    
+
     // Evita divisione per zero se tutti i valori sono uguali
     const range = (max - min) === 0 ? 1 : (max - min);
 
@@ -2543,7 +2749,7 @@ function generateSparklineSVG(data, color) {
         // Invertiamo Y perché SVG ha 0 in alto
         // Aggiungiamo un padding del 10% sopra e sotto per non tagliare la linea
         const normalizedVal = (val - min) / range;
-        const y = height - (normalizedVal * (height * 0.8) + (height * 0.1)); 
+        const y = height - (normalizedVal * (height * 0.8) + (height * 0.1));
         return `${x},${y}`;
     });
 
@@ -2556,12 +2762,12 @@ function generateSparklineSVG(data, color) {
     return `
         <svg class="sparkline-svg" viewBox="0 0 100 40" preserveAspectRatio="none">
             <defs>
-                <linearGradient id="grad-${color.replace('#','')}" x1="0%" y1="0%" x2="0%" y2="100%">
+                <linearGradient id="grad-${color.replace('#', '')}" x1="0%" y1="0%" x2="0%" y2="100%">
                     <stop offset="0%" style="stop-color:${color}; stop-opacity:0.4" />
                     <stop offset="100%" style="stop-color:${color}; stop-opacity:0" />
                 </linearGradient>
             </defs>
-            <path d="${fillPath}" fill="url(#grad-${color.replace('#','')})" />
+            <path d="${fillPath}" fill="url(#grad-${color.replace('#', '')})" />
             <path d="${linePath}" class="spark-path" stroke="${color}" />
         </svg>
     `;

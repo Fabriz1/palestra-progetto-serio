@@ -573,17 +573,30 @@ function initSlideToFinish() {
     document.addEventListener('mouseup', (e) => endDrag(e.clientX));
 }
 
-// SALVATAGGIO SU FIRESTORE
+// =========================================
+// SALVATAGGIO ROBUSTO (BB + PL)
+// =========================================
 async function saveWorkout() {
+    // Feedback visivo immediato sullo slider
+    if(slideText) slideText.textContent = "SALVATAGGIO...";
+
     const sessionLog = {
         workoutId: currentWorkoutId,
         workoutName: workoutData.name,
-        dayIndex: parseInt(currentDay) || 1,
+        dayIndex: currentDay, // Mantiene l'ID originale (es. "1" o "w1_d1")
         date: new Date().toISOString(),
         exercises: []
     };
 
-    const originalExercises = workoutData.data[currentDay] || workoutData.data[String(currentDay)] || [];
+    // Recupera la struttura originale per i muscoli
+    // Gestione chiave complessa (w1_d1) o semplice (1)
+    let originalExercises = [];
+    if (workoutData.data[currentDay]) {
+        originalExercises = workoutData.data[currentDay];
+    } else {
+        // Fallback se ci sono problemi di indici
+        originalExercises = window.currentExercisesList || [];
+    }
 
     document.querySelectorAll('.ex-card').forEach(card => {
         const idx = card.dataset.idx;
@@ -591,43 +604,73 @@ async function saveWorkout() {
         const name = card.querySelector('h3').textContent;
         const sets = [];
 
-        card.querySelectorAll('.set-row').forEach(row => {
-            const kg = parseFloat(row.querySelector('.input-kg').value) || 0;
-            const done = row.querySelector('.btn-check').classList.contains('done');
+        // SELEZIONE RIGHE: Cerca sia le vecchie (.set-row) che le nuove (.pl-set-row)
+        const rows = card.querySelectorAll('.set-row, .pl-set-row');
+
+        rows.forEach(row => {
+            // 1. Recupera KG
+            const kgInput = row.querySelector('.input-kg');
+            const kg = kgInput ? parseFloat(kgInput.value) : 0;
+
+            // 2. Recupera Check (Fatto/Non fatto)
+            const checkBtn = row.querySelector('.btn-check');
+            const done = checkBtn ? checkBtn.classList.contains('done') : false;
+
+            // 3. Recupera REPS (Target)
             let repsVal = row.dataset.reps;
             let repsNum = parseFloat(repsVal);
-            if (isNaN(repsNum) && repsVal.includes('-')) repsNum = parseFloat(repsVal.split('-')[0]);
+            // Gestione range (es. "8-10" -> salva 8)
+            if (isNaN(repsNum) && repsVal && repsVal.includes('-')) {
+                repsNum = parseFloat(repsVal.split('-')[0]);
+            }
 
+            // 4. (Opzionale) Recupera RPE se presente
+            const rpeInput = row.querySelector('.pl-rpe-input');
+            let rpeVal = rpeInput ? rpeInput.value : null;
+
+            // SALVA SOLO SE: C'è un peso inserito OPPURE è stato spuntato come fatto
             if (kg > 0 || done) {
-                sets.push({ kg: kg, reps: repsNum || 0, done: done });
+                const setObj = { 
+                    kg: kg, 
+                    reps: repsNum || 0, 
+                    done: done 
+                };
+                if(rpeVal) setObj.rpe = rpeVal; // Salva RPE se c'è
+                sets.push(setObj);
             }
         });
 
+        // Aggiungi esercizio al log solo se ha dei set validi
         if (sets.length > 0) {
             sessionLog.exercises.push({
-                name,
-                sets,
+                name: name,
+                sets: sets,
+                // Mantieni i metadati muscolari per i grafici
                 muscles: originalEx?.muscles ? originalEx.muscles : []
             });
         }
     });
 
     try {
+        // Scrive su Firestore
         await addDoc(collection(db, "users", auth.currentUser.uid, "logs"), sessionLog);
         
-        // PULIZIA: Rimuovi dati locali solo dopo successo
+        // PULIZIA
         clearSessionData();
         
-        // Vai alla dashboard (che aggiornerà i grafici)
+        // Redirect
         window.location.href = "dashboard-client.html";
     } catch (e) {
-        console.error(e);
-        alert("Errore salvataggio. Riprova.");
-        // Reset slider
+        console.error("Errore salvataggio:", e);
+        alert("Errore durante il salvataggio. Controlla la connessione.");
+        
+        // Reset Slider in caso di errore
         const knob = document.querySelector('.slide-knob');
         if (knob) knob.style.transform = `translateX(0px)`;
-        slideText.textContent = "SCORRI PER FINIRE";
-        slideText.style.opacity = 1;
+        if(slideText) {
+            slideText.textContent = "SCORRI PER FINIRE";
+            slideText.style.opacity = 1;
+        }
     }
 }
 
@@ -859,7 +902,7 @@ function createPLSetRow(group, groupIdx, subIdx, userMax, rest) {
     // (Per semplicità qui generiamo input puliti, il restoreSession li riempirà dopo il render)
 
     return `
-        <div class="pl-set-row ${rowClass}" data-rest="${rest || 90}">
+        <div class="pl-set-row ${rowClass}" data-rest="${rest || 90}" data-reps="${group.reps}">
             
             <!-- 1. Indice -->
             <div class="pl-set-idx">${isTop ? '👑' : (groupIdx + 1)}</div>

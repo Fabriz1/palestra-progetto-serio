@@ -180,66 +180,164 @@ async function loadWorkout(workoutId) {
 }
 
 // 4. RENDER LISTA GIORNI (Modificato per aprire il Bottom Sheet)
+// VARIABILE GLOBALE PER TENERE TRACCIA DELLA SETTIMANA SELEZIONATA
+let currentSelectedWeek = 1; 
+
 function renderDaysList(workout) {
     const container = document.getElementById('workout-days-list');
     if(!container) return;
     container.innerHTML = '';
 
-    for (let i = 1; i <= workout.days; i++) {
-        const exercises = workout.data[i] || [];
-        const count = exercises.length;
-        
-        const card = document.createElement('div');
-        card.className = 'day-card';
-        
-        // MODIFICA: Apre l'anteprima invece di andare diretto
-        card.onclick = () => {
-            openPreview(i, count);
-        };
+    // 1. ANALISI STRUTTURA: È Powerlifting (PL) o Bodybuilding (BB)?
+    const keys = Object.keys(workout.data);
+    const isPL = keys.some(k => k.startsWith('w')); // Se c'è una chiave che inizia con 'w' (es. w1_d1)
 
-        card.innerHTML = `
-            <div class="day-info">
-                <h4>Giorno ${i}</h4>
-                <p>${count} Esercizi</p>
-            </div>
-            <i class="ph ph-caret-right" style="color:#C7C7CC; font-size: 20px;"></i>
-        `;
-        container.appendChild(card);
+    if (isPL) {
+        // --- LOGICA POWERLIFTING ---
+        
+        // A. Raggruppa i giorni per settimana
+        const weeksMap = {};
+        keys.forEach(k => {
+            if(!k.startsWith('w')) return;
+            // Estrai numero settimana e giorno (es. w1_d2 -> week=1, day=2)
+            const parts = k.match(/w(\d+)_d(\d+)/);
+            if(parts) {
+                const w = parseInt(parts[1]);
+                const d = parseInt(parts[2]);
+                if(!weeksMap[w]) weeksMap[w] = [];
+                weeksMap[w].push({ id: k, dayNum: d, exercises: workout.data[k] });
+            }
+        });
+
+        // Ordina le settimane
+        const sortedWeeks = Object.keys(weeksMap).map(Number).sort((a,b) => a-b);
+        
+        // Se la selezione attuale non esiste (es. cambio scheda), resetta a 1
+        if (!sortedWeeks.includes(currentSelectedWeek)) currentSelectedWeek = sortedWeeks[0] || 1;
+
+        // B. Renderizza SELETTORE SETTIMANE (Pillole)
+        const weekSelector = document.createElement('div');
+        weekSelector.className = 'week-selector-container';
+        
+        sortedWeeks.forEach(w => {
+            const chip = document.createElement('div');
+            chip.className = `week-chip ${w === currentSelectedWeek ? 'active' : ''}`;
+            chip.textContent = `Week ${w}`;
+            chip.onclick = () => {
+                currentSelectedWeek = w;
+                renderDaysList(workout); // Ricarica la lista con la nuova settimana
+            };
+            weekSelector.appendChild(chip);
+        });
+        container.appendChild(weekSelector);
+
+        // C. Renderizza i GIORNI della settimana attiva
+        const activeDays = weeksMap[currentSelectedWeek] || [];
+        // Ordina per giorno (Day 1, Day 2...)
+        activeDays.sort((a,b) => a.dayNum - b.dayNum);
+
+        if (activeDays.length === 0) {
+            container.innerHTML += `<p style="text-align:center; color:#999; margin-top:20px;">Nessun allenamento in questa settimana.</p>`;
+        } else {
+            activeDays.forEach(dayObj => {
+                const card = createDayCard(`Day ${dayObj.dayNum}`, dayObj.exercises.length, dayObj.id, workout.name);
+                container.appendChild(card);
+            });
+        }
+
+    } else {
+        // --- LOGICA BODYBUILDING (Classica) ---
+        // Itera da 1 fino a workout.days
+        for (let i = 1; i <= workout.days; i++) {
+            const exercises = workout.data[i] || [];
+            // Usa l'indice "i" come ID
+            const card = createDayCard(`Giorno ${i}`, exercises.length, i, workout.name);
+            container.appendChild(card);
+        }
     }
+}
+
+// Funzione Helper per creare la card (così non ripetiamo codice)
+function createDayCard(title, exCount, dayId, workoutName) {
+    const card = document.createElement('div');
+    card.className = 'day-card';
+    card.onclick = () => {
+        // Passiamo dayId che può essere "1" (BB) o "w1_d1" (PL)
+        openPreview(dayId, exCount, workoutName);
+    };
+
+    card.innerHTML = `
+        <div class="day-info">
+            <h4>${title}</h4>
+            <p>${exCount} Esercizi</p>
+        </div>
+        <i class="ph ph-caret-right" style="color:#C7C7CC; font-size: 20px;"></i>
+    `;
+    return card;
 }
 
 // --- LOGICA BOTTOM SHEET & CONFLITTI ---
 
 // Apre il pannello
 // Apre il pannello con la lista esercizi
-window.openPreview = (dayIdx, exCount) => {
-    pendingDayIdx = dayIdx; // Ci segniamo quale giorno vuole fare
+window.openPreview = (dayId, exCount, workoutName) => {
+    pendingDayIdx = dayId; // Salva l'ID (può essere "1" o "w1_d1")
     
-    // 1. Testi Intestazione
+    // 1. Titoli
     const sheetTitle = document.getElementById('sheet-day-title');
     const sheetInfo = document.getElementById('sheet-day-info');
-    if(sheetTitle) sheetTitle.textContent = `Giorno ${dayIdx}`;
+    
+    // Formatta titolo carino
+    let displayTitle = `Giorno ${dayId}`;
+    if (String(dayId).includes('w')) {
+        // Formatta da w1_d1 a "Week 1 • Day 1"
+        const parts = dayId.match(/w(\d+)_d(\d+)/);
+        if(parts) displayTitle = `Week ${parts[1]} • Day ${parts[2]}`;
+    }
+    
+    if(sheetTitle) sheetTitle.textContent = displayTitle;
     if(sheetInfo) sheetInfo.textContent = `${exCount} Esercizi • ${currentWorkoutData.name}`;
 
-    // 2. Generazione Lista Esercizi (NUOVO)
+    // 2. Lista Esercizi
     const listContainer = document.getElementById('sheet-exercises-list');
     if (listContainer) {
-        listContainer.innerHTML = ''; // Pulisci lista vecchia
+        listContainer.innerHTML = ''; 
         
-        // Recupera gli esercizi veri dall'oggetto globale
-        const exercises = currentWorkoutData.data[dayIdx] || [];
+        const exercises = currentWorkoutData.data[dayId] || [];
         
         if (exercises.length === 0) {
             listContainer.innerHTML = '<p style="padding:20px; text-align:center; color:#999; font-size:13px;">Nessun esercizio</p>';
         } else {
             exercises.forEach(ex => {
-                // Calcola etichetta (es. "4x10")
                 let label = "";
-                if (ex.technique === "Top set + back-off") label = "Top + Backoff";
-                else if (ex.technique === "Myo-reps") label = "Myo-reps";
-                else label = `${ex.val1 || 3} x ${ex.val2 || 10}`;
 
-                // Crea HTML riga
+                // --- BIVIO: PL vs BB ---
+                
+                if (ex.isFundamental || (ex.sets && Array.isArray(ex.sets))) {
+                    // LOGICA PL: Analizza i set
+                    const sets = ex.sets;
+                    const topSet = sets.find(s => s.role === 'top');
+                    const workingSets = sets.filter(s => s.role !== 'warmup');
+                    
+                    if (topSet) {
+                        // Se c'è un Top Set, mostralo (es. "Top: 1x3 @ 85%")
+                        const val = topSet.mode === 'PERC' ? `${topSet.val}%` : (topSet.mode === 'RPE' ? `@${topSet.val}` : `${topSet.val}kg`);
+                        label = `Top Set: ${topSet.reps} reps ${val}`;
+                    } else if (workingSets.length > 0) {
+                        // Altrimenti mostra conteggio generico (es. "4 Sets Totali")
+                        label = `${workingSets.length} Working Sets`;
+                    } else {
+                        label = "Warmup / Tecnico";
+                    }
+                } 
+                else {
+                    // LOGICA BB: Classica
+                    if (ex.technique === "Top set + back-off") label = "Top + Backoff";
+                    else if (ex.technique === "Myo-reps") label = "Myo-reps";
+                    else label = `${ex.val1 || 3} x ${ex.val2 || 10}`;
+                }
+
+                // Render HTML
                 const row = document.createElement('div');
                 row.className = 'preview-row';
                 row.innerHTML = `
@@ -251,11 +349,10 @@ window.openPreview = (dayIdx, exCount) => {
         }
     }
     
-    // 3. Reset stato visivo (mostra bottone verde, nascondi errore rosso)
+    // 3. Reset UI e Apertura
     if(btnSheetStart) btnSheetStart.style.display = 'block';
     if(conflictBox) conflictBox.classList.remove('visible');
     
-    // 4. Animazione entrata
     if(sheetOverlay) {
         sheetOverlay.classList.remove('hidden');
         setTimeout(() => sheetOverlay.classList.add('active'), 10);

@@ -242,17 +242,17 @@ onAuthStateChanged(auth, async (user) => {
     function renderMaxesModal() {
         const container = document.getElementById('maxes-list-container');
         const modalTitle = document.querySelector('#maxes-modal h3'); // Assicurati di avere un h3 nel modale o usa un ID
-        
+
         if (!container) return;
         container.innerHTML = '';
 
         // Feedback visivo nel titolo del modale
         if (selectedPlClientId) {
-            if(modalTitle) modalTitle.textContent = "Gestione Massimali (CLIENTE)";
-            if(modalTitle) modalTitle.style.color = "#0071E3";
+            if (modalTitle) modalTitle.textContent = "Gestione Massimali (CLIENTE)";
+            if (modalTitle) modalTitle.style.color = "#0071E3";
         } else {
-            if(modalTitle) modalTitle.textContent = "Lista Esercizi Monitorati (TEMPLATE)";
-            if(modalTitle) modalTitle.style.color = "#1D1D1F";
+            if (modalTitle) modalTitle.textContent = "Lista Esercizi Monitorati (TEMPLATE)";
+            if (modalTitle) modalTitle.style.color = "#1D1D1F";
         }
 
         const keys = Object.keys(currentMaxes).sort();
@@ -360,7 +360,7 @@ onAuthStateChanged(auth, async (user) => {
                     // Pulisci i valori a 0 per sicurezza, lasciando solo le chiavi
                     // (Opzionale: se vuoi mantenere i tuoi massimali personali, togli il map)
                     // Per un archivio "template", meglio avere solo le chiavi.
-                    
+
                     // Nota: Se usi questo sistema anche per tracciare i TUOI massimali personali, 
                     // allora non azzerare. Lascio i valori intatti per flessibilità.
                     const coachRef = doc(db, "users", user.uid);
@@ -371,7 +371,7 @@ onAuthStateChanged(auth, async (user) => {
 
                 // Chiudi e aggiorna vista
                 document.getElementById('maxes-modal').classList.add('hidden');
-                if (isPlMode) renderPlDay(); 
+                if (isPlMode) renderPlDay();
 
             } catch (e) {
                 console.error("Errore salvataggio maxes:", e);
@@ -563,36 +563,36 @@ async function loadWorkoutToEdit(id, isCopy = false) {
         const plNav = document.getElementById('pl-navigation');
         const plTools = document.getElementById('pl-tools');
         const plChartControls = document.getElementById('pl-chart-controls');
-        
+
         // Etichette Toggle
         document.getElementById('lbl-bb').classList.toggle('selected', !isPowerliftingMode);
         document.getElementById('lbl-pl').classList.toggle('selected', isPowerliftingMode);
 
         if (isPowerliftingMode) {
             // --- MODALITÀ POWERLIFTING ---
-            
+
             // 1. Nascondi controlli BB
-            if(bbControls) bbControls.classList.add('hidden');
-            if(daysContainer) daysContainer.classList.add('hidden');
-            
+            if (bbControls) bbControls.classList.add('hidden');
+            if (daysContainer) daysContainer.classList.add('hidden');
+
             // 2. Mostra controlli PL
-            if(plNav) plNav.classList.remove('hidden');
-            if(plTools) plTools.classList.remove('hidden');
-            if(plChartControls) {
+            if (plNav) plNav.classList.remove('hidden');
+            if (plTools) plTools.classList.remove('hidden');
+            if (plChartControls) {
                 plChartControls.classList.remove('hidden');
                 plChartControls.style.display = 'flex';
             }
 
             // 3. Recupera Metadati PL (Settimane e Giorni)
             plWeeks = data.plWeeks || 4; // Default a 4 se manca
-            
+
             // Calcolo giorni per settimana analizzando le chiavi (es. w1_d4 -> 4 giorni)
             // Questo serve perché forse non abbiamo salvato plDaysPerWeek
             let maxDayFound = 1;
             Object.keys(workoutData).forEach(k => {
-                if(k.includes('_d')) {
+                if (k.includes('_d')) {
                     const dPart = parseInt(k.split('_d')[1]);
-                    if(dPart > maxDayFound) maxDayFound = dPart;
+                    if (dPart > maxDayFound) maxDayFound = dPart;
                 }
             });
             plDaysPerWeek = maxDayFound;
@@ -603,11 +603,11 @@ async function loadWorkoutToEdit(id, isCopy = false) {
 
         } else {
             // --- MODALITÀ BODYBUILDING ---
-            if(bbControls) bbControls.classList.remove('hidden');
-            if(daysContainer) daysContainer.classList.remove('hidden');
-            if(plNav) plNav.classList.add('hidden');
-            if(plTools) plTools.classList.add('hidden');
-            if(plChartControls) plChartControls.classList.add('hidden');
+            if (bbControls) bbControls.classList.remove('hidden');
+            if (daysContainer) daysContainer.classList.remove('hidden');
+            if (plNav) plNav.classList.add('hidden');
+            if (plTools) plTools.classList.add('hidden');
+            if (plChartControls) plChartControls.classList.add('hidden');
 
             renderTabs();
             renderDay(1);
@@ -1464,7 +1464,7 @@ btnOpenSave.addEventListener('click', async () => {
 
     // 1. Validazione UNIVERSALE (Funziona per BB e PL)
     let hasExercises = false;
-    
+
     // Prende TUTTI i valori dentro workoutData (liste di esercizi)
     const allDays = Object.values(workoutData);
 
@@ -1507,12 +1507,12 @@ optAssign.classList.add('active');
 
 // --- SALVATAGGIO REALE SU FIREBASE (VERSIONE BLINDATA) ---
 btnConfirmSave.addEventListener('click', async () => {
-    const user = auth.currentUser; 
+    const user = auth.currentUser;
     if (!user) return;
 
     // 1. Feedback Visivo
     const originalText = btnConfirmSave.textContent;
-    btnConfirmSave.textContent = "Salvataggio..."; 
+    btnConfirmSave.textContent = "Salvataggio...";
     btnConfirmSave.disabled = true;
 
     // ============================================================
@@ -1520,9 +1520,9 @@ btnConfirmSave.addEventListener('click', async () => {
     // ============================================================
     const newKnowledge = {};
     let hasNewKnowledge = false;
-    
+
     // Usa Object.keys per sicurezza
-    const allDayKeys = Object.keys(workoutData); 
+    const allDayKeys = Object.keys(workoutData);
 
     for (const dayKey of allDayKeys) {
         const exercises = workoutData[dayKey];
@@ -1542,7 +1542,7 @@ btnConfirmSave.addEventListener('click', async () => {
                 let isDifferent = false;
 
                 if (!known) {
-                    isDifferent = true; 
+                    isDifferent = true;
                 } else {
                     if (known.p !== currentPrimary) isDifferent = true;
                     if (known.s && currentSynergists.length !== known.s.length) isDifferent = true;
@@ -1578,11 +1578,11 @@ btnConfirmSave.addEventListener('click', async () => {
         if (saveMode === 'assign') {
             assignedClientId = modalClientSelect.value;
             // Controllo sicurezza se il valore è vuoto
-            if (!assignedClientId || assignedClientId === "undefined") { 
-                alert("Seleziona un atleta valido dalla lista!"); 
-                btnConfirmSave.disabled = false; 
+            if (!assignedClientId || assignedClientId === "undefined") {
+                alert("Seleziona un atleta valido dalla lista!");
+                btnConfirmSave.disabled = false;
                 btnConfirmSave.textContent = originalText;
-                return; 
+                return;
             }
         } else {
             finalName = modalTemplateName.value.trim() || finalName;
@@ -1597,14 +1597,14 @@ btnConfirmSave.addEventListener('click', async () => {
             coachId: user.uid,
             name: finalName,
             days: totalDays,
-            
+
             // Gestione PL sicura
             isPlMode: isPlMode === true, // Forza booleano
-            plWeeks: (isPlMode && plWeeks) ? plWeeks : null, 
-            
+            plWeeks: (isPlMode && plWeeks) ? plWeeks : null,
+
             // Dati puliti
-            data: cleanWorkoutData,       
-            
+            data: cleanWorkoutData,
+
             assignedTo: assignedClientId, // Sarà una stringa o null
             isTemplate: isTemplate,
             volumeSettingsUsed: userVolumeSettings,
@@ -1624,19 +1624,59 @@ btnConfirmSave.addEventListener('click', async () => {
 
         if (assignedClientId) {
             const clientRef = doc(db, "users", assignedClientId);
-            await updateDoc(clientRef, { 
-                activeWorkoutId: editingWorkoutId || "pending", 
-                lastWorkoutUpdate: serverTimestamp() 
+
+            // *** NUOVO: LOGICA ARCHIVIAZIONE ***
+            // Prima di sovrascrivere, salviamo la scheda corrente nello storico
+            try {
+                const clientSnap = await getDoc(clientRef);
+                if (clientSnap.exists()) {
+                    const clientData = clientSnap.data();
+                    const oldWorkoutId = clientData.activeWorkoutId;
+
+                    // Archiviamo solo se c'è una scheda valida vecchia (diversa da "pending" o null)
+                    // e se è diversa da quella che stiamo assegnando ora (caso raro di ri-assegnazione)
+                    if (oldWorkoutId && oldWorkoutId !== "pending" && oldWorkoutId !== editingWorkoutId) {
+
+                        // Recuperiamo il nome della vecchia scheda per averlo "in chiaro" nell'elenco storico
+                        let oldWorkoutName = "Scheda Archiviata";
+                        try {
+                            const oldWkRef = doc(db, "workouts", oldWorkoutId);
+                            const oldWkSnap = await getDoc(oldWkRef);
+                            if (oldWkSnap.exists()) {
+                                oldWorkoutName = oldWkSnap.data().name;
+                            }
+                        } catch (e) { console.log("Impossibile recuperare nome vecchia scheda", e); }
+
+                        // Creiamo il record nella sub-collection 'programHistory' del cliente
+                        await addDoc(collection(db, "users", assignedClientId, "programHistory"), {
+                            workoutId: oldWorkoutId,
+                            workoutName: oldWorkoutName,
+                            archivedAt: serverTimestamp(),
+                            coachId: user.uid
+                        });
+                        console.log("Storico aggiornato con la vecchia scheda.");
+                    }
+                }
+            } catch (archiveError) {
+                console.error("Errore non bloccante durante archiviazione:", archiveError);
+                // Non interrompiamo il flusso: l'assegnazione della nuova deve avvenire comunque
+            }
+            // *** FINE LOGICA ARCHIVIAZIONE ***
+
+            // Codice originale di assegnazione (Sovrascrittura)
+            await updateDoc(clientRef, {
+                activeWorkoutId: editingWorkoutId || "pending",
+                lastWorkoutUpdate: serverTimestamp()
             });
         }
 
         alert("Salvato e Assegnato con successo!");
         window.location.href = "dashboard-pt.html";
 
-    } catch (error) { 
-        console.error("ERRORE SALVATAGGIO:", error); 
-        alert("Errore critico salvataggio: " + error.message); 
-        btnConfirmSave.disabled = false; 
+    } catch (error) {
+        console.error("ERRORE SALVATAGGIO:", error);
+        alert("Errore critico salvataggio: " + error.message);
+        btnConfirmSave.disabled = false;
         btnConfirmSave.textContent = originalText;
     }
 });
@@ -1793,7 +1833,7 @@ async function setupPlClientSelector() {
 
     const container = document.createElement('div');
     container.style.cssText = "display:flex; align-items:center; gap:8px; margin-left:15px; border-left:1px solid #ccc; padding-left:15px;";
-    
+
     container.innerHTML = `
         <span class="tiny-label" style="margin:0;">Riferimento 1RM:</span>
         <select id="pl-client-context-select" style="padding:4px; border-radius:6px; border:1px solid #D2D2D7; font-size:12px; font-weight:600; width:160px;">
@@ -1810,7 +1850,7 @@ async function setupPlClientSelector() {
     // 1. Carica lista clienti
     const q = query(collection(db, "users"), where("role", "==", "client"));
     const snapshot = await getDocs(q);
-    
+
     // Pulisci e popola
     select.innerHTML = '<option value="">Nessuno (Archivio)</option>';
     snapshot.forEach(doc => {
@@ -1825,12 +1865,12 @@ async function setupPlClientSelector() {
     select.addEventListener('change', async (e) => {
         const clientId = e.target.value;
         const feedbackLabel = container.querySelector('.tiny-label');
-        selectedPlClientId = clientId || null; 
+        selectedPlClientId = clientId || null;
         if (!clientId) {
             // --- MODALITÀ COACH (Nessuno) ---
             feedbackLabel.textContent = "Riferimento 1RM:";
             feedbackLabel.style.color = "";
-            
+
             // Carica i massimali (struttura) del Coach per averli come base
             // (Assumiamo che userData sia accessibile o lo ricarichiamo)
             const user = auth.currentUser;
@@ -1840,8 +1880,8 @@ async function setupPlClientSelector() {
             } else {
                 currentMaxes = {};
             }
-            
-            renderPlDay(); 
+
+            renderPlDay();
             return;
         }
 
@@ -1850,21 +1890,21 @@ async function setupPlClientSelector() {
         try {
             const userRef = doc(db, "users", clientId);
             const userSnap = await getDoc(userRef);
-            
+
             if (userSnap.exists()) {
                 const data = userSnap.data();
                 // Sovrascrivi i massimali globali con quelli del cliente
-                currentMaxes = data.savedMaxes || {}; 
-                
+                currentMaxes = data.savedMaxes || {};
+
                 feedbackLabel.textContent = "✅ Dati caricati";
                 feedbackLabel.style.color = "green";
-                
+
                 // IMPORTANTE: Aggiorna tutta la vista
-                renderPlDay(); 
-                
+                renderPlDay();
+
                 // Aggiorna anche la tendina salvataggio finale per comodità
                 const modalSelect = document.getElementById('modal-client-select');
-                if(modalSelect) modalSelect.value = clientId;
+                if (modalSelect) modalSelect.value = clientId;
             }
         } catch (error) {
             console.error(error);
@@ -1976,11 +2016,11 @@ function renderPlDay() {
         alert("Copiato!");
     };
     dayContentArea.appendChild(copyAllBtn);
-    
+
     // *** CORREZIONE QUI SOTTO ***
     // Prima c'era workoutData[day], che causava l'errore. Ora usa workoutData[key].
     setupDragAndDrop(listContainer, workoutData[key]);
-    
+
     updateLiveStatsPL();
 }
 
@@ -2374,7 +2414,7 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
         for (let w = currentWeekNum + 1; w <= plWeeks; w++) {
             const targetKey = `w${w}_${dayPart}`;
             if (!workoutData[targetKey]) workoutData[targetKey] = [];
-            
+
             // 1. RIMUOVI VECCHIA VERSIONE DELLO STESSO ESERCIZIO (Se esisteva)
             // Nota: Se ci sono due "Squat" diversi nello stesso giorno, questo li rimuove entrambi.
             // Per il PL solitamente va bene, altrimenti servirebbe un ID unico persistente.
@@ -2420,7 +2460,7 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
             // Usiamo l'indice originale ('index') passato alla funzione principale.
             // Se l'array target è più corto dell'indice, splice lo aggiunge in fondo (corretto).
             // Se l'indice esiste, lo inserisce LÌ e sposta gli altri sotto.
-            
+
             // Caso speciale: se la week target è vuota o l'indice è troppo alto
             if (index >= workoutData[targetKey].length) {
                 workoutData[targetKey].push(targetEx);
@@ -2580,7 +2620,7 @@ function openVariantDropdown(targetElement, onSelect) {
 
 
 function updateLiveStatsPL() {
-    
+
     // 1. HELPER: Calcola i set reali (ignora vuoti e warmup)
     const getRealSets = (ex) => {
         if (ex.isFundamental) {
@@ -2597,7 +2637,7 @@ function updateLiveStatsPL() {
                 const back = ex.backSets === '' ? 0 : (parseFloat(ex.backSets) || 0);
                 // Conta 1 (top set) solo se i campi top set sono compilati, altrimenti 0? 
                 // Per semplicità: se backSets è > 0 o c'è un top set, contiamo.
-                return 1 + back; 
+                return 1 + back;
             }
             const val = ex.val1 === '' ? 0 : (parseFloat(ex.val1) || 0);
             return val;
@@ -2628,13 +2668,13 @@ function updateLiveStatsPL() {
                             for (const [cat, list] of Object.entries(MUSCLE_STRUCTURE)) {
                                 if (list.includes(m.name) || cat === m.name) { parent = cat; break; }
                             }
-                            
+
                             // Logica pesi muscolari (Primario 100%, Secondario 50%)
                             let mult = 1.0;
                             if (m.type === 'secondary') mult = 0.5;
-                            
+
                             const vol = sets * mult;
-                            if(hierarchyMap[parent]) {
+                            if (hierarchyMap[parent]) {
                                 hierarchyMap[parent].total += vol;
                                 if (!hierarchyMap[parent].children[m.name]) hierarchyMap[parent].children[m.name] = 0;
                                 hierarchyMap[parent].children[m.name] += vol;
@@ -2644,16 +2684,16 @@ function updateLiveStatsPL() {
                 }
             });
         });
-        
+
         // Renderizza usando la UI del BB (Liste + Grafico dettagliato)
-        renderStatsUI(hierarchyMap); 
-        return; 
+        renderStatsUI(hierarchyMap);
+        return;
     }
 
     // --- MODO 2: VISTA ALZATE (Sintetica PL) ---
     // Resetta UI BB se presente
     const statsList = document.getElementById('stats-breakdown');
-    statsList.innerHTML = ''; 
+    statsList.innerHTML = '';
 
     let liftStats = { "Squat": 0, "Panca": 0, "Stacco": 0, "Military": 0, "Accessori": 0 };
 
@@ -2700,7 +2740,7 @@ function updateLiveStatsPL() {
                 statsList.appendChild(row);
             }
         });
-        
+
         // Se tutto è vuoto
         if (data.every(v => v === 0)) {
             statsList.innerHTML = '<div style="text-align:center; color:#ccc; font-size:12px; padding:20px;">Nessun dato</div>';
@@ -2901,7 +2941,7 @@ function exportWorkoutToExcel() {
     }
 
     const workoutName = document.getElementById('workout-name').textContent.trim() || "Scheda Allenamento";
-    
+
     // 1. DEFINIZIONE STILI
     const styles = {
         title: {
@@ -2936,7 +2976,7 @@ function exportWorkoutToExcel() {
     // 2. PREPARAZIONE DATI
     // Creiamo un array di righe per Excel
     let wsData = [];
-    
+
     // Titolo Scheda
     wsData.push([{ v: workoutName.toUpperCase(), s: styles.title }]);
     wsData.push([]); // Riga vuota
@@ -2956,7 +2996,7 @@ function exportWorkoutToExcel() {
         if (key.includes('w')) {
             // Formato PL: w1_d1 -> Week 1 - Day 1
             const parts = key.split('_');
-            dayTitle = `WEEK ${parts[0].replace('w','')} • DAY ${parts[1].replace('d','')}`;
+            dayTitle = `WEEK ${parts[0].replace('w', '')} • DAY ${parts[1].replace('d', '')}`;
         } else {
             // Formato BB: 1 -> Giorno 1
             dayTitle = `GIORNO ${key}`;
@@ -2973,7 +3013,7 @@ function exportWorkoutToExcel() {
         exercises.forEach(ex => {
             let name = ex.name;
             if (ex.variant) name += ` (${ex.variant})`;
-            
+
             let setsStr = "";
             let repsStr = "";
             let loadStr = "";
@@ -2985,13 +3025,13 @@ function exportWorkoutToExcel() {
                 // PL MODE: Struttura complessa
                 ex.sets.forEach(s => {
                     const roleIcon = s.role === 'top' ? '👑' : (s.role === 'backoff' ? '📉' : '•');
-                    
+
                     // Formattazione Sets
                     setsStr += `${roleIcon} ${s.numSets || 1}\n`;
-                    
+
                     // Formattazione Reps
                     repsStr += `${s.reps}\n`;
-                    
+
                     // Formattazione Carico (Smart)
                     let loadLine = "";
                     if (s.mode === 'PERC') loadLine = `${s.val}%`;
@@ -2999,15 +3039,15 @@ function exportWorkoutToExcel() {
                     else if (s.mode === 'RPE') loadLine = `@RPE ${s.targetVal || ''}`;
                     else if (s.mode === 'MAV') loadLine = `MAV`;
                     else loadLine = s.val || "-";
-                    
+
                     loadStr += `${loadLine}\n`;
                 });
             } else {
                 // BB MODE o COMPLEMENTARE PL
                 if (ex.technique === 'Top set + back-off') {
-                     setsStr = "TOP\nBACK";
-                     repsStr = `${ex.topReps || '-'}\n${ex.backReps || '-'}`;
-                     loadStr = `${ex.topInt || '-'}\n${ex.backSets || '?'} set`;
+                    setsStr = "TOP\nBACK";
+                    repsStr = `${ex.topReps || '-'}\n${ex.backReps || '-'}`;
+                    loadStr = `${ex.topInt || '-'}\n${ex.backSets || '?'} set`;
                 } else {
                     setsStr = ex.val1 || ex.sets || "-"; // val1 nel vecchio sistema BB è i Sets
                     repsStr = ex.val2 || ex.reps || "-";
@@ -3038,10 +3078,10 @@ function exportWorkoutToExcel() {
     let currentRow = 0;
     wsData.forEach((row, idx) => {
         if (row[0] && row[0].s === styles.title) {
-             ws['!merges'].push({ s: { r: idx, c: 0 }, e: { r: idx, c: 4 } });
+            ws['!merges'].push({ s: { r: idx, c: 0 }, e: { r: idx, c: 4 } });
         }
         if (row[0] && row[0].s === styles.dayHeader) {
-             ws['!merges'].push({ s: { r: idx, c: 0 }, e: { r: idx, c: 4 } });
+            ws['!merges'].push({ s: { r: idx, c: 0 }, e: { r: idx, c: 4 } });
         }
     });
 

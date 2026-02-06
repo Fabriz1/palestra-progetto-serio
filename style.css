@@ -1243,3 +1243,467 @@ h2 { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #1D1D1F; }
     stroke: none;
     opacity: 0.2;
 }
+
+
+
+/* --- SUMMARY VIEW STYLES (VIBRANT) --- */
+
+.summary-actions-bar {
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px dashed #E5E5EA; /* Linea tratteggiata più moderna */
+    display: flex;
+    justify-content: center;
+}
+
+/* CARDS GIORNI */
+/* --- BOX GIORNO (CORNICE STYLISH) --- */
+.day-summary-block {
+    background: white;
+    
+    /* LA CORNICE */
+    border: 1px solid #D1D1D6; /* Grigio definito per dare struttura */
+    border-left: 6px solid #0071E3; /* L'accento colorato a sinistra! */
+    border-radius: 14px; /* Angoli ben arrotondati */
+    
+    /* SPAZIATURA */
+    margin-bottom: 30px; /* Ben separati tra loro */
+    overflow: hidden;
+    
+    /* PROFONDITÀ */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    
+    /* ANIMAZIONE */
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* EFFETTO HOVER "VIVO" */
+.day-summary-block:hover {
+    transform: translateY(-4px); /* Si alza leggermente */
+    border-color: #0071E3; /* Tutta la cornice diventa blu */
+    box-shadow: 0 12px 24px rgba(0, 113, 227, 0.15); /* L'ombra diventa bluastra! */
+}
+
+/* HEADER DEL GIORNO (Ritocco per adattarsi alla cornice) */
+.day-summary-header {
+    background: #FFFFFF; /* Bianco pulito o grigio chiarissimo */
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px dashed #E5E5EA; /* Separatore tratteggiato interno */
+}
+
+.day-title {
+    font-weight: 700;
+    font-size: 15px;
+    color: #1D1D1F;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Icona decorativa accanto al titolo del giorno */
+.day-icon {
+    width: 28px;
+    height: 28px;
+    background: white;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0071E3; /* Blu Apple */
+    font-size: 16px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+/* RIGHE ESERCIZI */
+.ex-summary-row {
+    padding: 12px 18px; /* Un po' più di aria */
+    display: flex;
+    justify-content: space-between;
+    align-items: center; /* Allinea perfettamente al centro verticale */
+    border-bottom: 1px solid transparent; /* Rimuovo il bordo solido per pulizia */
+    transition: all 0.2s ease;
+}
+
+/* ZEBRA STRIPING: Righe alterne grigio chiarissimo */
+.ex-summary-row:nth-child(odd) {
+    background-color: #FFFFFF;
+}
+.ex-summary-row:nth-child(even) {
+    background-color: #e0e0e0; /* Grigio quasi bianco */
+}
+
+/* HOVER: Quando passi sopra, si evidenzia tutto */
+.ex-summary-row:hover {
+    background-color: #F0F8FF; /* Azzurrino chiarissimo (AliceBlue) */
+    transform: scale(1.01); /* Micro-zoom impercettibile */
+    border-radius: 8px; /* Arrotonda leggermente la riga selezionata */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    z-index: 1; /* Porta in primo piano */
+    border-bottom-color: transparent;
+}
+
+/* Info Esercizio (Sinistra) */
+.ex-info {
+    flex-shrink: 0; /* Non si schiaccia */
+}
+
+.ex-info h5 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1D1D1F;
+}
+
+.ex-info span {
+    font-size: 11px;
+    color: #86868B;
+    font-weight: 500;
+    display: block; /* Va a capo sotto il nome */
+    margin-top: 2px;
+}
+
+/* LINEA GUIDA (I puntini in mezzo) */
+.ex-leader {
+    flex-grow: 1; /* Occupa tutto lo spazio disponibile */
+    border-bottom: 2px dotted #E5E5EA; /* I puntini */
+    height: 1px;
+    margin: 0 15px; /* Spazio dai lati */
+    position: relative;
+    top: -2px; /* Aggiustamento ottico */
+    opacity: 0.6; /* Leggero per non disturbare */
+}
+
+/* BADGES PERCENTUALE (Restyling) */
+.prog-badge {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 10px;
+    border-radius: 8px; /* Più stondato */
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 70px;
+    flex-shrink: 0;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.03); /* Micro ombra */
+}
+
+/* Colori più vivaci ma sempre professionali */
+.prog-badge.green {
+    background: #E0F8E3; /* Verde più luminoso */
+    color: #008535;
+    border: 1px solid transparent; 
+}
+
+.prog-badge.orange {
+    background: #FFF4E5; 
+    color: #FF8800;
+    border: 1px solid transparent;
+}
+
+.prog-badge.red {
+    background: #FFEBEE;
+    color: #D32F2F;
+    border: 1px solid transparent;
+}
+
+.prog-badge.gray {
+    background: #F5F5F7;
+    color: #98989D;
+    border: 1px solid transparent;
+}
+
+/* ============================================================
+   MOBILE RESPONSIVENESS (COACH DASHBOARD)
+   ============================================================ */
+
+@media (max-width: 768px) {
+
+    /* --- 1. LAYOUT GENERALE & NAVIGAZIONE (BOTTOM BAR) --- */
+    
+    .app-container {
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    /* Trasforma la Sidebar in Bottom Bar */
+   
+    
+    .sidebar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 60px; /* Altezza ridotta per eleganza */
+        flex-direction: row; 
+        padding: 0;
+        border-right: none;
+        border-top: 1px solid #E5E5EA; /* Bordo sottile sopra */
+        z-index: 5000; 
+        justify-content: space-around;
+        align-items: center; /* Centra verticalmente */
+        background: rgba(255, 255, 255, 0.98); /* Sfondo quasi solido */
+        backdrop-filter: blur(10px);
+    }
+
+    /* NASCONDI IL LOGO E IL FOOTER UTENTE SU MOBILE */
+    .sidebar-header, 
+    .sidebar-footer {
+        display: none !important; 
+    }
+
+    /* Stile Link nella Bottom Bar */
+    .sidebar-nav {
+        flex-direction: row;
+        width: 100%;
+        justify-content: space-around;
+        align-items: center;
+        gap: 0;
+    }
+
+    .nav-link {
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 0;
+        height: 100%;
+        flex: 1; /* Distribuisci spazio equamente */
+        border-radius: 0;
+        background: transparent !important; 
+        color: #999; /* Colore inattivo più chiaro */
+        gap: 4px; /* Spazio tra icona e testo */
+    }
+
+    /* DIMENSIONI ICONE CORRETTE */
+    .nav-link i {
+        font-size: 22px !important; /* Dimensione icona giusta */
+        margin: 0;
+    }
+
+    /* DIMENSIONI TESTO SOTTO ICONA */
+    .nav-link span:not(.badge) {
+        font-size: 10px !important; /* Testo piccolo */
+        font-weight: 500;
+        display: block !important; /* Assicurati che si veda */
+        line-height: 1;
+    }
+
+    /* Colore attivo */
+    .nav-link.active {
+        color: #0071E3; 
+    }
+
+    /* Badge notifiche sopra l'icona */
+    .nav-link .badge {
+        top: 5px;
+        right: 25%;
+        border: 2px solid white;
+    }
+
+    /* Contenuto Principale: Fai spazio alla barra sotto */
+    .main-content {
+        padding: 20px 15px 100px 15px; /* Padding bottom 100px per non coprire content */
+        width: 100%;
+        overflow-x: hidden;
+    }
+
+    /* Top Bar ridotta */
+    .top-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+        margin-bottom: 20px;
+    }
+    #page-title { font-size: 22px; }
+
+    /* --- 2. SEZIONE CLIENTI & FILTRI --- */
+
+    .stats-controls {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .filters-row {
+        flex-direction: column;
+        width: 100%;
+        gap: 10px;
+    }
+
+    .search-bar, .filter-select {
+        width: 100%; /* Tutto larghezza piena */
+        min-width: 0;
+    }
+
+    /* Lista Clienti (Modalità Lista su Mobile) */
+    .clients-grid.list-view-mode .client-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+        padding: 15px;
+    }
+
+    .clients-grid.list-view-mode .client-header {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    
+    .clients-grid.list-view-mode .custom-label-badge {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        order: unset;
+    }
+
+    .clients-grid.list-view-mode .btn-details {
+        width: 100%;
+        margin-left: 0;
+        text-align: center;
+    }
+
+    /* --- 3. TABELLA SCHEDE (Active / Archive) --- */
+    
+    /* Nascondi header tabella (inutile su mobile) */
+    .table-header-row { display: none; }
+
+    /* Trasforma righe in Card */
+    .table-body .row-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 15px;
+        background: white;
+        border: 1px solid #E5E5EA;
+        border-radius: 12px;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    }
+
+    /* Label fittizie per far capire i dati */
+    .col-name { font-size: 16px; width: 100%; margin-bottom: 5px; }
+    
+    .col-client::before { content: "Assegnato a: "; font-weight: 600; font-size: 11px; color: #86868B; }
+    .col-date::before { content: "Data: "; font-weight: 600; font-size: 11px; color: #86868B; }
+    .col-days::before { content: "Durata: "; font-weight: 600; font-size: 11px; color: #86868B; }
+
+    .col-actions {
+        width: 100%;
+        justify-content: flex-end;
+        border-top: 1px dashed #E5E5EA;
+        padding-top: 10px;
+        margin-top: 5px;
+    }
+
+    /* --- 4. CHAT (Layout Verticale) --- */
+
+    .chat-layout {
+        flex-direction: column;
+        height: calc(100vh - 160px); /* Adatta altezza schermo mobile */
+    }
+
+    .chat-sidebar {
+        width: 100%;
+        height: 80px; /* Striscia orizzontale in alto */
+        flex-direction: row;
+        overflow-x: auto; /* Scroll orizzontale */
+        overflow-y: hidden;
+        border-right: none;
+        border-bottom: 1px solid #E5E5EA;
+        padding: 10px;
+        gap: 10px;
+    }
+
+    .chat-list-item {
+        min-width: 60px;
+        flex-direction: column;
+        padding: 5px;
+        border: none;
+        background: transparent;
+        text-align: center;
+    }
+    
+    .chat-list-item.active {
+        border-left: none;
+        background: transparent;
+    }
+    .chat-list-item.active .avatar-small {
+        border: 2px solid #0071E3;
+        box-shadow: 0 0 0 2px white inset;
+    }
+
+    /* Nascondi anteprima testo chat, mostra solo Avatar e Nome */
+    .chat-preview p { display: none; }
+    .chat-preview h5 { font-size: 10px; text-align: center; width: 60px; overflow: hidden; text-overflow: ellipsis; }
+    
+    .chat-window {
+        height: auto;
+        flex-grow: 1;
+    }
+
+    /* --- 5. DETTAGLIO CLIENTE & GRAFICI --- */
+
+    /* Pannello slide full screen */
+    .slide-panel-inner {
+        width: 100%;
+        border-radius: 0;
+        height: 100%;
+    }
+
+    .slide-header {
+        padding: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .client-title-info h2 { font-size: 16px; }
+    
+    .slide-actions {
+        width: 100%;
+        margin-top: 10px;
+        justify-content: flex-end;
+    }
+
+    /* Tabs scrollabili */
+    .client-tabs {
+        overflow-x: auto;
+        white-space: nowrap;
+        padding-bottom: 5px;
+    }
+
+    /* Griglia Misure */
+    .input-grid-3, .input-grid-4 {
+        grid-template-columns: 1fr; /* Una colonna */
+    }
+
+    /* Nuova Vista Riepilogo Scheda */
+    .summary-actions-bar {
+        flex-direction: column;
+    }
+    .summary-actions-bar button {
+        width: 100%;
+    }
+
+    .ex-summary-row {
+        /* Se il nome è lungo, vai a capo */
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .ex-leader {
+        display: none; /* Nascondi i puntini su mobile, fanno casino */
+    }
+    .prog-badge {
+        margin-left: auto; /* Spingi badge tutto a destra */
+    }
+
+    /* Settings */
+    .profile-edit-row {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        text-align: center;
+    }
+    .volume-inputs-grid {
+        grid-template-columns: 1fr 1fr; /* 2 col per riga */
+    }
+}

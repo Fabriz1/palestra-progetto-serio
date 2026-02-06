@@ -674,3 +674,35 @@ body.is-training #view-chat {
 }
 
 .nav-badge.hidden { display: none; }
+/* SELETTORE SETTIMANE (Dashboard) */
+.week-selector-container {
+    display: flex;
+    overflow-x: auto;
+    gap: 10px;
+    padding: 0 5px 15px 5px;
+    margin-bottom: 10px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+}
+.week-selector-container::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+
+.week-chip {
+    background: white;
+    border: 1px solid #E5E5EA;
+    color: #86868B;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.week-chip.active {
+    background: #1C1C1E; /* O il tuo colore primario #0071E3 */
+    color: white;
+    border-color: #1C1C1E;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}

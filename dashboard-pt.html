@@ -17,7 +17,7 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- CSS -->
-     <meta name="theme-color" content="#d32f2f"> <!-- Aggiungi questo per la coerenza su mobile -->
+    <meta name="theme-color" content="#d32f2f"> <!-- Aggiungi questo per la coerenza su mobile -->
     <link rel="apple-touch-icon" href="icon/icon-192.png"> <!-- Per dispositivi Apple -->
 
     <link rel="manifest" href="manifest.json">
@@ -73,10 +73,7 @@
                     <span id="chat-badge" class="badge hidden"></span>
                 </button>
 
-                <button class="nav-link" data-target="section-settings">
-                    <i class="ph ph-gear"></i>
-                    <span>Impostazioni</span>
-                </button>
+
             </nav>
 
             <div class="sidebar-footer">
@@ -609,6 +606,7 @@
                     </div>
 
                     <!-- STANZA 2: ANALISI DETTAGLIO (Nascosta) -->
+                    <!-- STANZA 2: ANALISI DETTAGLIO -->
                     <div id="view-analysis" class="hidden fade-in">
 
                         <!-- Header Navigazione -->
@@ -619,33 +617,54 @@
                                 </button>
                                 <h2 id="analysis-title">Nome Scheda</h2>
                             </div>
-
-                            <!-- NUOVO BOTTONE STORICO -->
                             <button class="btn-secondary-outline small" onclick="openLogHistoryPanel()">
                                 <i class="ph ph-scroll"></i> Diario Logs
                             </button>
                         </div>
 
-                        <!-- Barra Controlli Grafici -->
-                        <div class="analysis-controls">
-                            <div class="toggle-group">
-                                <button class="toggle-chip active"
-                                    onclick="setAnalysisType(this, 'exercise')">Esercizi</button>
-                                <button class="toggle-chip" onclick="setAnalysisType(this, 'muscle')">Muscoli</button>
-                                <button class="toggle-chip" onclick="setAnalysisType(this, 'session')">Sedute</button>
-                            </div>
-                            <!-- Nota: Ho tolto il selettore date perché analizzeremo l'intera durata della scheda selezionata -->
-                            <div style="flex-grow: 1; display: flex; gap: 10px; justify-content: flex-end;">
-                                <input type="text" id="analysis-search" class="analysis-search" placeholder="Cerca...">
-                                <button class="analysis-sort-btn" onclick="toggleSortOrder()" id="btn-sort">
-                                    <i class="ph ph-sort-descending"></i>
+                        <!-- 1. NUOVA VISTA: RIEPILOGO STRUTTURALE (Default) -->
+                        <div id="analysis-summary-view">
+                            <div class="summary-actions-bar">
+                                <button class="btn-primary" onclick="switchToDeepAnalysis()">
+                                    <i class="ph ph-chart-line-up"></i> Vedi Analisi Approfondita (Grafici)
                                 </button>
+                            </div>
+
+                            <div id="workout-structure-container">
+                                <!-- Qui il JS inietterà la struttura con i badge -->
+                                <p class="empty-msg">Analisi dati in corso...</p>
                             </div>
                         </div>
 
-                        <!-- Lista Grafici (Accordion) -->
-                        <div id="analysis-list-container" class="analysis-list">
-                            <!-- Qui appariranno i grafici come prima -->
+                        <!-- 2. VECCHIA VISTA: GRAFICI COMPLETI (Nascosta inizialmente) -->
+                        <div id="analysis-charts-view" class="hidden">
+                            <!-- Barra Controlli Grafici (Spostata qui dentro) -->
+                            <div class="analysis-controls">
+                                <button class="btn-secondary small" onclick="backToSummaryView()"
+                                    style="margin-right:10px;">
+                                    <i class="ph ph-list"></i> Riepilogo
+                                </button>
+                                <div class="toggle-group">
+                                    <button class="toggle-chip active"
+                                        onclick="setAnalysisType(this, 'exercise')">Esercizi</button>
+                                    <button class="toggle-chip"
+                                        onclick="setAnalysisType(this, 'muscle')">Muscoli</button>
+                                    <button class="toggle-chip"
+                                        onclick="setAnalysisType(this, 'session')">Sedute</button>
+                                </div>
+                                <div style="flex-grow: 1; display: flex; gap: 10px; justify-content: flex-end;">
+                                    <input type="text" id="analysis-search" class="analysis-search"
+                                        placeholder="Cerca...">
+                                    <button class="analysis-sort-btn" onclick="toggleSortOrder()" id="btn-sort">
+                                        <i class="ph ph-sort-descending"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Lista Grafici (Accordion) -->
+                            <div id="analysis-list-container" class="analysis-list">
+                                <!-- Qui appariranno i grafici come prima -->
+                            </div>
                         </div>
 
                     </div>
