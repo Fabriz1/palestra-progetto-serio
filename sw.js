@@ -1,4 +1,4 @@
-const CACHE_NAME = 'palestra-v3'; // Ho incrementato la versione per forzare l'aggiornamento
+const CACHE_NAME = 'palestra-v4'; // Ho incrementato la versione per forzare l'aggiornamento
 const ASSETS = [
   './', // Cache della root, importante!
   './login.html',
