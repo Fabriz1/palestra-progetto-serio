@@ -2934,6 +2934,10 @@ document.getElementById('btn-import-excel').addEventListener('click', exportWork
 // lo volessi usare per ESPORTARE (visto il nome della tua richiesta).
 // Se il tasto ha un altro ID, cambia 'btn-import-excel' con l'ID giusto.
 
+// ==========================================
+// === ESPORTAZIONE EXCEL (PREMIUM STYLE) ===
+// ==========================================
+
 function exportWorkoutToExcel() {
     if (!workoutData || Object.keys(workoutData).length === 0) {
         alert("Nessun dato da esportare!");
@@ -2942,48 +2946,67 @@ function exportWorkoutToExcel() {
 
     const workoutName = document.getElementById('workout-name').textContent.trim() || "Scheda Allenamento";
 
-    // 1. DEFINIZIONE STILI
+    // --- 1. DEFINIZIONE STILI AVANZATI ---
+    const borderStyle = { style: "thin", color: { rgb: "D1D1D6" } }; // Grigio Apple
+    const fontBase = { name: "Arial", sz: 11 };
+
     const styles = {
-        title: {
-            font: { bold: true, sz: 16, color: { rgb: "FFFFFF" } },
-            fill: { fgColor: { rgb: "1D1D1F" } }, // Nero Apple
+        // Titolo Principale (Nero)
+        mainTitle: {
+            font: { name: "Arial", bold: true, sz: 18, color: { rgb: "FFFFFF" } },
+            fill: { fgColor: { rgb: "1D1D1F" } },
             alignment: { horizontal: "center", vertical: "center" }
         },
+        // Intestazione Giorno (Giallo/Oro)
         dayHeader: {
-            font: { bold: true, sz: 14, color: { rgb: "000000" } },
-            fill: { fgColor: { rgb: "FFD60A" } }, // Giallo evidenziatore
-            alignment: { horizontal: "left", vertical: "center" },
-            border: { bottom: { style: "medium", color: { rgb: "000000" } } }
+            font: { name: "Arial", bold: true, sz: 14, color: { rgb: "000000" } },
+            fill: { fgColor: { rgb: "FFD60A" } }, 
+            alignment: { horizontal: "left", vertical: "center", indent: 1 },
+            border: { top: { style: "medium" }, bottom: { style: "medium" } }
         },
+        // Intestazione Colonne (Blu)
         colHeader: {
-            font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
-            fill: { fgColor: { rgb: "0071E3" } }, // Blu Apple
+            font: { name: "Arial", bold: true, sz: 11, color: { rgb: "FFFFFF" } },
+            fill: { fgColor: { rgb: "0071E3" } },
             alignment: { horizontal: "center", vertical: "center" },
             border: { right: { style: "thin", color: { rgb: "FFFFFF" } } }
         },
-        cellNormal: {
-            font: { sz: 11 },
-            alignment: { wrapText: true, vertical: "top" },
-            border: { bottom: { style: "thin", color: { rgb: "E5E5EA" } } }
+        // Cella Normale (Bianca)
+        cellWhite: {
+            font: fontBase,
+            alignment: { wrapText: true, vertical: "top", horizontal: "left" },
+            border: { bottom: borderStyle, right: borderStyle, left: borderStyle }
         },
-        cellCenter: {
-            font: { sz: 11 },
-            alignment: { horizontal: "center", vertical: "top", wrapText: true },
-            border: { bottom: { style: "thin", color: { rgb: "E5E5EA" } } }
+        // Cella Alternata (Grigio Chiaro - Zebra)
+        cellGray: {
+            font: fontBase,
+            fill: { fgColor: { rgb: "F2F2F7" } },
+            alignment: { wrapText: true, vertical: "top", horizontal: "left" },
+            border: { bottom: borderStyle, right: borderStyle, left: borderStyle }
+        },
+        // Cella Centrata (per numeri)
+        cellCenterWhite: {
+            font: { ...fontBase, bold: true },
+            alignment: { wrapText: true, vertical: "top", horizontal: "center" },
+            border: { bottom: borderStyle, right: borderStyle, left: borderStyle }
+        },
+        cellCenterGray: {
+            font: { ...fontBase, bold: true },
+            fill: { fgColor: { rgb: "F2F2F7" } },
+            alignment: { wrapText: true, vertical: "top", horizontal: "center" },
+            border: { bottom: borderStyle, right: borderStyle, left: borderStyle }
         }
     };
 
-    // 2. PREPARAZIONE DATI
-    // Creiamo un array di righe per Excel
+    // --- 2. PREPARAZIONE DATI ---
     let wsData = [];
-
+    
     // Titolo Scheda
-    wsData.push([{ v: workoutName.toUpperCase(), s: styles.title }]);
-    wsData.push([]); // Riga vuota
+    wsData.push([{ v: workoutName.toUpperCase(), s: styles.mainTitle }]);
+    wsData.push([]); // Spazio
 
-    // Ordiniamo le chiavi (Giorni o Settimane)
+    // Ordiniamo le chiavi
     const sortedKeys = Object.keys(workoutData).sort((a, b) => {
-        // Logica sort mista (numeri per BB, stringhe w1_d1 per PL)
         return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
     });
 
@@ -2991,112 +3014,134 @@ function exportWorkoutToExcel() {
         const exercises = workoutData[key];
         if (!exercises || exercises.length === 0) return;
 
-        // -- INTESTAZIONE GIORNO --
+        // Header Giorno
         let dayTitle = "";
         if (key.includes('w')) {
-            // Formato PL: w1_d1 -> Week 1 - Day 1
             const parts = key.split('_');
-            dayTitle = `WEEK ${parts[0].replace('w', '')} • DAY ${parts[1].replace('d', '')}`;
+            const w = parts[0].replace('w', '');
+            const d = parts[1].replace('d', '');
+            dayTitle = `SETTIMANA ${w}  •  GIORNO ${d}`;
         } else {
-            // Formato BB: 1 -> Giorno 1
             dayTitle = `GIORNO ${key}`;
         }
 
-        wsData.push([{ v: dayTitle, s: styles.dayHeader }, null, null, null, null]); // Occupa 5 colonne
+        // Riga Titolo Giorno (Occupa 5 colonne)
+        wsData.push([{ v: dayTitle, s: styles.dayHeader }, null, null, null, null]);
 
-        // -- INTESTAZIONE COLONNE --
-        const headers = ["ESERCIZIO", "SETS", "REPS", "CARICO / INTENSITÀ", "NOTE / RECUPERO"];
-        const headerRow = headers.map(h => ({ v: h, s: styles.colHeader }));
-        wsData.push(headerRow);
+        // Riga Intestazioni Colonne
+        const headers = ["ESERCIZIO", "SETS", "REPS", "INTENSITÀ / CARICO", "NOTE & RECUPERO"];
+        wsData.push(headers.map(h => ({ v: h, s: styles.colHeader })));
 
-        // -- RIGHE ESERCIZI --
-        exercises.forEach(ex => {
-            let name = ex.name;
-            if (ex.variant) name += ` (${ex.variant})`;
+        // Righe Esercizi
+        exercises.forEach((ex, index) => {
+            // Zebra Striping: Righe pari grigie, dispari bianche
+            const isGray = index % 2 !== 0;
+            const styleText = isGray ? styles.cellGray : styles.cellWhite;
+            const styleCenter = isGray ? styles.cellCenterGray : styles.cellCenterWhite;
 
+            // 1. Nome Esercizio
+            let name = ex.name || "Esercizio";
+            if (ex.variant && ex.variant !== "Standard") name += `\n(${ex.variant})`;
+            if (ex.variantValue) name += ` [${ex.variantValue}]`;
+
+            // 2. Logica Sets/Reps/Carico
             let setsStr = "";
             let repsStr = "";
             let loadStr = "";
-            let notesStr = ex.notes || "";
-            if (ex.rest) notesStr += `\nRec: ${ex.rest}`;
 
-            // LOGICA FORMATTAZIONE (BB vs PL)
             if (ex.isFundamental) {
-                // PL MODE: Struttura complessa
-                ex.sets.forEach(s => {
-                    const roleIcon = s.role === 'top' ? '👑' : (s.role === 'backoff' ? '📉' : '•');
+                // --- POWERLIFTING MODE ---
+                if (ex.sets && Array.isArray(ex.sets)) {
+                    ex.sets.forEach(s => {
+                        // Icona Ruolo
+                        let roleIcon = "•";
+                        if (s.role === 'top') roleIcon = "👑";
+                        else if (s.role === 'backoff') roleIcon = "📉";
+                        else if (s.role === 'warmup') roleIcon = "🔥";
 
-                    // Formattazione Sets
-                    setsStr += `${roleIcon} ${s.numSets || 1}\n`;
+                        // Sets
+                        setsStr += `${roleIcon}  ${s.numSets || 1}\n`;
 
-                    // Formattazione Reps
-                    repsStr += `${s.reps}\n`;
+                        // Reps
+                        repsStr += `${s.reps}\n`;
 
-                    // Formattazione Carico (Smart)
-                    let loadLine = "";
-                    if (s.mode === 'PERC') loadLine = `${s.val}%`;
-                    else if (s.mode === 'KG') loadLine = `${s.val}Kg`;
-                    else if (s.mode === 'RPE') loadLine = `@RPE ${s.targetVal || ''}`;
-                    else if (s.mode === 'MAV') loadLine = `MAV`;
-                    else loadLine = s.val || "-";
+                        // Carico Smart
+                        let valDisplay = s.val || "-";
+                        if (s.mode === 'PERC') valDisplay = `${s.val}%`;
+                        else if (s.mode === 'KG') valDisplay = `${s.val}Kg`;
+                        else if (s.mode === 'RPE') valDisplay = `@${s.val}`; // Esempio: @8
+                        else if (s.mode === 'RIR') valDisplay = `RIR ${s.val}`;
+                        else if (s.mode === 'MAV') valDisplay = `MAV`;
 
-                    loadStr += `${loadLine}\n`;
-                });
+                        loadStr += `${valDisplay}\n`;
+                    });
+                }
             } else {
-                // BB MODE o COMPLEMENTARE PL
+                // --- BODYBUILDING / ACCESSORY ---
                 if (ex.technique === 'Top set + back-off') {
                     setsStr = "TOP\nBACK";
                     repsStr = `${ex.topReps || '-'}\n${ex.backReps || '-'}`;
                     loadStr = `${ex.topInt || '-'}\n${ex.backSets || '?'} set`;
                 } else {
-                    setsStr = ex.val1 || ex.sets || "-"; // val1 nel vecchio sistema BB è i Sets
+                    setsStr = ex.val1 || ex.sets || "-"; 
                     repsStr = ex.val2 || ex.reps || "-";
-                    loadStr = `${ex.metricType || ''} ${ex.intensityVal || ''}`;
+                    
+                    // Se c'è un target specifico (es. RPE 9)
+                    let metric = ex.metricType || "";
+                    let val = ex.intensityVal || "";
+                    loadStr = (metric && val) ? `${metric} ${val}` : "-";
                 }
             }
 
-            // Crea la riga Excel
-            const row = [
-                { v: name, s: styles.cellNormal },
-                { v: setsStr.trim(), s: styles.cellCenter },
-                { v: repsStr.trim(), s: styles.cellCenter },
-                { v: loadStr.trim(), s: styles.cellCenter },
-                { v: notesStr.trim(), s: styles.cellNormal }
-            ];
-            wsData.push(row);
+            // 3. Note e Recupero
+            let notesStr = ex.notes || "";
+            if (ex.rest) {
+                // Aggiunge il recupero in cima alle note se presente
+                notesStr = `Rec: ${ex.rest}\n` + notesStr;
+            }
+
+            // Push Riga
+            wsData.push([
+                { v: name.trim(), s: styleText },
+                { v: setsStr.trim(), s: styleCenter },
+                { v: repsStr.trim(), s: styleCenter },
+                { v: loadStr.trim(), s: styleCenter },
+                { v: notesStr.trim(), s: styleText }
+            ]);
         });
 
-        wsData.push([]); // Riga vuota tra i giorni
+        // Riga vuota separatrice tra giorni
+        wsData.push([]); 
     });
 
-    // 3. CREAZIONE FOGLIO
+    // --- 3. CREAZIONE FOGLIO ---
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-    // Merge Celle (Titolo e Header Giorni sparsi su 5 colonne)
+    // Gestione Merge (Titolo e Intestazioni Giorni)
     ws['!merges'] = [];
-    let currentRow = 0;
-    wsData.forEach((row, idx) => {
-        if (row[0] && row[0].s === styles.title) {
-            ws['!merges'].push({ s: { r: idx, c: 0 }, e: { r: idx, c: 4 } });
+    wsData.forEach((row, rIdx) => {
+        if (row[0] && row[0].s === styles.mainTitle) {
+            ws['!merges'].push({ s: { r: rIdx, c: 0 }, e: { r: rIdx, c: 4 } }); // Merge Titolo
         }
         if (row[0] && row[0].s === styles.dayHeader) {
-            ws['!merges'].push({ s: { r: idx, c: 0 }, e: { r: idx, c: 4 } });
+            ws['!merges'].push({ s: { r: rIdx, c: 0 }, e: { r: rIdx, c: 4 } }); // Merge Giorno
         }
     });
 
-    // Larghezza Colonne
+    // Larghezza Colonne Ottimizzata
     ws['!cols'] = [
-        { wch: 35 }, // Esercizio
-        { wch: 8 },  // Sets
+        { wch: 30 }, // Esercizio
+        { wch: 8 },  // Sets (stretto)
         { wch: 10 }, // Reps
-        { wch: 20 }, // Carico
-        { wch: 30 }  // Note
+        { wch: 18 }, // Carico
+        { wch: 35 }  // Note (largo)
     ];
 
+    // Aggiungi foglio
     XLSX.utils.book_append_sheet(wb, ws, "Scheda Allenamento");
 
-    // 4. DOWNLOAD
-    const fileName = `${workoutName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.xlsx`;
-    XLSX.writeFile(wb, fileName);
+    // --- 4. DOWNLOAD ---
+    const cleanName = workoutName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    XLSX.writeFile(wb, `${cleanName}_export.xlsx`);
 }
