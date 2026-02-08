@@ -2073,6 +2073,41 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
     row.style.padding = '0';
     row.style.overflow = 'visible';
 
+    // --- 0. FUNZIONE LOCALE PER AGGIORNAMENTO LIVE INOL ---
+    const updateLocalInol = () => {
+        // Cerca il contenitore dove c'è già il badge 1RM
+        const badgeContainer = row.querySelector('.max-badge-display');
+        if(!badgeContainer) return;
+
+        // Rimuove badge vecchio se esiste
+        const oldInol = badgeContainer.querySelector('.inol-live-badge');
+        if(oldInol) oldInol.remove();
+
+        // Calcola usando le funzioni globali (che devi aver incollato a fine file)
+        const score = calculateDataINOL(data.sets, data.name);
+        
+        if (score > 0) {
+            let color = "#34C759"; // Verde
+            let bg = "#E4F9E4";
+            let label = "OK";
+
+            if (score < 0.4) { 
+                color = "#86868B"; bg = "#F2F2F7"; label = "LOW"; 
+            } else if (score > 1.0 && score <= 2.0) {
+                color = "#FF9500"; bg = "#FFF5E0"; label = "HIGH";
+            } else if (score > 2.0) {
+                color = "#FF3B30"; bg = "#FFF0F0"; label = "STOP";
+            }
+
+            const badge = document.createElement('div');
+            badge.className = 'inol-live-badge';
+            badge.style.cssText = `background:${bg}; color:${color}; border:1px solid ${color}; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; margin-left:8px; display:flex; align-items:center; gap:4px;`;
+            badge.innerHTML = `<span>INOL: ${score.toFixed(2)}</span> <span style="font-size:8px; opacity:0.7">${label}</span>`;
+            
+            badgeContainer.appendChild(badge);
+        }
+    };
+
     // --- 1. DATA SETUP ---
     data.isFundamental = true;
 
@@ -2225,6 +2260,7 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
         data.name = name;
         updateMaxBadge();
         renderSets();
+        updateLocalInol(); // Aggiorna anche l'INOL quando cambi esercizio (massimale cambia)
     };
 
     // Dropdown Esercizio
@@ -2237,13 +2273,21 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
     }
     selectContainer.appendChild(exDropdown);
 
-    // BADGE 1RM (Logica corretta: se currentMaxes è vuoto, ritorna 0 e nasconde)
+    // BADGE 1RM
     const updateMaxBadge = () => {
         const badgeArea = leftCol.querySelector('.max-badge-display');
         const max = getReferenceMax(data.name);
-        // MOSTRA SOLO SE IL MASSIMALE ESISTE ED È > 0
+        
+        // Rimuove SOLO il badge 1RM se esiste, ma lascia il container e l'INOL
+        // Per semplicità rigeneriamo la stringa ma preserviamo l'INOL se c'è
+        // Oppure: usiamo un div specifico. Qui faccio un check semplice.
+        
+        // Pulizia selettiva (rimuoviamo solo il div con testo 1RM se non usiamo classi specifiche, 
+        // ma dato che il container è flex, possiamo fare prepend)
+        
+        // Approccio sicuro: svuota e rimetti (l'INOL verrà rimesso da updateLocalInol subito dopo)
         badgeArea.innerHTML = max > 0
-            ? `<div style="background:#FFF8E1; color:#F57F17; font-size:11px; font-weight:700; padding:6px 12px; border-radius:6px; border:1px solid #FFD54F; white-space:nowrap;">1RM: ${max}kg</div>`
+            ? `<div style="background:#FFF8E1; color:#F57F17; font-size:11px; font-weight:700; padding:6px 12px; border-radius:6px; border:1px solid #FFD54F; white-space:nowrap; margin-right:5px;">1RM: ${max}kg</div>`
             : ``;
     };
     updateMaxBadge();
@@ -2291,7 +2335,7 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
     const setsCont = leftCol.querySelector('.sets-container');
     const renderSets = () => {
         setsCont.innerHTML = '';
-        const max = getReferenceMax(data.name); // Qui prende il massimale del cliente se selezionato
+        const max = getReferenceMax(data.name);
 
         data.sets.forEach((set, sIdx) => {
             const div = document.createElement('div');
@@ -2302,7 +2346,6 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
             let isMav = (set.mode === 'MAV');
             let isSetDisabled = isMav;
 
-            // CALCOLO HINT KG: Solo se abbiamo un massimale > 0 (quindi cliente selezionato)
             if (max > 0 && set.val) {
                 if (set.mode === 'PERC') {
                     const kg = Math.round((max * parseFloat(set.val)) / 100);
@@ -2349,37 +2392,52 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
             const selRole = div.querySelector('.sel-role');
             const delBtn = div.querySelector('.btn-del-set');
 
+            // --- AGGIUNTO updateLocalInol() A TUTTI GLI EVENTI ---
             inpSets.oninput = (e) => {
-                // Se cancello tutto, metto 0, altrimenti il numero
                 const val = e.target.value;
                 set.numSets = val === '' ? 0 : (parseInt(val) || 0);
-                updateLiveStatsPL(); // <--- QUESTO AGGIORNA IL GRAFICO MENTRE SCRIVI
+                updateLiveStatsPL(); 
+                updateLocalInol(); // <--- UPDATE LIVE
             };
-            inpReps.oninput = (e) => set.reps = e.target.value;
+            inpReps.oninput = (e) => {
+                set.reps = e.target.value;
+                updateLocalInol(); // <--- UPDATE LIVE
+            };
             inpVal.oninput = (e) => {
                 set.val = e.target.value;
-                if (max > 0 && set.mode !== 'MAV' && set.mode !== 'RPE') renderSets(); // Ricalcola hint live
+                if (max > 0 && set.mode !== 'MAV' && set.mode !== 'RPE') {
+                    renderSets(); 
+                } else {
+                    updateLocalInol(); // <--- Se non re-renderizza tutto, aggiorna solo l'INOL
+                }
             };
             selMode.onchange = (e) => {
                 set.mode = e.target.value;
                 set.val = '';
                 if (set.mode === 'MAV') set.numSets = 1;
                 renderSets();
+                // updateLocalInol chiamato da renderSets()
             };
             selRole.onchange = (e) => {
                 set.role = e.target.value;
                 selRole.style.borderColor = getRoleColor(set.role);
                 selRole.style.color = getRoleColor(set.role);
+                updateLocalInol(); // <--- UPDATE LIVE (i warmup non contano)
             };
             delBtn.onclick = () => {
                 data.sets.splice(sIdx, 1);
                 renderSets();
-                updateLiveStatsPL(); // <--- Aggiorna grafico dopo eliminazione
+                updateLiveStatsPL();
             };
+            
             div.addEventListener('focusin', () => div.style.borderColor = '#0071E3');
             div.addEventListener('focusout', () => div.style.borderColor = '#E5E5EA');
             setsCont.appendChild(div);
         });
+        
+        // Aggiorna l'INOL ogni volta che la griglia dei set viene ridisegnata
+        updateLocalInol();
+        
         if (window.PhosphorIcons) window.PhosphorIcons.replace();
     };
 
@@ -2403,7 +2461,7 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
         updateLiveStatsPL();
     };
 
-    // --- GENERAZIONE AUTOMATICA FIXATA (ORDINAMENTO) ---
+    // --- GENERAZIONE AUTOMATICA FIXATA ---
     function handleGenerateProgression() {
         if (!confirm(`Generare settimane future per "${data.name}"?`)) return;
 
@@ -2415,17 +2473,12 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
             const targetKey = `w${w}_${dayPart}`;
             if (!workoutData[targetKey]) workoutData[targetKey] = [];
 
-            // 1. RIMUOVI VECCHIA VERSIONE DELLO STESSO ESERCIZIO (Se esisteva)
-            // Nota: Se ci sono due "Squat" diversi nello stesso giorno, questo li rimuove entrambi.
-            // Per il PL solitamente va bene, altrimenti servirebbe un ID unico persistente.
             workoutData[targetKey] = workoutData[targetKey].filter(e => !(e.isFundamental && e.name === data.name));
 
-            // 2. CREA CLONE
             const targetEx = JSON.parse(JSON.stringify(data));
-            targetEx.id = Date.now() + Math.random(); // Nuovo ID
+            targetEx.id = Date.now() + Math.random(); 
             const weeksDelta = w - currentWeekNum;
 
-            // 3. APPLICA CALCOLI PROGRESSIONE
             targetEx.sets.forEach((tSet) => {
                 let config = data.progression.all;
                 if (strat === 'role_based') {
@@ -2456,12 +2509,6 @@ function createFundamentalRowHTML(container, data, index, dayKey) {
                 }
             });
 
-            // 4. INSERIMENTO NELLA POSIZIONE CORRETTA (FIX!)
-            // Usiamo l'indice originale ('index') passato alla funzione principale.
-            // Se l'array target è più corto dell'indice, splice lo aggiunge in fondo (corretto).
-            // Se l'indice esiste, lo inserisce LÌ e sposta gli altri sotto.
-
-            // Caso speciale: se la week target è vuota o l'indice è troppo alto
             if (index >= workoutData[targetKey].length) {
                 workoutData[targetKey].push(targetEx);
             } else {
@@ -2746,6 +2793,7 @@ function updateLiveStatsPL() {
             statsList.innerHTML = '<div style="text-align:center; color:#ccc; font-size:12px; padding:20px;">Nessun dato</div>';
         }
     }
+    
 }
 //ancora pl fino a quiì
 
@@ -3144,4 +3192,82 @@ function exportWorkoutToExcel() {
     // --- 4. DOWNLOAD ---
     const cleanName = workoutName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
     XLSX.writeFile(wb, `${cleanName}_export.xlsx`);
+}
+
+// ==========================================
+// === MODULO INOL (CALCOLATORE CARICO) ===
+// ==========================================
+
+// 1. TABELLA CONVERSIONE RPE -> %1RM ESTIMATA
+// (Basata su Reactive Training Systems / Tuchscherer)
+const RPE_MAP = {
+    1:  {10: 100, 9.5: 97.8, 9: 95.5, 8.5: 93.9, 8: 92.2, 7.5: 90.7, 7: 89.2, 6: 86.3},
+    2:  {10: 95.5, 9.5: 93.9, 9: 92.2, 8.5: 90.7, 8: 89.2, 7.5: 87.8, 7: 86.3, 6: 83.7},
+    3:  {10: 92.2, 9.5: 90.7, 9: 89.2, 8.5: 87.8, 8: 86.3, 7.5: 85.0, 7: 83.7, 6: 81.1},
+    4:  {10: 89.2, 9.5: 87.8, 9: 86.3, 8.5: 85.0, 8: 83.7, 7.5: 82.4, 7: 81.1, 6: 78.6},
+    5:  {10: 86.3, 9.5: 85.0, 9: 83.7, 8.5: 82.4, 8: 81.1, 7.5: 79.9, 7: 78.6, 6: 76.2},
+    6:  {10: 83.7, 9.5: 82.4, 9: 81.1, 8.5: 79.9, 8: 78.6, 7.5: 77.4, 7: 76.2, 6: 73.8},
+    7:  {10: 81.1, 9.5: 79.9, 9: 78.6, 8.5: 77.4, 8: 76.2, 7.5: 75.1, 7: 73.8, 6: 71.3},
+    8:  {10: 78.6, 9.5: 77.4, 9: 76.2, 8.5: 75.1, 8: 73.8, 7.5: 72.3, 7: 71.3, 6: 68.9},
+    9:  {10: 76.2, 9.5: 75.1, 9: 73.8, 8.5: 72.3, 8: 71.3, 7.5: 69.9, 7: 68.9, 6: 66.5},
+    10: {10: 73.8, 9.5: 72.3, 9: 71.3, 8.5: 69.9, 8: 68.9, 7.5: 67.5, 7: 66.5, 6: 64.1},
+    12: {10: 69.0, 9: 67.0, 8: 65.0, 7: 63.0} // Semplificato per alte reps
+};
+
+
+function getIntensityPercentage(reps, mode, val, max1rm) {
+    let intensity = 0;
+    const r = parseFloat(reps) || 1;
+    const v = parseFloat(val) || 0;
+
+    if (mode === 'PERC') {
+        intensity = v;
+    } 
+    else if (mode === 'KG') {
+        if (max1rm > 0) intensity = (v / max1rm) * 100;
+        else return 0; // Senza massimale non calcoliamo
+    } 
+    else if (mode === 'RPE') {
+        // Tabella o Stima Lineare se rep range non mappato
+        if (RPE_MAP[r] && RPE_MAP[r][v]) intensity = RPE_MAP[r][v];
+        else intensity = (100 - (r * 2.5)) - ((10 - v) * 2.5);
+    } 
+    else if (mode === 'RIR') {
+        const rpeEq = 10 - v;
+        if (RPE_MAP[r] && RPE_MAP[r][rpeEq]) intensity = RPE_MAP[r][rpeEq];
+        else intensity = (100 - (r * 2.5)) - ((10 - rpeEq) * 2.5);
+    } 
+    else if (mode === 'MAV') {
+        // RICHIESTA SPECIFICA: MAV = 85%
+        intensity = 85; 
+    }
+
+    return intensity;
+}
+
+function calculateDataINOL(dataSets, exerciseName) {
+    let totalInol = 0;
+    const max = getReferenceMax(exerciseName); // Usa la funzione globale che hai già
+
+    dataSets.forEach(s => {
+        // Ignora Warmup
+        if (s.role === 'warmup') return;
+        
+        const reps = parseFloat(s.reps) || 0;
+        if (reps === 0) return;
+
+        // Se MAV, forza 1 set per il calcolo se numSets è vuoto/auto
+        const sets = (s.mode === 'MAV') ? 1 : (parseInt(s.numSets) || 0);
+
+        const intensity = getIntensityPercentage(reps, s.mode, s.val, max);
+
+        // Formula: Reps / (100 - Intensity)
+        // Applicata per ogni set
+        if (intensity > 0 && intensity < 100) {
+            const singleSetInol = reps / (100 - intensity);
+            totalInol += (singleSetInol * sets);
+        }
+    });
+
+    return totalInol;
 }
