@@ -1007,7 +1007,7 @@ function createExerciseSmartDropdown(initialValue, onSelect, showOnlyMaxes = fal
         });
 
         // "Usa come nuovo" solo se NON siamo in modalità massimali stretta
-        if (!hasResults && filter && !showOnlyMaxes) {
+        if (filter && !showOnlyMaxes) {
             const newItem = document.createElement('div');
             newItem.className = 'ex-option-item';
             newItem.innerHTML = `Usa "<b>${filter}</b>" come nuovo`;
