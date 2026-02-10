@@ -538,27 +538,45 @@ async function loadWorkoutToEdit(id, isCopy = false) {
             return;
         }
 
-        const data = snap.data();
+       const data = snap.data();
 
         // 1. Popola variabili stato base
         workoutData = data.data || {};
         totalDays = data.days || 3;
 
-        // UI Base
+        // UI Base: Nome e Giorni
         workoutNameEl.textContent = isCopy ? `${data.name} (Copia)` : data.name;
         inputNumDays.value = totalDays;
 
-        // 2. CONTROLLO MODALITÀ (BB vs PL)
-        // Leggiamo il flag salvato. Se è undefined, assumiamo falso (vecchie schede BB)
-        isPowerliftingMode = !!data.isPlMode;
+        // ============================================================
+        // 2. RILEVAMENTO INTELLIGENTE MODALITÀ (LA LOGICA DETECTIVE)
+        // ============================================================
+        
+        // Controlliamo se dentro i dati c'è almeno una chiave che inizia per "w" e contiene "_d" (es. w1_d1)
+        const dataKeys = Object.keys(workoutData);
+        const looksLikePL = dataKeys.some(key => key.startsWith('w') && key.includes('_d'));
 
-        // Aggiorniamo lo Switch UI (senza triggerare l'evento 'change' che cancellerebbe i dati)
+        if (looksLikePL) {
+            // Se i dati sembrano PL, FORZIAMO la modalità PL
+            isPowerliftingMode = true;
+            console.log("Dati rilevati come Powerlifting (struttura w_d).");
+        } else {
+            // Altrimenti ci fidiamo del vecchio flag o andiamo in BB
+            isPowerliftingMode = !!data.isPlMode;
+        }
+
+        // Impostiamo VISIVAMENTE lo switch senza scatenare l'evento di cancellazione
         if (modeToggle) {
             modeToggle.checked = isPowerliftingMode;
         }
+        
+        // ============================================================
+        // FINE MODIFICA
+        // ============================================================
 
-        // Gestione Visibilità UI
+        // Gestione Visibilità UI (Il resto del codice rimane uguale...)
         const bbControls = document.getElementById('bb-controls');
+        // ... continua col codice originale ...
         const daysContainer = document.getElementById('days-tabs-container');
         const plNav = document.getElementById('pl-navigation');
         const plTools = document.getElementById('pl-tools');

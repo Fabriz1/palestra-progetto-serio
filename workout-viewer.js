@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, doc, getDoc, addDoc, collection } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, doc, getDoc, addDoc, collection, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { 
      
     query, where, orderBy, limit, getDocs // <--- AGGIUNTI QUESTI
@@ -223,6 +223,7 @@ async function loadData() {
         
         // Ripristina input se c'erano
         restoreSession(); 
+        initHistoryFeature();
 
     } catch (e) { console.error("Errore critico loadData:", e); }
 }
@@ -576,101 +577,99 @@ function initSlideToFinish() {
 // =========================================
 // SALVATAGGIO ROBUSTO (BB + PL)
 // =========================================
+
 async function saveWorkout() {
-    // Feedback visivo immediato sullo slider
-    if(slideText) slideText.textContent = "SALVATAGGIO...";
+    if(typeof slideText !== 'undefined') slideText.textContent = "SALVATAGGIO...";
 
     const sessionLog = {
         workoutId: currentWorkoutId,
         workoutName: workoutData.name,
-        dayIndex: currentDay, // Mantiene l'ID originale (es. "1" o "w1_d1")
+        dayIndex: currentDay, // Chiave univoca del giorno (es. w1_d1)
         date: new Date().toISOString(),
         exercises: []
     };
 
-    // Recupera la struttura originale per i muscoli
-    // Gestione chiave complessa (w1_d1) o semplice (1)
     let originalExercises = [];
-    if (workoutData.data[currentDay]) {
+    if (workoutData.data && workoutData.data[currentDay]) {
         originalExercises = workoutData.data[currentDay];
-    } else {
-        // Fallback se ci sono problemi di indici
-        originalExercises = window.currentExercisesList || [];
+    } else if (window.currentExercisesList) {
+        originalExercises = window.currentExercisesList;
     }
 
+    // --- RACCOLTA DATI (Identica a prima) ---
     document.querySelectorAll('.ex-card').forEach(card => {
         const idx = card.dataset.idx;
         const originalEx = originalExercises[idx];
-        const name = card.querySelector('h3').textContent;
+        const name = card.querySelector('h3').textContent.trim();
         const sets = [];
-
-        // SELEZIONE RIGHE: Cerca sia le vecchie (.set-row) che le nuove (.pl-set-row)
         const rows = card.querySelectorAll('.set-row, .pl-set-row');
 
         rows.forEach(row => {
-            // 1. Recupera KG
             const kgInput = row.querySelector('.input-kg');
-            const kg = kgInput ? parseFloat(kgInput.value) : 0;
-
-            // 2. Recupera Check (Fatto/Non fatto)
+            const kg = kgInput && kgInput.value !== "" ? parseFloat(kgInput.value) : 0;
             const checkBtn = row.querySelector('.btn-check');
             const done = checkBtn ? checkBtn.classList.contains('done') : false;
+            let repsNum = parseFloat(row.dataset.reps) || 0;
+            const rpeInput = row.querySelector('.pl-rpe-input, .input-rpe');
+            let rpeVal = rpeInput && rpeInput.value !== "" ? rpeInput.value : null;
+            const role = row.dataset.role || 'normal';
+            const prescribed = row.dataset.prescribed || ''; 
 
-            // 3. Recupera REPS (Target)
-            let repsVal = row.dataset.reps;
-            let repsNum = parseFloat(repsVal);
-            // Gestione range (es. "8-10" -> salva 8)
-            if (isNaN(repsNum) && repsVal && repsVal.includes('-')) {
-                repsNum = parseFloat(repsVal.split('-')[0]);
-            }
-
-            // 4. (Opzionale) Recupera RPE se presente
-            const rpeInput = row.querySelector('.pl-rpe-input');
-            let rpeVal = rpeInput ? rpeInput.value : null;
-
-            // SALVA SOLO SE: C'è un peso inserito OPPURE è stato spuntato come fatto
             if (kg > 0 || done) {
                 const setObj = { 
-                    kg: kg, 
-                    reps: repsNum || 0, 
-                    done: done 
+                    kg: kg, reps: repsNum, done: done, role: role, prescribed: prescribed 
                 };
-                if(rpeVal) setObj.rpe = rpeVal; // Salva RPE se c'è
+                if(rpeVal) setObj.rpe = rpeVal;
                 sets.push(setObj);
             }
         });
 
-        // Aggiungi esercizio al log solo se ha dei set validi
         if (sets.length > 0) {
             sessionLog.exercises.push({
                 name: name,
                 sets: sets,
-                // Mantieni i metadati muscolari per i grafici
                 muscles: originalEx?.muscles ? originalEx.muscles : []
             });
         }
     });
+    // ----------------------------------------
 
     try {
-        // Scrive su Firestore
-        await addDoc(collection(db, "users", auth.currentUser.uid, "logs"), sessionLog);
+        const logsRef = collection(db, "users", auth.currentUser.uid, "logs");
+
+        // 1. CERCA SE ESISTE GIÀ UN LOG PER QUESTO GIORNO
+        const q = query(
+            logsRef,
+            where("workoutId", "==", currentWorkoutId),
+            where("dayIndex", "==", currentDay)
+        );
         
-        // PULIZIA
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+            // A. ESISTE GIÀ -> SOVRASCRIVI (UPDATE)
+            // Prendiamo l'ID del primo documento trovato
+            const docId = querySnapshot.docs[0].id;
+            const docRef = doc(db, "users", auth.currentUser.uid, "logs", docId);
+            
+            // setDoc sovrascrive tutto il contenuto mantenendo l'ID
+            await setDoc(docRef, sessionLog);
+            console.log("Log esistente aggiornato:", docId);
+        } else {
+            // B. NON ESISTE -> CREA NUOVO
+            await addDoc(logsRef, sessionLog);
+            console.log("Nuovo log creato");
+        }
+
         clearSessionData();
-        
-        // Redirect
         window.location.href = "dashboard-client.html";
+
     } catch (e) {
         console.error("Errore salvataggio:", e);
-        alert("Errore durante il salvataggio. Controlla la connessione.");
-        
-        // Reset Slider in caso di errore
+        alert("Errore salvataggio. Riprova.");
         const knob = document.querySelector('.slide-knob');
         if (knob) knob.style.transform = `translateX(0px)`;
-        if(slideText) {
-            slideText.textContent = "SCORRI PER FINIRE";
-            slideText.style.opacity = 1;
-        }
+        if(typeof slideText !== 'undefined') slideText.textContent = "SCORRI PER FINIRE";
     }
 }
 
@@ -759,7 +758,20 @@ function renderFundamentalCard(ex, idx) {
     if(userMax > 0) metaTags += `<span class="meta-tag rm">🎯 1RM: ${userMax}kg</span>`;
     
     // Totale Sets
-    metaTags += `<span class="meta-tag">📊 ${ex.sets.length} Serie</span>`;
+    // --- FIX CONTEGGIO SERIE ---
+    // Calcoliamo la somma reale (es. se ho una riga 3x5, conta 3, non 1)
+    let totalRealSets = 0;
+    if (ex.sets && Array.isArray(ex.sets)) {
+        totalRealSets = ex.sets.reduce((sum, group) => {
+            // Prende il numero di set del gruppo, se manca assume 1
+            const count = parseInt(group.numSets) || 1; 
+            return sum + count;
+        }, 0);
+    }
+
+    // Totale Sets
+    metaTags += `<span class="meta-tag">📊 ${totalRealSets} Serie</span>`;
+    // ---------------------------
 
     // Note Coach (Badge tecnico)
     if(ex.notes) {
@@ -867,7 +879,14 @@ function createPLSetRow(group, groupIdx, subIdx, userMax, rest) {
     const isTop = group.role === 'top';
     const rowClass = isTop ? 'top' : (group.role === 'warmup' ? 'warmup' : '');
     
-    // Calcolo Target Visivo
+    // --- NUOVA LOGICA: Costruiamo la stringa di prescrizione ---
+    let prescribedData = "";
+    if (group.mode === 'PERC') prescribedData = `${group.val}%`;
+    else if (group.mode === 'KG') prescribedData = `${group.val}Kg`;
+    else if (group.mode === 'RPE') prescribedData = `@${group.val}`;
+    else if (group.mode === 'MAV') prescribedData = `MAV`;
+    // -----------------------------------------------------------
+
     let targetText = "";
     let placeholder = "Kg";
     let prefillKg = "";
@@ -877,14 +896,13 @@ function createPLSetRow(group, groupIdx, subIdx, userMax, rest) {
             const kg = Math.round((userMax * parseFloat(group.val)) / 100 / 2.5) * 2.5;
             targetText = `<span class="target-val">${kg}kg</span> (${group.val}%)`;
             placeholder = kg;
-            // prefillKg = kg; // Decommenta se vuoi precompilare il campo
         } else {
             targetText = `${group.val}% (No 1RM)`;
         }
     } else if (group.mode === 'KG') {
         targetText = `<span class="target-val">${group.val}kg</span> (Fissi)`;
         placeholder = group.val;
-        prefillKg = group.val; // Kg fissi si precompilano spesso
+        prefillKg = group.val; 
     } else if (group.mode === 'RPE') {
         targetText = `Target: <span class="target-val">RPE ${group.val}</span>`;
         placeholder = "Kg?";
@@ -893,23 +911,17 @@ function createPLSetRow(group, groupIdx, subIdx, userMax, rest) {
         placeholder = "Kg";
     }
 
-    const repsDisplay = `${group.reps} reps`;
-
-    // Recupero valori salvati (Auto-restore)
-    // Nota: idx corrente è 'card.dataset.idx'. Qui non lo abbiamo diretto,
-    // ma la funzione autoSaveSession rilegge il DOM, quindi basta generare classi giuste.
-    // Per il restore "al volo" servirebbe passare l'idx dell'esercizio.
-    // (Per semplicità qui generiamo input puliti, il restoreSession li riempirà dopo il render)
-
+    // Aggiunto data-prescribed="${prescribedData}" nel div principale
     return `
-        <div class="pl-set-row ${rowClass}" data-rest="${rest || 90}" data-reps="${group.reps}">
+        <div class="pl-set-row ${rowClass}" 
+             data-role="${group.role || 'normal'}" 
+             data-rest="${rest || 90}" 
+             data-reps="${group.reps}"
+             data-prescribed="${prescribedData}">
             
-            <!-- 1. Indice -->
             <div class="pl-set-idx">${isTop ? '👑' : (groupIdx + 1)}</div>
 
-            <!-- 2. Info Centrale -->
             <div class="pl-set-body">
-                <!-- ... (tutto uguale a prima) ... -->
                 <div class="pl-target-line">
                     <span>${group.reps} reps</span> ${targetText ? '• ' + targetText : ''}
                 </div>
@@ -927,7 +939,6 @@ function createPLSetRow(group, groupIdx, subIdx, userMax, rest) {
                 </div>
             </div>
 
-            <!-- 3. Check -->
             <button class="pl-check-btn btn-check" onclick="toggleSet(this)">
                 <i class="ph ph-check"></i>
             </button>
@@ -1342,3 +1353,160 @@ window.toggleFocusSet = (btn, exIdx, setIdx) => {
     sessionState[exIdx].sets[setIdx].done = isDone;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionState));
 };
+
+// =========================================
+// STORICO SETTIMANA PRECEDENTE (PL LOGIC)
+// =========================================
+
+async function initHistoryFeature() {
+    // 1. Controlla se siamo in un formato PL (es. w2_d1)
+    if (!currentDay.startsWith('w') || !currentDay.includes('_d')) return;
+
+    // 2. Parsifica la stringa
+    const parts = currentDay.split('_'); // ["w2", "d1"]
+    const weekNum = parseInt(parts[0].replace('w', ''));
+    const dayPart = parts[1]; // "d1"
+
+    // Se è la settimana 1, non c'è storico
+    if (weekNum <= 1) return;
+
+    // 3. Calcola la chiave della settimana scorsa
+    const prevKey = `w${weekNum - 1}_${dayPart}`; // es. "w1_d1"
+
+    // 4. Cerca su Firebase
+    try {
+        const logsRef = collection(db, "users", auth.currentUser.uid, "logs");
+        const q = query(
+            logsRef,
+            where("workoutId", "==", currentWorkoutId),
+            where("dayIndex", "==", prevKey), // Cerca esattamente w1_d1
+            limit(1)
+        );
+
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+            const logData = snapshot.docs[0].data();
+            renderHistoryButton(logData, weekNum - 1);
+        }
+    } catch (e) {
+        console.log("Nessun storico trovato per", prevKey);
+    }
+}
+
+function renderHistoryButton(logData, prevWeekNum) {
+    // Invece dell'header, lo mettiamo nel main container, PRIMA della lista esercizi
+    const mainContainer = document.querySelector('main.exercises-stream');
+    
+    // Rimuovi se ne esiste già uno (per sicurezza)
+    const existing = document.getElementById('history-btn-bar');
+    if(existing) existing.remove();
+
+    const btn = document.createElement('div');
+    btn.id = 'history-btn-bar';
+    
+    // Stile "Barra di Notifica" cliccabile
+    btn.style.cssText = `
+        background: #F2F2F7;
+        color: #0071E3;
+        margin: 10px 15px 0 15px;
+        padding: 12px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    `;
+    
+    btn.innerHTML = `<i class="ph ph-clock-counter-clockwise" style="font-size:16px;"></i> Vedi carichi Week ${prevWeekNum}`;
+    
+    btn.onclick = () => showHistoryModal(logData);
+    
+    // Inserisci come PRIMO elemento del main (sopra la lista esercizi)
+    mainContainer.insertBefore(btn, mainContainer.firstChild);
+}
+
+function showHistoryModal(logData) {
+    let content = `<div style="padding-bottom:20px;">`;
+    
+    logData.exercises.forEach(ex => {
+        content += `
+            <div style="margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
+                <div style="font-weight:bold; color:#0071E3; font-size:14px; margin-bottom:8px;">${ex.name}</div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+        `;
+        
+        ex.sets.forEach(s => {
+            let icon = '•';
+            if(s.role === 'top') icon = '👑';
+            if(s.role === 'backoff') icon = '📉';
+            
+            // LOGICA INTELLIGENTE DI DISPLAY
+            let mainValue = "";
+            let subValue = "";
+
+            const safeKg = (isNaN(s.kg) || s.kg === null) ? 0 : parseFloat(s.kg);
+
+            if (safeKg > 0) {
+                // Utente ha inserito peso reale
+                mainValue = `<b>${safeKg}kg</b>`;
+            } else if (s.prescribed) {
+                // Utente non ha inserito peso, mostriamo la prescrizione del coach
+                mainValue = `<span style="color:#555;">${s.prescribed}</span>`;
+            } else {
+                mainValue = "Fatto";
+            }
+
+            // Se c'è RPE inserito dall'utente, lo accodiamo
+            if (s.rpe) {
+                subValue = ` @RPE${s.rpe}`;
+            }
+
+            const label = `${mainValue} x ${s.reps}${subValue}`;
+            
+            // Stile
+            const bg = s.done ? '#F2F2F7' : '#FFF0F0';
+            const color = s.done ? '#1D1D1F' : '#FF3B30';
+            
+            content += `
+                <span style="background:${bg}; padding:6px 10px; border-radius:6px; font-size:12px; color:${color}; border:1px solid #E5E5EA;">
+                    ${icon} ${label}
+                </span>
+            `;
+        });
+        
+        content += `</div></div>`;
+    });
+    content += `</div>`;
+
+    // (Il resto della funzione per creare l'overlay rimane uguale...)
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position: fixed; top:0; left:0; width:100%; height:100%;
+        background: rgba(0,0,0,0.5); z-index: 9999;
+        display: flex; align-items: flex-end; justify-content: center;
+        backdrop-filter: blur(2px);
+    `;
+    
+    overlay.innerHTML = `
+        <div style="background:white; width:100%; max-height:85vh; border-radius: 20px 20px 0 0; padding:20px; overflow-y:auto; animation: slideUp 0.3s ease-out; box-shadow: 0 -4px 20px rgba(0,0,0,0.15);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; position:sticky; top:0; background:white; z-index:10; padding-bottom:10px; border-bottom:1px solid #f0f0f0;">
+                <h3 style="margin:0; font-size:18px;">📅 Storico Week Scorsa</h3>
+                <button id="close-hist" style="background:#f0f0f0; border:none; width:30px; height:30px; border-radius:50%; font-size:18px; color:#555; display:flex; align-items:center; justify-content:center;">&times;</button>
+            </div>
+            ${content}
+            <button id="close-hist-btn" style="width:100%; padding:15px; background:#0071E3; color:white; border:none; border-radius:12px; font-weight:bold; margin-top:10px;">CHIUDI</button>
+        </div>
+        <style>@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }</style>
+    `;
+
+    document.body.appendChild(overlay);
+    
+    const close = () => overlay.remove();
+    overlay.querySelector('#close-hist').onclick = close;
+    overlay.querySelector('#close-hist-btn').onclick = close;
+    overlay.onclick = (e) => { if(e.target === overlay) close(); };
+}
