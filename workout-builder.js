@@ -3271,3 +3271,166 @@ function calculateDataINOL(dataSets, exerciseName) {
 
     return totalInol;
 }
+// ============================================================
+// === MODULO MATRIX VIEW (VISIONE GLOBALE EXCEL) ===
+// ============================================================
+
+const btnToggleMatrix = document.getElementById('btn-toggle-matrix');
+const matrixArea = document.getElementById('matrix-view-area');
+const dayContent = document.getElementById('day-content-area');
+const plNavContainer = document.getElementById('pl-navigation');
+
+let isMatrixOpen = false;
+
+if (btnToggleMatrix) {
+    btnToggleMatrix.addEventListener('click', () => {
+        isMatrixOpen = !isMatrixOpen;
+        
+        if (isMatrixOpen) {
+            // APRI MATRICE
+            btnToggleMatrix.innerHTML = `<i class="ph ph-pencil-simple"></i> Torna all'Editor`;
+            btnToggleMatrix.style.background = "#0071E3";
+            btnToggleMatrix.style.color = "white";
+            
+            dayContent.classList.add('hidden');
+            plNavContainer.classList.add('hidden');
+            matrixArea.classList.remove('hidden');
+            
+            renderMatrixView();
+        } else {
+            // CHIUDI MATRICE E TORNA ALL'EDITOR
+            btnToggleMatrix.innerHTML = `<i class="ph ph-table"></i> Visione Globale`;
+            btnToggleMatrix.style.background = "transparent";
+            btnToggleMatrix.style.color = "#0071E3";
+            
+            matrixArea.classList.add('hidden');
+            plNavContainer.classList.remove('hidden');
+            dayContent.classList.remove('hidden');
+            
+            renderPlNav();
+            renderPlDay();
+        }
+    });
+}
+
+function renderMatrixView() {
+    if (!matrixArea) return;
+    matrixArea.innerHTML = '';
+
+    // 1. Definisci il layout CSS Grid (Colonna Esercizio + 1 Colonna per ogni Settimana)
+    const grid = document.createElement('div');
+    grid.className = 'matrix-grid';
+    grid.style.gridTemplateColumns = `160px repeat(${plWeeks}, minmax(140px, 1fr))`;
+    
+    // 2. Crea riga intestazioni (Header Settimane)
+    let headerHtml = `<div class="matrix-header-cell" style="border-radius: 12px 0 0 0;">Esercizio</div>`;
+    for (let w = 1; w <= plWeeks; w++) {
+        headerHtml += `<div class="matrix-header-cell">Week ${w}</div>`;
+    }
+    grid.innerHTML += `<div class="matrix-header-row">${headerHtml}</div>`;
+
+    // 3. Itera sui Giorni
+    for (let d = 1; d <= plDaysPerWeek; d++) {
+        
+        // Aggiungi divisore Giorno (es. --- GIORNO 1 ---)
+        grid.innerHTML += `<div class="matrix-day-divider">DAY ${d}</div>`;
+
+        // Dobbiamo capire quanti esercizi ci sono come MASSIMO in questo giorno su tutte le settimane
+        let maxExercises = 0;
+        for (let w = 1; w <= plWeeks; w++) {
+            const arr = workoutData[`w${w}_d${d}`] || [];
+            if (arr.length > maxExercises) maxExercises = arr.length;
+        }
+
+        // Se il giorno è completamente vuoto, salta
+        if (maxExercises === 0) {
+            grid.innerHTML += `<div class="matrix-cell matrix-cell-empty" style="grid-column: 1 / -1;">Nessun allenamento impostato</div>`;
+            continue;
+        }
+
+        // 4. Itera riga per riga (per ogni esercizio)
+        for (let exIndex = 0; exIndex < maxExercises; exIndex++) {
+            
+            // Trova il nome dell'esercizio basandosi sulla Week 1 (o la prima disponibile)
+            let exNameDisplay = "Esercizio...";
+            for (let w = 1; w <= plWeeks; w++) {
+                const ex = (workoutData[`w${w}_d${d}`] || [])[exIndex];
+                if (ex && ex.name) {
+                    exNameDisplay = ex.name;
+                    if(ex.variant && ex.variant !== 'Standard') exNameDisplay += `<br><span style="font-size:9px; color:#888; font-weight:normal;">(${ex.variant})</span>`;
+                    break; // Trovato il nome, esci dal loop
+                }
+            }
+
+            // Crea le celle della riga
+            let rowHtml = `<div class="matrix-cell ex-name-cell">${exNameDisplay}</div>`;
+            
+            for (let w = 1; w <= plWeeks; w++) {
+                const ex = (workoutData[`w${w}_d${d}`] || [])[exIndex];
+                const cellContent = formatMatrixCellData(ex);
+                
+                // Se la cella ha dati, aggiungi data-week e data-day per renderla interattiva
+                const interactionAttrs = ex ? `data-w="${w}" data-d="${d}" onclick="jumpToEditor(this)"` : '';
+                
+                rowHtml += `<div class="matrix-cell ${ex ? 'data-cell' : ''}" ${interactionAttrs}>${cellContent}</div>`;
+            }
+            grid.innerHTML += `<div class="matrix-exercise-row">${rowHtml}</div>`;
+        }
+    }
+
+    matrixArea.appendChild(grid);
+}
+
+// Funzione Helper per compattare i dati di un esercizio in testo HTML
+function formatMatrixCellData(ex) {
+    if (!ex) return `<span class="matrix-cell-empty">-</span>`;
+
+    let html = '';
+
+    if (ex.isFundamental) {
+        // Logica compatta per i Fondamentali PL
+        if (!ex.sets || ex.sets.length === 0) return 'Dati mancanti';
+
+        ex.sets.forEach(s => {
+            let icon = '•';
+            if (s.role === 'top') icon = '👑';
+            if (s.role === 'backoff') icon = '📉';
+            
+            let load = s.val || '-';
+            if (s.mode === 'PERC') load += '%';
+            else if (s.mode === 'KG') load += 'kg';
+            else if (s.mode === 'RPE') load = `@${load}`;
+            else if (s.mode === 'MAV') load = `MAV`;
+
+            html += `<div style="margin-bottom:3px; white-space:nowrap;">${icon} ${s.numSets}x${s.reps} <b style="color:#0071E3;">${load}</b></div>`;
+        });
+    } else {
+        // Logica per i Complementari BB
+        if (ex.technique === 'Top set + back-off') {
+            html += `Top: ${ex.topReps} @${ex.topInt || '-'}<br>`;
+            html += `Back: ${ex.backSets}x${ex.backReps}`;
+        } else {
+            const val1 = ex.val1 || '-';
+            const val2 = ex.val2 || '-';
+            const metric = ex.intensityVal ? ` @${ex.intensityVal}` : '';
+            html += `<b>${val1}x${val2}</b>${metric}`;
+        }
+    }
+
+    return html;
+}
+
+// Funzione per saltare dalla Matrice all'Editor nel giorno esatto
+window.jumpToEditor = function(cellElement) {
+    const targetW = parseInt(cellElement.getAttribute('data-w'));
+    const targetD = parseInt(cellElement.getAttribute('data-d'));
+
+    if (targetW && targetD) {
+        // Imposta lo stato globale sulle settimane scelte
+        currentPlWeek = targetW;
+        currentPlDay = targetD;
+        
+        // Simula il click sul bottone per chiudere la matrice
+        if (btnToggleMatrix) btnToggleMatrix.click();
+    }
+};
